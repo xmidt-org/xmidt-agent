@@ -45,7 +45,7 @@ func Test_handleCLIShow(t *testing.T) {
 			var early earlyExit
 			handleCLIShow(tc.cli, tc.cfg, &early)
 
-			assert.Equal(tc.expectEarly, early)
+			assert.Equal(tc.expectEarly, bool(early))
 		})
 	}
 }
