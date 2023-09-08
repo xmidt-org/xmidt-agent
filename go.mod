@@ -1,0 +1,26 @@
+module github.com/xmidt-org/xmidt-agent
+
+go 1.21.0
+
+require (
+	github.com/alecthomas/kong v0.8.0
+	github.com/goschtalt/goschtalt v0.22.1
+	github.com/goschtalt/yaml-decoder v0.0.1
+	github.com/goschtalt/yaml-encoder v0.0.3
+	github.com/stretchr/testify v1.8.4
+	github.com/xmidt-org/sallust v0.2.2
+	go.uber.org/fx v1.20.0
+	go.uber.org/zap v1.25.0
+)
+
+require (
+	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/goschtalt/approx v1.0.0 // indirect
+	github.com/mitchellh/mapstructure v1.5.0 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
+	go.uber.org/dig v1.17.0 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
+	golang.org/x/sys v0.4.0 // indirect
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
+)

@@ -1,0 +1,40 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: xmidt-agent
+Upstream-Contact: Weston Schmidt <weston_scmidt@alumni.purdue.edu>
+Source: https://github.com/xmidt-org/xmidt-agent
+
+Files: .codecov.yml
+Copyright: SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
+License: Apache-2.0
+
+Files: .golangci.yml
+Copyright: SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
+License: Apache-2.0
+
+Files: go.mod
+Copyright: SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
+License: Apache-2.0
+
+Files: go.sum
+Copyright: SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
+License: Apache-2.0
+
+Files: .gitignore
+Copyright: SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
+License: Apache-2.0
+
+Files: CONTRIBUTING.md
+Copyright: SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
+License: Apache-2.0
+
+Files: MAINTAINERS.md
+Copyright: SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
+License: Apache-2.0
+
+Files: README.md
+Copyright: SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
+License: Apache-2.0
+
+Files: .whitesource
+Copyright: SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
+License: Apache-2.0
