@@ -49,3 +49,46 @@ func Test_handleCLIShow(t *testing.T) {
 		})
 	}
 }
+
+func Test_provideCLI(t *testing.T) {
+	tests := []struct {
+		description string
+		args        cliArgs
+		earlyExit   bool
+		dev         bool
+		want        CLI
+		expectedErr error
+	}{
+		{
+			description: "no arguments, everything works",
+		}, {
+			description: "dev mode",
+			args:        cliArgs{"-d"},
+			dev:         true,
+			want:        CLI{Dev: true},
+		}, {
+			description: "invalid argument",
+			args:        cliArgs{"-w"},
+			earlyExit:   true,
+		}, {
+			description: "invalid argument",
+			args:        cliArgs{"-d", "-w"},
+			earlyExit:   true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.description, func(t *testing.T) {
+			assert := assert.New(t)
+
+			var devMode devMode
+			var earlyExit earlyExit
+			got, err := provideCLI(tc.args, &devMode, &earlyExit)
+
+			assert.ErrorIs(err, tc.expectedErr)
+			want := tc.want
+			assert.Equal(&want, got)
+			assert.Equal(tc.earlyExit, bool(earlyExit))
+			assert.Equal(tc.dev, bool(devMode))
+		})
+	}
+}

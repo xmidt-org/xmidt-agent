@@ -55,6 +55,7 @@ func xmidtAgent(args []string) error {
 	)
 
 	app := fx.New(
+		fx.Supply(cliArgs(args)),
 		fx.Supply(&early),
 		fx.Supply(&dev),
 
@@ -63,30 +64,7 @@ func xmidtAgent(args []string) error {
 		}),
 
 		fx.Provide(
-			// Handle the CLI processing and return the processed input.
-			func(dev *devMode) (*CLI, error) {
-				var cli CLI
-				parser, err := kong.New(&cli,
-					kong.Name(applicationName),
-					kong.Description("The Xmidt agent.\n"+
-						fmt.Sprintf("\tVersion:  %s\n", version)+
-						fmt.Sprintf("\tDate:     %s\n", date)+
-						fmt.Sprintf("\tCommit:   %s\n", commit)+
-						fmt.Sprintf("\tBuilt By: %s\n", builtBy),
-					),
-					kong.UsageOnError(),
-				)
-				if err != nil {
-					return nil, err
-				}
-
-				_, err = parser.Parse(args)
-				parser.FatalIfErrorf(err)
-
-				// Mark the devMode state so the collector can be output
-				*dev = devMode(cli.Dev)
-				return &cli, err
-			},
+			provideCLI,
 
 			// Collect and process the configuration files and env vars and
 			// produce a configuration object.
@@ -175,6 +153,9 @@ type earlyExit bool
 // Provides a named type so it's a bit easier to flow through & use in fx.
 type devMode bool
 
+// Provides a named type so it's a bit easier to flow through & use in fx.
+type cliArgs []string
+
 // handleCLIShow handles the -s/--show option where the configuration is shown,
 // then the program is exited.
 func handleCLIShow(cli *CLI, cfg *goschtalt.Config, early *earlyExit) {
@@ -192,4 +173,36 @@ func handleCLIShow(cli *CLI, cfg *goschtalt.Config, early *earlyExit) {
 	}
 
 	*early = earlyExit(true)
+}
+
+// Handle the CLI processing and return the processed input.
+func provideCLI(args cliArgs, dev *devMode, early *earlyExit) (*CLI, error) {
+	var cli CLI
+	parser, err := kong.New(&cli,
+		kong.Name(applicationName),
+		kong.Description("The cpe agent for Xmidt service.\n"+
+			fmt.Sprintf("\tVersion:  %s\n", version)+
+			fmt.Sprintf("\tDate:     %s\n", date)+
+			fmt.Sprintf("\tCommit:   %s\n", commit)+
+			fmt.Sprintf("\tBuilt By: %s\n", builtBy),
+		),
+		kong.UsageOnError(),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = parser.Parse(args)
+	if err != nil {
+		parser.Exit = func(i int) {} // Don't exit on error
+		parser.FatalIfErrorf(err)
+
+		// Exit early on error, but we still need to return the CLI object
+		// otherwise fx will complain & hide the useful message we want to print.
+		*early = earlyExit(true)
+	}
+
+	// Mark the devMode state so the collector can be output
+	*dev = devMode(cli.Dev)
+	return &cli, nil
 }
