@@ -65,12 +65,12 @@ func xmidtAgent(args []string) error {
 
 		fx.Provide(
 			provideCLI,
+			provideLogger,
 
 			// Collect and process the configuration files and env vars and
 			// produce a configuration object.
 			func(cli *CLI) (*goschtalt.Config, error) {
-				var err error
-				gscfg, err = goschtalt.New(
+				return goschtalt.New(
 					goschtalt.StdCfgLayout(applicationName, cli.Files...),
 					goschtalt.ConfigIs("two_words"),
 
@@ -82,42 +82,16 @@ func xmidtAgent(args []string) error {
 						goschtalt.AsDefault(), // Mark this as a default so it is ordered correctly
 					),
 				)
-
-				return gscfg, err
 			},
 
 			goschtalt.UnmarshalFunc[sallust.Config]("logger", goschtalt.Optional()),
-
-			// Create the logger and configure it based on if the program is in
-			// debug mode or normal mode.
-			func(cli *CLI, cfg sallust.Config) (*zap.Logger, error) {
-				if cli.Dev {
-					cfg.Level = "DEBUG"
-					cfg.Development = true
-					cfg.Encoding = "console"
-					cfg.EncoderConfig = sallust.EncoderConfig{
-						TimeKey:        "T",
-						LevelKey:       "L",
-						NameKey:        "N",
-						CallerKey:      "C",
-						FunctionKey:    zapcore.OmitKey,
-						MessageKey:     "M",
-						StacktraceKey:  "S",
-						LineEnding:     zapcore.DefaultLineEnding,
-						EncodeLevel:    "capitalColor",
-						EncodeTime:     "RFC3339",
-						EncodeDuration: "string",
-						EncodeCaller:   "short",
-					}
-					cfg.OutputPaths = []string{"stderr"}
-					cfg.ErrorOutputPaths = []string{"stderr"}
-				}
-				return cfg.Build()
-			},
 		),
 
 		fx.Invoke(
 			handleCLIShow,
+			func(gs *goschtalt.Config) {
+				gscfg = gs
+			},
 		),
 	)
 
@@ -192,17 +166,46 @@ func provideCLI(args cliArgs, dev *devMode, early *earlyExit) (*CLI, error) {
 		return nil, err
 	}
 
-	_, err = parser.Parse(args)
-	if err != nil {
-		parser.Exit = func(i int) {} // Don't exit on error
-		parser.FatalIfErrorf(err)
-
+	parser.Exit = func(i int) {
 		// Exit early on error, but we still need to return the CLI object
 		// otherwise fx will complain & hide the useful message we want to print.
 		*early = earlyExit(true)
 	}
 
+	fmt.Printf("parser: %p\n", parser)
+	_, err = parser.Parse(args)
+	if err != nil {
+		parser.FatalIfErrorf(err)
+	}
+
 	// Mark the devMode state so the collector can be output
 	*dev = devMode(cli.Dev)
 	return &cli, nil
+}
+
+// Create the logger and configure it based on if the program is in
+// debug mode or normal mode.
+func provideLogger(cli *CLI, cfg sallust.Config) (*zap.Logger, error) {
+	if cli.Dev {
+		cfg.Level = "DEBUG"
+		cfg.Development = true
+		cfg.Encoding = "console"
+		cfg.EncoderConfig = sallust.EncoderConfig{
+			TimeKey:        "T",
+			LevelKey:       "L",
+			NameKey:        "N",
+			CallerKey:      "C",
+			FunctionKey:    zapcore.OmitKey,
+			MessageKey:     "M",
+			StacktraceKey:  "S",
+			LineEnding:     zapcore.DefaultLineEnding,
+			EncodeLevel:    "capitalColor",
+			EncodeTime:     "RFC3339",
+			EncodeDuration: "string",
+			EncodeCaller:   "short",
+		}
+		cfg.OutputPaths = []string{"stderr"}
+		cfg.ErrorOutputPaths = []string{"stderr"}
+	}
+	return cfg.Build()
 }
