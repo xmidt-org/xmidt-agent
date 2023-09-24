@@ -23,3 +23,5 @@ go.work
 xmidt-agent
 
 internal/jwtxt/cmd/example/*
+
+*.dot

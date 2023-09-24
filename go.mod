@@ -15,12 +15,14 @@ require (
 	github.com/xmidt-org/wrp-go/v3 v3.2.0
 	go.uber.org/fx v1.20.0
 	go.uber.org/zap v1.26.0
+	gopkg.in/dealancer/validate.v2 v2.1.0
 )
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/uuid v1.3.1 // indirect
 	github.com/goschtalt/approx v1.0.0 // indirect
+	github.com/leodido/go-urn v1.1.0 // indirect
 	github.com/miekg/dns v1.1.25 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect

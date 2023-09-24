@@ -4,9 +4,10 @@
 package main
 
 import (
+	"context"
 	"testing"
+	"time"
 
-	"github.com/goschtalt/goschtalt"
 	_ "github.com/goschtalt/goschtalt/pkg/typical"
 	_ "github.com/goschtalt/yaml-decoder"
 	_ "github.com/goschtalt/yaml-encoder"
@@ -15,49 +16,12 @@ import (
 	"github.com/xmidt-org/sallust"
 )
 
-func Test_handleCLIShow(t *testing.T) {
-	gs, err := goschtalt.New()
-	require.NoError(t, err)
-	require.NotNil(t, gs)
-
-	tests := []struct {
-		description string
-		cli         *CLI
-		cfg         *goschtalt.Config
-		expectEarly bool
-	}{
-		{
-			description: "early exit",
-			cli: &CLI{
-				Show: true,
-			},
-			cfg:         gs,
-			expectEarly: true,
-		}, {
-			description: "no early exit",
-			cli:         &CLI{},
-			cfg:         gs,
-		},
-	}
-	for _, tc := range tests {
-		t.Run(tc.description, func(t *testing.T) {
-			assert := assert.New(t)
-
-			var early earlyExit
-			handleCLIShow(tc.cli, tc.cfg, &early)
-
-			assert.Equal(tc.expectEarly, bool(early))
-		})
-	}
-}
-
 func Test_provideCLI(t *testing.T) {
 	tests := []struct {
 		description string
 		args        cliArgs
-		earlyExit   bool
-		dev         bool
 		want        CLI
+		exits       bool
 		expectedErr error
 	}{
 		{
@@ -65,31 +29,36 @@ func Test_provideCLI(t *testing.T) {
 		}, {
 			description: "dev mode",
 			args:        cliArgs{"-d"},
-			dev:         true,
 			want:        CLI{Dev: true},
 		}, {
 			description: "invalid argument",
 			args:        cliArgs{"-w"},
-			earlyExit:   true,
+			exits:       true,
 		}, {
 			description: "invalid argument",
 			args:        cliArgs{"-d", "-w"},
-			earlyExit:   true,
+			exits:       true,
+		}, {
+			description: "help",
+			args:        cliArgs{"-h"},
+			exits:       true,
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.description, func(t *testing.T) {
 			assert := assert.New(t)
 
-			var devMode devMode
-			var earlyExit earlyExit
-			got, err := provideCLI(tc.args, &devMode, &earlyExit)
+			if tc.exits {
+				assert.Panics(func() {
+					_, _ = provideCLIWithOpts(tc.args, true)
+				})
+			} else {
+				got, err := provideCLI(tc.args)
 
-			assert.ErrorIs(err, tc.expectedErr)
-			want := tc.want
-			assert.Equal(&want, got)
-			assert.Equal(tc.earlyExit, bool(earlyExit))
-			assert.Equal(tc.dev, bool(devMode))
+				assert.ErrorIs(err, tc.expectedErr)
+				want := tc.want
+				assert.Equal(&want, got)
+			}
 		})
 	}
 }
@@ -98,24 +67,69 @@ func Test_xmidtAgent(t *testing.T) {
 	tests := []struct {
 		description string
 		args        []string
+		duration    time.Duration
 		expectedErr error
+		panic       bool
 	}{
 		{
 			description: "show config and exit",
 			args:        []string{"-s"},
-		},
-		{
+			panic:       true,
+		}, {
 			description: "show help and exit",
 			args:        []string{"-h"},
+			panic:       true,
+		}, {
+			description: "confirm invalid config file check works",
+			args:        []string{"-f", "invalid.yml"},
+			panic:       true,
+		}, {
+			description: "enable debug mode",
+			args:        []string{"-d"},
+		}, {
+			description: "output graph",
+			args:        []string{"-g", "graph.dot"},
+		}, {
+			description: "start and stop",
+			duration:    time.Millisecond,
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.description, func(t *testing.T) {
 			assert := assert.New(t)
+			require := require.New(t)
 
-			err := xmidtAgent(tc.args)
+			if tc.panic {
+				assert.Panics(func() {
+					_, _ = xmidtAgent(tc.args)
+				})
+				return
+			}
+
+			app, err := xmidtAgent(tc.args)
 
 			assert.ErrorIs(err, tc.expectedErr)
+			if tc.expectedErr != nil {
+				assert.Nil(app)
+				return
+			}
+
+			if tc.duration <= 0 {
+				return
+			}
+
+			// only run the program for	a few seconds to make sure it starts
+			startCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			err = app.Start(startCtx)
+			require.NoError(err)
+
+			time.Sleep(tc.duration)
+
+			stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			err = app.Stop(stopCtx)
+			require.NoError(err)
 		})
 	}
 }
