@@ -23,5 +23,6 @@ go.work
 xmidt-agent
 
 internal/jwtxt/cmd/example/*
+internal/credentials/cmd/example/*
 
 *.dot

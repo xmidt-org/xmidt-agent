@@ -6,6 +6,7 @@ require (
 	github.com/alecthomas/kong v0.8.0
 	github.com/foxcpp/go-mockdns v1.0.0
 	github.com/golang-jwt/jwt/v5 v5.0.1-0.20230913133926-0cb4fa15e31b
+	github.com/google/uuid v1.3.1
 	github.com/goschtalt/goschtalt v0.22.1
 	github.com/goschtalt/yaml-decoder v0.0.1
 	github.com/goschtalt/yaml-encoder v0.0.3
@@ -20,7 +21,6 @@ require (
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/google/uuid v1.3.1 // indirect
 	github.com/goschtalt/approx v1.0.0 // indirect
 	github.com/leodido/go-urn v1.2.4 // indirect
 	github.com/miekg/dns v1.1.56 // indirect
