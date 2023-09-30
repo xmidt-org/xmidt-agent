@@ -48,7 +48,7 @@ func main() {
 			panic(err)
 		}
 
-		caCert, err := os.ReadFile("ca.crt")
+		caCert, err := os.ReadFile(cli.CA)
 		if err != nil {
 			panic(err)
 		}
