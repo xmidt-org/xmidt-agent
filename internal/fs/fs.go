@@ -21,3 +21,38 @@ type FS interface {
 	// WriteFile writes the file with the specified permissions.  Should match os.WriteFile().
 	WriteFile(name string, data []byte, perm fs.FileMode) error
 }
+
+// Option is an interface for options that can be applied in order via the Operate function.
+type Option interface {
+	Apply(FS) error
+}
+
+// OptionFunc is a function that implements the Option interface.
+type OptionFunc func(FS) error
+
+func (f OptionFunc) Apply(fs FS) error {
+	return f(fs)
+}
+
+// Operate applies the specified options to the filesystem.  This allows for declaring
+// a set of conditions that must be present (like creating a directory path) before
+// the final operation is performed.
+//
+// Example:
+//
+//	Operate(fs,
+//		MakeDir("tmp", 0755),
+//		MakeDir("tmp/foo", 0755),
+//		MakeDir("tmp/foo/bar", 0755),
+//		WriteFile("tmp/foo/bar/baz.txt", []byte("hello world"), 0644))
+func Operate(f FS, opts ...Option) error {
+	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+		if err := opt.Apply(f); err != nil {
+			return err
+		}
+	}
+	return nil
+}
