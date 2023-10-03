@@ -13,10 +13,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/ugorji/go/codec"
 	"github.com/xmidt-org/eventor"
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials/event"
+	"github.com/xmidt-org/xmidt-agent/internal/fs"
 )
 
 var (
@@ -57,6 +60,10 @@ type Credentials struct {
 	url                  string
 	refetchPercent       float64
 	assumedLifetime      time.Duration
+	ignoreBody           bool
+	required             bool
+	fs                   fs.FS
+	filename             string
 	client               *http.Client
 	macAddress           wrp.DeviceID
 	serialNumber         string
@@ -70,7 +77,7 @@ type Credentials struct {
 	partnerID            func() string // dynamic
 
 	// What we are using to decorate the request.
-	token *xmidtToken
+	token *xmidtInfo
 }
 
 // Option is the interface implemented by types that can be used to
@@ -186,9 +193,27 @@ func (c *Credentials) MarkInvalid(ctx context.Context) {
 
 }
 
+func (c *Credentials) Credentials() (string, time.Time, error) {
+	c.m.RLock()
+	defer c.m.RUnlock()
+	if c.token == nil {
+		return "", time.Time{}, ErrNoToken
+	}
+	return c.token.Token, c.token.ExpiresAt, nil
+}
+
 // Decorate decorates the request with the credentials.  If the credentials
 // are not valid, an error is returned.
 func (c *Credentials) Decorate(req *http.Request) error {
+	err := c.decorate(req)
+	if c.required && err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Credentials) decorate(req *http.Request) error {
 	var e event.Decorate
 
 	if req == nil {
@@ -199,15 +224,9 @@ func (c *Credentials) Decorate(req *http.Request) error {
 	var token string
 	var expiresAt time.Time
 
-	c.m.RLock()
-	if c.token != nil {
-		token = c.token.Token
-		expiresAt = c.token.ExpiresAt
-	}
-	c.m.RUnlock()
+	token, expiresAt, e.Err = c.Credentials()
 
-	if token == "" {
-		e.Err = ErrNoToken
+	if e.Err != nil {
 		return c.dispatch(e)
 	}
 
@@ -223,7 +242,7 @@ func (c *Credentials) Decorate(req *http.Request) error {
 
 // fetch fetches the credentials from the server.  This should only be called
 // by the run() method.
-func (c *Credentials) fetch(ctx context.Context) (*xmidtToken, time.Duration, error) {
+func (c *Credentials) fetch(ctx context.Context) (*xmidtInfo, time.Duration, error) {
 	var fe event.Fetch
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url, nil)
@@ -275,7 +294,7 @@ func (c *Credentials) fetch(ctx context.Context) (*xmidtToken, time.Duration, er
 		return nil, retryIn, c.dispatch(fe)
 	}
 
-	var token xmidtToken
+	var token xmidtInfo
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fe.Err = errors.Join(err, ErrFetchFailed)
@@ -283,6 +302,14 @@ func (c *Credentials) fetch(ctx context.Context) (*xmidtToken, time.Duration, er
 	}
 	token.Token = string(body)
 
+	c.determineExpiration(resp, &token)
+
+	fe.Expiration = token.ExpiresAt
+
+	return &token, 0, c.dispatch(fe)
+}
+
+func (c *Credentials) determineExpiration(resp *http.Response, token *xmidtInfo) {
 	// One hundred years is forever.
 	token.ExpiresAt = c.nowFunc().Add(time.Hour * 24 * 365 * 100)
 	if c.assumedLifetime > 0 {
@@ -295,9 +322,17 @@ func (c *Credentials) fetch(ctx context.Context) (*xmidtToken, time.Duration, er
 		token.ExpiresAt = expiration
 	}
 
-	fe.Expiration = token.ExpiresAt
+	if c.ignoreBody {
+		return
+	}
 
-	return &token, 0, c.dispatch(fe)
+	// If we are examining the JWT, parse it and get the expiration.
+	claims := jwt.RegisteredClaims{}
+	parser := jwt.NewParser()
+	_, _, err := parser.ParseUnverified(token.Token, &claims)
+	if err == nil && claims.ExpiresAt != nil {
+		token.ExpiresAt = claims.ExpiresAt.Time
+	}
 }
 
 // run is the main loop for the credentials service.
@@ -359,6 +394,22 @@ func (c *Credentials) run(ctx context.Context) {
 	}
 }
 
+func (c *Credentials) store(token xmidtInfo) error {
+	if c.fs == nil {
+		return nil
+	}
+
+	buf := make([]byte, 0, len(token.Token))
+	handle := new(codec.MsgpackHandle)
+	enc := codec.NewEncoderBytes(&buf, handle)
+	err := enc.Encode(token)
+	if err != nil {
+		return err
+	}
+
+	return c.fs.WriteFile(c.filename, []byte(c.token.Token), 0600)
+}
+
 // dispatch dispatches the event to the listeners and returns the error that
 // should be returned by the caller.
 func (c *Credentials) dispatch(evnt any) error {
@@ -378,9 +429,10 @@ func (c *Credentials) dispatch(evnt any) error {
 	panic("unknown event type")
 }
 
-// xmidtToken is the token returned from the server as well as the expiration
+// xmidtInfo is the token returned from the server as well as the expiration
 // time.
-type xmidtToken struct {
+type xmidtInfo struct {
 	Token     string
 	ExpiresAt time.Time
+	Headers   http.Header
 }

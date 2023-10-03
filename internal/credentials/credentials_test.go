@@ -548,3 +548,58 @@ func TestDecorate(t *testing.T) {
 
 	assert.Equal(2, count)
 }
+
+func TestEndToEndWithJwtPayload(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	when := time.Date(2023, 10, 30, 7, 4, 26, 0, time.UTC)
+
+	token := `eyJhbGciOiJSUzI1NiIsImtpZCI6InRoZW1pcy0yMDE3MDEiLCJ0eXAiOiJKV1QifQ.` +
+		`eyJhdWQiOiJYTWlEVCIsImNhcGFiaWxpdGllcyI6WyJ4MTppc3N1ZXI6dGVzdDouKjphbGwi` +
+		`XSwiY3VzdG9tIjoicmJsIiwiZXhwIjoxNjk4Njc0NjY2LCJpYXQiOjE2OTYwODI2NjYsImlz` +
+		`cyI6InRoZW1pcyIsImp0aSI6IldUZDh3SlV0Rzc3SkNZd3lWelRxRnciLCJtYWMiOiIxMTIy` +
+		`MzM0NDU1NjYiLCJuYmYiOjE2OTYwODI1MTYsInBhcnRuZXItaWQiOiJjb21jYXN0Iiwic2Vy` +
+		`aWFsIjoiMTIzNDU2Nzg5MCIsInN1YiI6ImNsaWVudDpzdXBwbGllZCIsInRydXN0IjoxMDAw` +
+		`LCJ1dWlkIjoiMTczYTZlMjQtODgxOC00Nzk2LTgzNzYtNzdiOTA0NmJhZmVjIn0.invalid`
+
+	server := httptest.NewServer(
+		http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				r.Body.Close()
+
+				w.Header().Add("Expires", when.Format(http.TimeFormat))
+				_, _ = w.Write([]byte(token))
+			},
+		),
+	)
+	defer server.Close()
+
+	c, err := New(
+		URL(server.URL),
+		MacAddress(wrp.DeviceID("mac:112233445566")),
+		SerialNumber("1234567890"),
+		HardwareModel("model"),
+		HardwareManufacturer("manufacturer"),
+		FirmwareVersion("version"),
+		LastRebootReason("reason"),
+		XmidtProtocol("protocol"),
+		BootRetryWait(1),
+		AddFetchListener(event.FetchListenerFunc(
+			func(e event.Fetch) {
+				assert.Equal(when.Format(http.TimeFormat), e.Expiration.Format(http.TimeFormat))
+				assert.NoError(e.Err)
+			})),
+	)
+
+	require.NoError(err)
+	require.NotNil(c)
+
+	c.Start()
+	defer c.Stop()
+
+	ctx := context.Background()
+	deadline, cancel := context.WithDeadline(ctx, time.Now().Add(1*time.Second))
+	defer cancel()
+	c.WaitUntilValid(deadline)
+}

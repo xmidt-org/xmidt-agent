@@ -11,6 +11,8 @@ require (
 	github.com/goschtalt/yaml-decoder v0.0.1
 	github.com/goschtalt/yaml-encoder v0.0.3
 	github.com/stretchr/testify v1.8.4
+	github.com/ugorji/go/codec v1.2.11
+	github.com/xmidt-org/arrange v0.5.0
 	github.com/xmidt-org/eventor v0.0.0-20230910205925-8ff168bd12ed
 	github.com/xmidt-org/sallust v0.2.2
 	github.com/xmidt-org/wrp-go/v3 v3.2.0
@@ -26,7 +28,7 @@ require (
 	github.com/miekg/dns v1.1.56 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/ugorji/go/codec v1.2.11 // indirect
+	github.com/xmidt-org/httpaux v0.4.0 // indirect
 	go.uber.org/dig v1.17.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/mod v0.12.0 // indirect
