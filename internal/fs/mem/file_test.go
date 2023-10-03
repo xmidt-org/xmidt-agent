@@ -31,6 +31,18 @@ func TestFile_Stat(t *testing.T) {
 				mode:  iofs.FileMode(0644),
 				isDir: false,
 			},
+		}, {
+			description: "a simple dir",
+			file: File{
+				Perm:  iofs.FileMode(0755),
+				name:  "foo",
+				isDir: true,
+			},
+			want: &fileInfo{
+				name:  "foo",
+				mode:  iofs.FileMode(0755),
+				isDir: true,
+			},
 		},
 	}
 	for _, tc := range tests {
