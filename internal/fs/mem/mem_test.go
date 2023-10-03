@@ -425,6 +425,7 @@ func TestNew(t *testing.T) {
 		description string
 		opts        []Option
 		want        FS
+		panics      bool
 	}{
 		{
 			description: "an empty fs",
@@ -441,7 +442,8 @@ func TestNew(t *testing.T) {
 		}, {
 			description: "with a file",
 			opts: []Option{
-				WithFile("foo.txt", "foo file"),
+				WithDir(".", 0755),
+				WithFile("foo.txt", "foo file", 0644),
 			},
 			want: FS{
 				Files: map[string]File{
@@ -454,12 +456,31 @@ func TestNew(t *testing.T) {
 					".": iofs.FileMode(0755),
 				},
 			},
+		}, {
+			description: "panic on WithDir",
+			opts: []Option{
+				WithDir("", 0755),
+			},
+			panics: true,
+		}, {
+			description: "panic on WithFile",
+			opts: []Option{
+				WithFile("", "", 0755),
+			},
+			panics: true,
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.description, func(t *testing.T) {
 			assert := assert.New(t)
 			fs := tc.want
+
+			if tc.panics {
+				assert.Panics(func() {
+					_ = New(tc.opts...)
+				})
+				return
+			}
 			assert.Equal(&fs, New(tc.opts...))
 		})
 	}

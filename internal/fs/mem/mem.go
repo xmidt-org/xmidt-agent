@@ -51,16 +51,9 @@ type Option func(*FS)
 
 // WithFile adds a file to the MemFS instance.  Only the first permission
 // specified is used.  Errors are panic'd.
-func WithFile(name, data string, perm ...iofs.FileMode) Option {
+func WithFile(name, data string, perm iofs.FileMode) Option {
 	return func(fs *FS) {
-		path := filepath.Dir(name)
-		dirPerm := append(perm, 0755)
-		filePerm := append(perm, 0644)
-		err := fs.MkdirAll(path, dirPerm[0])
-		if err == nil {
-			err = fs.WriteFile(name, []byte(data), filePerm[0])
-		}
-
+		err := fs.WriteFile(name, []byte(data), perm)
 		if err != nil {
 			panic(err)
 		}
@@ -75,6 +68,16 @@ func WithError(name string, err error) Option {
 			fs.Errs = make(map[string]error)
 		}
 		fs.Errs[name] = err
+	}
+}
+
+// WithDir adds a directory to the MemFS instance.
+func WithDir(name string, perm iofs.FileMode) Option {
+	return func(fs *FS) {
+		err := fs.MkdirAll(name, perm)
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -110,7 +113,10 @@ func (fs *FS) Mkdir(path string, perm iofs.FileMode) error {
 		fs.Dirs = make(map[string]iofs.FileMode)
 	}
 
-	fs.Dirs[path] = perm
+	// Don't change the permissions if the directory is already there.
+	if _, found := fs.Dirs[path]; !found {
+		fs.Dirs[path] = perm
+	}
 	return nil
 }
 
@@ -195,3 +201,25 @@ func (fs *FS) hasPerms(name string, perm iofs.FileMode) error {
 
 	return nil
 }
+
+// Remove this in favor of pp ... except I can't download pp right now.
+/*
+func (fs *FS) String() string {
+	buf := strings.Builder{}
+
+	buf.WriteString("Files:\n")
+	for k, v := range fs.Files {
+		fmt.Fprintf(&buf, "  '%s': '%s'\n", k, string(v.Bytes))
+	}
+	buf.WriteString("Dirs:\n")
+	for k, v := range fs.Dirs {
+		fmt.Fprintf(&buf, "  '%s': %v\n", k, v)
+	}
+	buf.WriteString("Errs:\n")
+	for k, v := range fs.Errs {
+		fmt.Fprintf(&buf, "  '%s': %v\n", k, v)
+	}
+
+	return buf.String()
+}
+*/

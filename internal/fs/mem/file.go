@@ -34,7 +34,7 @@ func (f *File) Stat() (iofs.FileInfo, error) {
 		size:    int64(len(f.Bytes)),
 		mode:    f.Perm,
 		modTime: time.Time{},
-		isDir:   false,
+		isDir:   f.isDir,
 	}, nil
 }
 
