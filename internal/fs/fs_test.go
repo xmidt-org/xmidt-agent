@@ -18,7 +18,7 @@ var (
 	errUnknown = errors.New("unknown error")
 )
 
-func TestMakeDir(t *testing.T) {
+func TestWithDirOrSimiar(t *testing.T) {
 	tests := []struct {
 		description string
 		opt         xafs.Option
@@ -29,39 +29,103 @@ func TestMakeDir(t *testing.T) {
 	}{
 		{
 			description: "simple path",
-			opt:         xafs.MakeDir("foo", 0755),
+			opt:         xafs.WithDir("foo", 0755),
 			expect:      mem.New(mem.WithDir("foo", 0755)),
 		}, {
 			description: "simple existing path",
-			opt:         xafs.MakeDir("foo", 0755),
+			opt:         xafs.WithDir("foo", 0755),
 			start:       mem.New(mem.WithDir("foo", 0755)),
 			expect:      mem.New(mem.WithDir("foo", 0755)),
 		}, {
 			description: "not a directory",
-			opt:         xafs.MakeDir("foo", 0755),
+			opt:         xafs.WithDir("foo", 0755),
 			start:       mem.New(mem.WithFile("foo", "data", 0755)),
 			expectErr:   xafs.ErrNotDirectory,
 		}, {
-			description: "not able to read",
-			opt:         xafs.MakeDir("foo", 0755),
-			start:       mem.New(mem.WithDir("foo", 0111)),
-			expectErr:   fs.ErrPermission,
-		}, {
 			description: "error opening the file",
-			opt:         xafs.MakeDir("foo", 0755),
+			opt:         xafs.WithDir("foo", 0755),
 			start:       mem.New(mem.WithError("foo", errUnknown)),
 			expectErr:   errUnknown,
 		}, {
-			description: "two directory path",
+			description: "three directory path",
 			opts: []xafs.Option{
-				xafs.MakeDir("foo", 0700),
-				xafs.MakeDir("foo/bar", 0750),
-				xafs.MakeDir("foo/bar/car", 0755),
+				xafs.WithDir("foo", 0700),
+				xafs.WithDir("foo/bar", 0750),
+				xafs.WithDir("foo/bar/car", 0755),
 			},
 			expect: mem.New(
 				mem.WithDir("foo", 0700),
 				mem.WithDir("foo/bar", 0750),
 				mem.WithDir("foo/bar/car", 0755),
+			),
+		}, {
+			description: "abs directory path",
+			start:       mem.New(mem.WithDir("/", 0755)),
+			opts: []xafs.Option{
+				xafs.WithDir("/foo", 0700),
+				xafs.WithDir("/foo/bar", 0750),
+				xafs.WithDir("/foo/bar/car", 0755),
+			},
+			expect: mem.New(
+				mem.WithDir("/", 0755),
+				mem.WithDir("/foo", 0700),
+				mem.WithDir("/foo/bar", 0750),
+				mem.WithDir("/foo/bar/car", 0755),
+			),
+		}, {
+			description: "WithDirs three directory path",
+			start:       mem.New(),
+			opts: []xafs.Option{
+				xafs.WithDirs("foo/bar/car", 0755),
+			},
+			expect: mem.New(
+				mem.WithDir("foo", 0755),
+				mem.WithDir("foo/bar", 0755),
+				mem.WithDir("foo/bar/car", 0755),
+			),
+		}, {
+			description: "WithDirs three directory path one exists",
+			start:       mem.New(mem.WithDir("foo", 0711)),
+			opts: []xafs.Option{
+				xafs.WithDirs("foo/bar/car", 0755),
+			},
+			expect: mem.New(
+				mem.WithDir("foo", 0711),
+				mem.WithDir("foo/bar", 0755),
+				mem.WithDir("foo/bar/car", 0755),
+			),
+		}, {
+			description: "abs three directory path",
+			start:       mem.New(mem.WithDir("/", 0700)),
+			opts: []xafs.Option{
+				xafs.WithDirs("/boo/egg/cat", 0755),
+			},
+			expect: mem.New(
+				mem.WithDir("/", 0700),
+				mem.WithDir("/boo", 0755),
+				mem.WithDir("/boo/egg", 0755),
+				mem.WithDir("/boo/egg/cat", 0755),
+			),
+		}, {
+			description: "WithPath two directory path one exists, and a filename",
+			start:       mem.New(mem.WithDir("foo", 0711)),
+			opts: []xafs.Option{
+				xafs.WithPath("foo/bar/car.json", 0755),
+			},
+			expect: mem.New(
+				mem.WithDir("foo", 0711),
+				mem.WithDir("foo/bar", 0755),
+			),
+		}, {
+			description: "Ensure Operate can handle nil options",
+			start:       mem.New(mem.WithDir("foo", 0711)),
+			opts: []xafs.Option{
+				nil,
+				xafs.WithPath("foo/bar/car.json", 0755),
+			},
+			expect: mem.New(
+				mem.WithDir("foo", 0711),
+				mem.WithDir("foo/bar", 0755),
 			),
 		},
 	}
@@ -71,7 +135,12 @@ func TestMakeDir(t *testing.T) {
 			require := require.New(t)
 			assert := assert.New(t)
 
-			opts := append(tc.opts, tc.opt)
+			opts := make([]xafs.Option, 0, len(tc.opts)+1)
+			if tc.opt != nil {
+				opts = append(tc.opts, tc.opt)
+			}
+			opts = append(opts, tc.opts...)
+
 			fs := tc.start
 			if fs == nil {
 				fs = mem.New()

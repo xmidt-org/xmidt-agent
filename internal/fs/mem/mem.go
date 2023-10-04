@@ -105,8 +105,10 @@ func (fs *FS) Open(name string) (iofs.File, error) {
 }
 
 func (fs *FS) Mkdir(path string, perm iofs.FileMode) error {
-	if err := fs.hasPerms(path, iofs.FileMode(0111)); err != nil {
-		return err
+	if path != separator {
+		if err := fs.hasPerms(path, iofs.FileMode(0111)); err != nil {
+			return err
+		}
 	}
 
 	if fs.Dirs == nil {
@@ -201,25 +203,3 @@ func (fs *FS) hasPerms(name string, perm iofs.FileMode) error {
 
 	return nil
 }
-
-// Remove this in favor of pp ... except I can't download pp right now.
-/*
-func (fs *FS) String() string {
-	buf := strings.Builder{}
-
-	buf.WriteString("Files:\n")
-	for k, v := range fs.Files {
-		fmt.Fprintf(&buf, "  '%s': '%s'\n", k, string(v.Bytes))
-	}
-	buf.WriteString("Dirs:\n")
-	for k, v := range fs.Dirs {
-		fmt.Fprintf(&buf, "  '%s': %v\n", k, v)
-	}
-	buf.WriteString("Errs:\n")
-	for k, v := range fs.Errs {
-		fmt.Fprintf(&buf, "  '%s': %v\n", k, v)
-	}
-
-	return buf.String()
-}
-*/
