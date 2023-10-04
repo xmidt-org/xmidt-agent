@@ -4,6 +4,7 @@
 package credentials
 
 import (
+	iofs "io/fs"
 	"net/http"
 	"time"
 
@@ -92,11 +93,15 @@ func Required() Option {
 		})
 }
 
-func LocalStorage(fs fs.FS, filename string) Option {
+// LocalStorage is the local storage used to cache the credentials.
+//
+// The filename (and path) is relative to the provided filesystem.
+func LocalStorage(fs fs.FS, filename string, perm iofs.FileMode) Option {
 	return nilOptionFunc(
 		func(c *Credentials) {
 			c.fs = fs
 			c.filename = filename
+			c.perm = perm
 		})
 }
 

@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials/event"
+	"github.com/xmidt-org/xmidt-agent/internal/fs/mem"
 )
 
 func TestNew(t *testing.T) {
@@ -256,7 +257,7 @@ func TestEndToEnd429(t *testing.T) {
 	defer c.Stop()
 
 	ctx := context.Background()
-	deadline, cancel := context.WithDeadline(ctx, time.Now().Add(1*time.Second))
+	deadline, cancel := context.WithDeadline(ctx, time.Now().Add(100*time.Millisecond))
 	defer cancel()
 	c.WaitUntilFetched(deadline)
 	assert.Equal(1, called)
@@ -385,6 +386,8 @@ func TestEndToEnd(t *testing.T) {
 	)
 	defer server.Close()
 
+	fs := mem.New(mem.WithDir(".", 0755))
+
 	c, err := New(
 		URL(server.URL),
 		MacAddress(wrp.DeviceID("mac:112233445566")),
@@ -396,6 +399,7 @@ func TestEndToEnd(t *testing.T) {
 		XmidtProtocol("protocol"),
 		BootRetryWait(1),
 		AssumedLifetime(24*time.Hour),
+		LocalStorage(fs, "credentials.msgpack", 0600),
 		AddFetchListener(event.FetchListenerFunc(
 			func(e event.Fetch) {
 				fmt.Println("Fetch:")
@@ -452,6 +456,12 @@ func TestEndToEnd(t *testing.T) {
 
 	// Multiple calls to Stop is ok.
 	c.Stop()
+
+	_, found := fs.Files["credentials.msgpack"]
+	assert.True(found)
+
+	_, found = fs.Files["credentials.msgpack.sha256"]
+	assert.True(found)
 }
 
 func TestContextExpires(t *testing.T) {
@@ -510,6 +520,7 @@ func TestDecorate(t *testing.T) {
 		LastRebootReason("reason"),
 		XmidtProtocol("protocol"),
 		BootRetryWait(1),
+		Required(),
 		AddFetchListener(event.FetchListenerFunc(
 			func(e event.Fetch) {
 				assert.NoError(e.Err)
@@ -549,33 +560,27 @@ func TestDecorate(t *testing.T) {
 	assert.Equal(2, count)
 }
 
-func TestEndToEndWithJwtPayload(t *testing.T) {
+func TestToAndFromFile(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
-	when := time.Date(2023, 10, 30, 7, 4, 26, 0, time.UTC)
-
-	token := `eyJhbGciOiJSUzI1NiIsImtpZCI6InRoZW1pcy0yMDE3MDEiLCJ0eXAiOiJKV1QifQ.` +
-		`eyJhdWQiOiJYTWlEVCIsImNhcGFiaWxpdGllcyI6WyJ4MTppc3N1ZXI6dGVzdDouKjphbGwi` +
-		`XSwiY3VzdG9tIjoicmJsIiwiZXhwIjoxNjk4Njc0NjY2LCJpYXQiOjE2OTYwODI2NjYsImlz` +
-		`cyI6InRoZW1pcyIsImp0aSI6IldUZDh3SlV0Rzc3SkNZd3lWelRxRnciLCJtYWMiOiIxMTIy` +
-		`MzM0NDU1NjYiLCJuYmYiOjE2OTYwODI1MTYsInBhcnRuZXItaWQiOiJjb21jYXN0Iiwic2Vy` +
-		`aWFsIjoiMTIzNDU2Nzg5MCIsInN1YiI6ImNsaWVudDpzdXBwbGllZCIsInRydXN0IjoxMDAw` +
-		`LCJ1dWlkIjoiMTczYTZlMjQtODgxOC00Nzk2LTgzNzYtNzdiOTA0NmJhZmVjIn0.invalid`
-
+	var count int
 	server := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				r.Body.Close()
 
-				w.Header().Add("Expires", when.Format(http.TimeFormat))
-				_, _ = w.Write([]byte(token))
+				w.Header().Add("Expires", time.Now().Add(1*time.Hour).Format(http.TimeFormat))
+				_, _ = w.Write([]byte(`token`))
+				count++
 			},
 		),
 	)
 	defer server.Close()
 
-	c, err := New(
+	fs := mem.New(mem.WithDir(".", 0755))
+
+	opts := []Option{
 		URL(server.URL),
 		MacAddress(wrp.DeviceID("mac:112233445566")),
 		SerialNumber("1234567890"),
@@ -585,21 +590,54 @@ func TestEndToEndWithJwtPayload(t *testing.T) {
 		LastRebootReason("reason"),
 		XmidtProtocol("protocol"),
 		BootRetryWait(1),
+		LocalStorage(fs, "credentials.msgpack", 0600),
+	}
+
+	var listenerCount int
+	copts := append(opts,
 		AddFetchListener(event.FetchListenerFunc(
 			func(e event.Fetch) {
-				assert.Equal(when.Format(http.TimeFormat), e.Expiration.Format(http.TimeFormat))
-				assert.NoError(e.Err)
-			})),
-	)
+				if listenerCount == 0 {
+					assert.Equal("fs", e.Origin)
+					assert.Error(e.Err)
+				} else {
+					assert.Equal("network", e.Origin)
+					assert.NoError(e.Err)
+				}
+				listenerCount++
+			})))
+
+	c, err := New(copts...)
 
 	require.NoError(err)
 	require.NotNil(c)
 
 	c.Start()
-	defer c.Stop()
 
 	ctx := context.Background()
 	deadline, cancel := context.WithDeadline(ctx, time.Now().Add(1*time.Second))
 	defer cancel()
-	c.WaitUntilValid(deadline)
+	c.WaitUntilFetched(deadline)
+
+	c.Stop()
+
+	dopts := append(opts,
+		AddFetchListener(event.FetchListenerFunc(
+			func(e event.Fetch) {
+				assert.Equal("fs", e.Origin)
+				assert.NoError(e.Err)
+			})))
+
+	d, err := New(dopts...)
+	require.NoError(err)
+
+	d.Start()
+	ctx = context.Background()
+	deadline, cancel = context.WithDeadline(ctx, time.Now().Add(1*time.Second))
+	defer cancel()
+	d.WaitUntilFetched(deadline)
+
+	d.Stop()
+
+	assert.Equal(1, count)
 }

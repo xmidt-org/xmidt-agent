@@ -8,12 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	iofs "io/fs"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/ugorji/go/codec"
 	"github.com/xmidt-org/eventor"
@@ -64,6 +64,7 @@ type Credentials struct {
 	required             bool
 	fs                   fs.FS
 	filename             string
+	perm                 iofs.FileMode
 	client               *http.Client
 	macAddress           wrp.DeviceID
 	serialNumber         string
@@ -196,9 +197,10 @@ func (c *Credentials) MarkInvalid(ctx context.Context) {
 func (c *Credentials) Credentials() (string, time.Time, error) {
 	c.m.RLock()
 	defer c.m.RUnlock()
-	if c.token == nil {
+	if c.token == nil || c.token.Token == "" {
 		return "", time.Time{}, ErrNoToken
 	}
+
 	return c.token.Token, c.token.ExpiresAt, nil
 }
 
@@ -237,13 +239,16 @@ func (c *Credentials) decorate(req *http.Request) error {
 	}
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
 	return c.dispatch(e)
 }
 
 // fetch fetches the credentials from the server.  This should only be called
 // by the run() method.
 func (c *Credentials) fetch(ctx context.Context) (*xmidtInfo, time.Duration, error) {
-	var fe event.Fetch
+	fe := event.Fetch{
+		Origin: "network",
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url, nil)
 	if err != nil {
@@ -321,37 +326,42 @@ func (c *Credentials) determineExpiration(resp *http.Response, token *xmidtInfo)
 		// Even better, we were told when it expires.
 		token.ExpiresAt = expiration
 	}
-
-	if c.ignoreBody {
-		return
-	}
-
-	// If we are examining the JWT, parse it and get the expiration.
-	claims := jwt.RegisteredClaims{}
-	parser := jwt.NewParser()
-	_, _, err := parser.ParseUnverified(token.Token, &claims)
-	if err == nil && claims.ExpiresAt != nil {
-		token.ExpiresAt = claims.ExpiresAt.Time
-	}
 }
 
 // run is the main loop for the credentials service.
 func (c *Credentials) run(ctx context.Context) {
 	var (
-		timer   *time.Timer
-		fetched bool
-		valid   bool
+		timer     *time.Timer
+		skipFetch bool
+		fromDisc  bool
+		fetched   bool
+		valid     bool
+		retryIn   time.Duration
 	)
 
 	c.wg.Add(1)
 	defer c.wg.Done()
 
+	token, err := c.load()
+	if err == nil && token != nil {
+		fromDisc = true
+		skipFetch = true
+	}
+
 	for {
-		token, retryIn, err := c.fetch(ctx)
+		if !skipFetch {
+			token, retryIn, err = c.fetch(ctx)
+			if err == nil {
+				fromDisc = false
+			}
+		}
 		if !fetched {
 			close(c.fetched)
 			fetched = true
 		}
+
+		// Only skip the fetch once.
+		skipFetch = false
 
 		// Assume we failed, so retry in 1 second or when the server suggested.
 		next := max(time.Second, retryIn)
@@ -366,6 +376,10 @@ func (c *Credentials) run(ctx context.Context) {
 			if !valid {
 				close(c.valid)
 				valid = true
+			}
+
+			if !fromDisc {
+				_ = c.store(token)
 			}
 
 			until := expires.Sub(c.nowFunc())
@@ -394,7 +408,7 @@ func (c *Credentials) run(ctx context.Context) {
 	}
 }
 
-func (c *Credentials) store(token xmidtInfo) error {
+func (c *Credentials) store(token *xmidtInfo) error {
 	if c.fs == nil {
 		return nil
 	}
@@ -407,7 +421,43 @@ func (c *Credentials) store(token xmidtInfo) error {
 		return err
 	}
 
-	return c.fs.WriteFile(c.filename, []byte(c.token.Token), 0600)
+	return fs.Operate(c.fs,
+		fs.WithPath(c.filename, c.perm),
+		fs.WriteFileWithSHA256(c.filename, buf, c.perm))
+}
+
+func (c *Credentials) load() (*xmidtInfo, error) {
+	fe := event.Fetch{
+		Origin: "fs",
+	}
+
+	if c.fs == nil {
+		return nil, nil
+	}
+
+	var buf []byte
+
+	fe.At = time.Now()
+	err := fs.Operate(c.fs,
+		fs.WithPath(c.filename, c.perm),
+		fs.ReadFileWithSHA256(c.filename, &buf))
+	fe.Duration = time.Since(fe.At)
+	if err != nil {
+		fe.Err = errors.Join(err, ErrFetchFailed)
+		return nil, c.dispatch(fe)
+	}
+
+	handle := new(codec.MsgpackHandle)
+	dec := codec.NewDecoderBytes(buf, handle)
+
+	var token xmidtInfo
+	err = dec.Decode(&token)
+	if err != nil {
+		fe.Err = errors.Join(err, ErrFetchFailed)
+		return nil, c.dispatch(fe)
+	}
+	fe.Expiration = token.ExpiresAt
+	return &token, c.dispatch(fe)
 }
 
 // dispatch dispatches the event to the listeners and returns the error that
@@ -434,5 +484,4 @@ func (c *Credentials) dispatch(evnt any) error {
 type xmidtInfo struct {
 	Token     string
 	ExpiresAt time.Time
-	Headers   http.Header
 }
