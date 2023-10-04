@@ -13,6 +13,7 @@ import (
 	_ "github.com/goschtalt/yaml-decoder"
 	_ "github.com/goschtalt/yaml-encoder"
 	"github.com/xmidt-org/sallust"
+	"github.com/xmidt-org/xmidt-agent/internal/credentials"
 
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -67,11 +68,24 @@ func xmidtAgent(args []string) (*fx.App, error) {
 			provideCLI,
 			provideLogger,
 			provideConfig,
+			provideCredentials,
 
 			goschtalt.UnmarshalFunc[sallust.Config]("logger", goschtalt.Optional()),
+			goschtalt.UnmarshalFunc[Identity]("identity"),
+			goschtalt.UnmarshalFunc[OperationalState]("operational_state"),
+			goschtalt.UnmarshalFunc[XmidtCredentials]("xmidt_credentials"),
+			goschtalt.UnmarshalFunc[XmidtService]("xmidt_service"),
+			goschtalt.UnmarshalFunc[Storage]("storage"),
 		),
 
-		fx.Invoke(),
+		fsProvide(),
+
+		fx.Invoke(
+			// TODO: Remove this.
+			// For now require the credentials to be fetched this way.  Later
+			// Other services will depend on this.
+			func(*credentials.Credentials) {},
+		),
 	)
 
 	if cli != nil && cli.Graph != "" {
