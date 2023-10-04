@@ -24,6 +24,7 @@ type FS interface {
 
 // Option is an interface for options that can be applied in order via the Operate function.
 type Option interface {
+	// Apply applies the option to the filesystem.
 	Apply(FS) error
 }
 

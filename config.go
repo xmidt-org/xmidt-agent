@@ -6,15 +6,62 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/goschtalt/goschtalt"
+	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/sallust"
+	"github.com/xmidt-org/wrp-go/v3"
 	"gopkg.in/dealancer/validate.v2"
 )
 
 type Config struct {
-	SpecialValue string
-	Logger       sallust.Config
+	Identity         Identity
+	OperationalState OperationalState
+	XmidtCredentials XmidtCredentials
+	Logger           sallust.Config
+}
+
+type Identity struct {
+	DeviceID             wrp.DeviceID
+	SerialNumber         string
+	HardwareModel        string
+	HardwareManufacturer string
+	FirmwareVersion      string
+	PartnerID            string
+}
+
+type OperationalState struct {
+	LastRebootReason string
+	BootTime         time.Time
+}
+
+type XmidtCredentials struct {
+	URL            string
+	HTTPClient     arrangehttp.ClientConfig
+	RefetchPercent float64
+}
+
+type XmidtService struct {
+	URL              string
+	JwtTxtRedirector JwtTxtRedirector
+	Backoff          Backoff
+}
+
+type JwtTxtRedirector struct {
+	Required          bool
+	AllowedAlgorithms []string
+	Timeout           time.Duration
+	PEMs              []string
+	PEMFiles          []string
+}
+
+// Backoff defines the parameters that limit the retry backoff algorithm.
+// The retries are a geometric progression.
+// 1, 3, 7, 15, 31 ... n = (2n+1)
+type Backoff struct {
+	MinDelay time.Duration
+	MaxDelay time.Duration
 }
 
 // Collect and process the configuration files and env vars and

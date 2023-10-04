@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/xmidt-org/wrp-go/v3"
 	cred "github.com/xmidt-org/xmidt-agent/internal/credentials"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials/event"
@@ -38,9 +39,9 @@ func main() {
 
 	client := http.DefaultClient
 
-	if cli.Private != "" || cli.Public != "" || cli.CA != "" {
-		if cli.Private == "" || cli.Public == "" || cli.CA == "" {
-			panic("--private, --public and --ca must be specified together")
+	if cli.Private != "" || cli.Public != "" {
+		if cli.Private == "" || cli.Public == "" {
+			panic("--private and --public must be specified together")
 		}
 
 		cert, err := tls.LoadX509KeyPair(cli.Public, cli.Private)
@@ -48,16 +49,18 @@ func main() {
 			panic(err)
 		}
 
-		caCert, err := os.ReadFile(cli.CA)
-		if err != nil {
-			panic(err)
-		}
-		caCertPool := x509.NewCertPool()
-		caCertPool.AppendCertsFromPEM(caCert)
-
 		tlsConfig := &tls.Config{
 			Certificates: []tls.Certificate{cert},
-			RootCAs:      caCertPool,
+		}
+
+		if cli.CA != "" {
+			caCert, err := os.ReadFile(cli.CA)
+			if err != nil {
+				panic(err)
+			}
+			caCertPool := x509.NewCertPool()
+			caCertPool.AppendCertsFromPEM(caCert)
+			tlsConfig.RootCAs = caCertPool
 		}
 		tr := &http.Transport{TLSClientConfig: tlsConfig}
 
@@ -117,4 +120,41 @@ func main() {
 	defer cancel()
 
 	credentials.WaitUntilFetched(ctx)
+	token, expires, err := credentials.Credentials()
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("JWT:     %s\n", token)
+	fmt.Printf("Expires: %s\n", expires.Format(time.RFC3339))
+
+	claims := jwt.RegisteredClaims{}
+	parser := jwt.NewParser()
+	_, parts, err := parser.ParseUnverified(token, &claims)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("Claims:")
+	fmt.Printf("  ID:             %s\n", claims.ID)
+	fmt.Printf("  ExpirationTime: %s\n", claims.ExpiresAt)
+	fmt.Printf("  IssuedAt:       %s\n", claims.IssuedAt)
+	fmt.Printf("  NotBefore:      %s\n", claims.NotBefore)
+	fmt.Printf("  Issuer:         %s\n", claims.Issuer)
+	fmt.Printf("  Subject:        %s\n", claims.Subject)
+	fmt.Printf("  Audience:       %s\n", claims.Audience)
+
+	header, err := parser.DecodeSegment(parts[0])
+	if err != nil {
+		panic(err)
+	}
+
+	body, err := parser.DecodeSegment(parts[1])
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("Parts:")
+	fmt.Printf("  Header: %s\n", header)
+	fmt.Printf("  Body:   %s\n", body)
 }

@@ -15,6 +15,9 @@ type CancelListenerFunc func()
 
 // Fetch is the event that is sent when the credentials are fetched.
 type Fetch struct {
+	// The origin of the data - "fs" or "network" are the only valid values.
+	Origin string
+
 	// At holds the time when the fetch request was made.
 	At time.Time
 

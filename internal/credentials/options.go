@@ -4,11 +4,13 @@
 package credentials
 
 import (
+	iofs "io/fs"
 	"net/http"
 	"time"
 
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials/event"
+	"github.com/xmidt-org/xmidt-agent/internal/fs"
 )
 
 type optionFunc func(*Credentials) error
@@ -69,6 +71,37 @@ func AssumedLifetime(lifetime time.Duration) Option {
 	return nilOptionFunc(
 		func(c *Credentials) {
 			c.assumedLifetime = lifetime
+		})
+}
+
+// IgnoreBody is a flag that indicates whether the body of the response should
+// be ignored instead of examined for an expiration time.  The default is to
+// examine the body.
+func IgnoreBody() Option {
+	return nilOptionFunc(
+		func(c *Credentials) {
+			c.ignoreBody = true
+		})
+}
+
+// Required is a flag that indicates whether the credentials are required to
+// successfully decorate a request.  The default is optional.
+func Required() Option {
+	return nilOptionFunc(
+		func(c *Credentials) {
+			c.required = true
+		})
+}
+
+// LocalStorage is the local storage used to cache the credentials.
+//
+// The filename (and path) is relative to the provided filesystem.
+func LocalStorage(fs fs.FS, filename string, perm iofs.FileMode) Option {
+	return nilOptionFunc(
+		func(c *Credentials) {
+			c.fs = fs
+			c.filename = filename
+			c.perm = perm
 		})
 }
 
