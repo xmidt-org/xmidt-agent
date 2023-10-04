@@ -76,6 +76,9 @@ func provideCredentials(in credsIn) (*credentials.Credentials, error) {
 	}
 
 	creds, err := credentials.New(opts...)
+	if err != nil {
+		return nil, err
+	}
 
 	in.LC.Append(fx.Hook{
 		OnStart: func(context.Context) error {

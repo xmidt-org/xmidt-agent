@@ -54,7 +54,6 @@ type XmidtService struct {
 }
 
 type JwtTxtRedirector struct {
-	Required          bool
 	AllowedAlgorithms []string
 	Timeout           time.Duration
 	PEMs              []string
@@ -143,8 +142,7 @@ var defaultConfig = Config{
 	},
 	XmidtService: XmidtService{
 		JwtTxtRedirector: JwtTxtRedirector{
-			Required: true,
-			Timeout:  10 * time.Second,
+			Timeout: 10 * time.Second,
 			AllowedAlgorithms: []string{
 				"EdDSA",
 				"ES256", "ES384", "ES512",

@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -14,6 +15,7 @@ import (
 	_ "github.com/goschtalt/yaml-encoder"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials"
+	"github.com/xmidt-org/xmidt-agent/internal/jwtxt"
 
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -69,6 +71,7 @@ func xmidtAgent(args []string) (*fx.App, error) {
 			provideLogger,
 			provideConfig,
 			provideCredentials,
+			provideInstructions,
 
 			goschtalt.UnmarshalFunc[sallust.Config]("logger", goschtalt.Optional()),
 			goschtalt.UnmarshalFunc[Identity]("identity"),
@@ -85,6 +88,14 @@ func xmidtAgent(args []string) (*fx.App, error) {
 			// For now require the credentials to be fetched this way.  Later
 			// Other services will depend on this.
 			func(*credentials.Credentials) {},
+
+			// TODO: Remove this, too.
+			func(i *jwtxt.Instructions) {
+				if i != nil {
+					s, _ := i.Endpoint(context.Background())
+					fmt.Println(s)
+				}
+			},
 		),
 	)
 
