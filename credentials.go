@@ -28,70 +28,65 @@ type credsIn struct {
 	Logger  *zap.Logger
 }
 
-func credentialsModule() fx.Option {
-	return fx.Module(
-		"credentials",
-		fx.Provide(
-			func(in credsIn) (*credentials.Credentials, error) {
-				client, err := in.Creds.HTTPClient.NewClient()
-				if err != nil {
-					return nil, err
-				}
+func provideCredentials(in credsIn) (*credentials.Credentials, error) {
+	// If the URL is empty, then there is no credentials service to use.
+	if in.Creds.URL == "" {
+		return nil, nil
+	}
 
-				logger := in.Logger.Named("credentials")
+	client, err := in.Creds.HTTPClient.NewClient()
+	if err != nil {
+		return nil, err
+	}
 
-				opts := []credentials.Option{
-					credentials.URL(in.Creds.URL),
-					credentials.HTTPClient(client),
-					credentials.MacAddress(in.ID.DeviceID),
-					credentials.SerialNumber(in.ID.SerialNumber),
-					credentials.HardwareModel(in.ID.HardwareModel),
-					credentials.HardwareManufacturer(in.ID.HardwareManufacturer),
-					credentials.FirmwareVersion(in.ID.FirmwareVersion),
-					credentials.PartnerID(func() string { return in.ID.PartnerID }),
-					credentials.LastRebootReason(in.Ops.LastRebootReason),
-					credentials.XmidtProtocol(xmidtProtocol),
-					credentials.BootRetryWait(time.Second),
-					credentials.RefetchPercent(in.Creds.RefetchPercent),
-					credentials.AddFetchListener(event.FetchListenerFunc(
-						func(e event.Fetch) {
-							logger.Info("fetch",
-								zap.String("origin", e.Origin),
-								zap.Time("at", e.At),
-								zap.Duration("duration", e.Duration),
-								zap.String("uuid", e.UUID.String()),
-								zap.Int("status_code", e.StatusCode),
-								zap.Duration("retry_in", e.RetryIn),
-								zap.Time("expiration", e.Expiration),
-								zap.Error(e.Err),
-							)
-						})),
-				}
+	logger := in.Logger.Named("credentials")
 
-				if in.Durable != nil {
-					opts = append(opts,
-						credentials.LocalStorage(in.Durable, in.Creds.FileName, in.Creds.FilePermissions),
-					)
-				}
+	opts := []credentials.Option{
+		credentials.URL(in.Creds.URL),
+		credentials.HTTPClient(client),
+		credentials.MacAddress(in.ID.DeviceID),
+		credentials.SerialNumber(in.ID.SerialNumber),
+		credentials.HardwareModel(in.ID.HardwareModel),
+		credentials.HardwareManufacturer(in.ID.HardwareManufacturer),
+		credentials.FirmwareVersion(in.ID.FirmwareVersion),
+		credentials.PartnerID(func() string { return in.ID.PartnerID }),
+		credentials.LastRebootReason(in.Ops.LastRebootReason),
+		credentials.XmidtProtocol(xmidtProtocol),
+		credentials.BootRetryWait(time.Second),
+		credentials.RefetchPercent(in.Creds.RefetchPercent),
+		credentials.AddFetchListener(event.FetchListenerFunc(
+			func(e event.Fetch) {
+				logger.Info("fetch",
+					zap.String("origin", e.Origin),
+					zap.Time("at", e.At),
+					zap.Duration("duration", e.Duration),
+					zap.String("uuid", e.UUID.String()),
+					zap.Int("status_code", e.StatusCode),
+					zap.Duration("retry_in", e.RetryIn),
+					zap.Time("expiration", e.Expiration),
+					zap.Error(e.Err),
+				)
+			})),
+	}
 
-				creds, err := credentials.New(opts...)
+	if in.Durable != nil {
+		opts = append(opts,
+			credentials.LocalStorage(in.Durable, in.Creds.FileName, in.Creds.FilePermissions),
+		)
+	}
 
-				in.LC.Append(fx.Hook{
-					OnStart: func(context.Context) error {
-						creds.Start()
-						return nil
-					},
-					OnStop: func(context.Context) error {
-						creds.Stop()
-						return nil
-					},
-				})
+	creds, err := credentials.New(opts...)
 
-				return creds, err
-			},
-		),
-		fx.Invoke(
-			func(*credentials.Credentials) error { return nil },
-		),
-	)
+	in.LC.Append(fx.Hook{
+		OnStart: func(context.Context) error {
+			creds.Start()
+			return nil
+		},
+		OnStop: func(context.Context) error {
+			creds.Stop()
+			return nil
+		},
+	})
+
+	return creds, err
 }
