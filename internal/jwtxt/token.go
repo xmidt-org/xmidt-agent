@@ -150,6 +150,7 @@ func (ins *Instructions) fetch(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, ins.timeout)
 	defer cancel()
 
+	fe.At = time.Now()
 	lines, err := ins.resolver.LookupTXT(ctx, ins.fqdn)
 	if err != nil {
 		var dnsError *net.DNSError
@@ -164,9 +165,11 @@ func (ins *Instructions) fetch(ctx context.Context) error {
 				fe.TemporaryErr = true
 			}
 		}
+		fe.Duration = time.Since(fe.At)
 		fe.Err = err
 		return ins.dispatch(fe)
 	}
+	fe.Duration = time.Since(fe.At)
 
 	fe.Found = true
 

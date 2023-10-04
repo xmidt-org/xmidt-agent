@@ -21,6 +21,12 @@ type Fetch struct {
 	// Timeout indicates whether the query timed out.
 	Timeout bool
 
+	// At holds the time when the fetch request was made.
+	At time.Time
+
+	// Duration is the time waited for the token/response.
+	Duration time.Duration
+
 	// PriorExpiration is the expiration time of the previous TXT record.
 	PriorExpiration time.Time
 

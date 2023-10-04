@@ -26,6 +26,7 @@ func provideInstructions(in instructionsIn) (*jwtxt.Instructions, error) {
 		(in.Service.JwtTxtRedirector.PEMFiles == nil && in.Service.JwtTxtRedirector.PEMs == nil) {
 		return nil, nil
 	}
+
 	logger := in.Logger.Named("jwtxt")
 
 	opts := []jwtxt.Option{
@@ -40,6 +41,8 @@ func provideInstructions(in instructionsIn) (*jwtxt.Instructions, error) {
 					zap.String("server", fe.Server),
 					zap.Bool("found", fe.Found),
 					zap.Bool("timeout", fe.Timeout),
+					zap.Time("at", fe.At),
+					zap.Duration("duration", fe.Duration),
 					zap.Time("prior_expiration", fe.PriorExpiration),
 					zap.Time("expiration", fe.Expiration),
 					zap.Bool("temporary_err", fe.TemporaryErr),
