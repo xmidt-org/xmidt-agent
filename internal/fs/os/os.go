@@ -6,33 +6,47 @@ package os
 import (
 	iofs "io/fs"
 	"os"
+	"path/filepath"
 
 	xafs "github.com/xmidt-org/xmidt-agent/internal/fs"
 )
 
 // Provide the os implementation of the internal FS interface.
-type fs struct{}
+type fs struct {
+	base string
+}
 
-func New() *fs {
-	return &fs{}
+// New creates a new fs struct with the specified base directory.  If the
+// directory does not exist, it is created with 0755 permissions.
+func New(base string) (*fs, error) {
+	tmp := fs{}
+
+	err := xafs.Operate(&tmp, xafs.WithDirs(base, 0755))
+	if err != nil {
+		return nil, err
+	}
+
+	return &fs{
+		base: base,
+	}, nil
 }
 
 // Ensure that the fs struct implements the internal and fs.FS interfaces.
 var _ iofs.FS = (*fs)(nil)
 var _ xafs.FS = (*fs)(nil)
 
-func (*fs) Open(name string) (iofs.File, error) {
-	return os.Open(name)
+func (f *fs) Open(name string) (iofs.File, error) {
+	return os.Open(filepath.Join(f.base, name))
 }
 
-func (*fs) Mkdir(path string, perm iofs.FileMode) error {
-	return os.Mkdir(path, perm)
+func (f *fs) Mkdir(path string, perm iofs.FileMode) error {
+	return os.Mkdir(filepath.Join(f.base, path), perm)
 }
 
-func (*fs) ReadFile(name string) ([]byte, error) {
-	return os.ReadFile(name)
+func (f *fs) ReadFile(name string) ([]byte, error) {
+	return os.ReadFile(filepath.Join(f.base, name))
 }
 
-func (*fs) WriteFile(name string, data []byte, perm iofs.FileMode) error {
-	return os.WriteFile(name, data, perm)
+func (f *fs) WriteFile(name string, data []byte, perm iofs.FileMode) error {
+	return os.WriteFile(filepath.Join(f.base, name), data, perm)
 }

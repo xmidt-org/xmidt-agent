@@ -5,6 +5,7 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"time"
 
@@ -19,7 +20,9 @@ type Config struct {
 	Identity         Identity
 	OperationalState OperationalState
 	XmidtCredentials XmidtCredentials
+	XmidtService     XmidtService
 	Logger           sallust.Config
+	Storage          Storage
 }
 
 type Identity struct {
@@ -37,9 +40,11 @@ type OperationalState struct {
 }
 
 type XmidtCredentials struct {
-	URL            string
-	HTTPClient     arrangehttp.ClientConfig
-	RefetchPercent float64
+	URL             string
+	HTTPClient      arrangehttp.ClientConfig
+	RefetchPercent  float64
+	FileName        string
+	FilePermissions fs.FileMode
 }
 
 type XmidtService struct {
@@ -62,6 +67,11 @@ type JwtTxtRedirector struct {
 type Backoff struct {
 	MinDelay time.Duration
 	MaxDelay time.Duration
+}
+
+type Storage struct {
+	Temporary string
+	Durable   string
 }
 
 // Collect and process the configuration files and env vars and
@@ -125,4 +135,22 @@ func provideConfig(cli *CLI) (*goschtalt.Config, error) {
 // see what the default configuration is.
 // -----------------------------------------------------------------------------
 
-var defaultConfig = Config{}
+var defaultConfig = Config{
+	XmidtCredentials: XmidtCredentials{
+		RefetchPercent:  90.0,
+		FileName:        "credentials.msgpack",
+		FilePermissions: fs.FileMode(0600),
+	},
+	XmidtService: XmidtService{
+		JwtTxtRedirector: JwtTxtRedirector{
+			Required: true,
+			Timeout:  10 * time.Second,
+			AllowedAlgorithms: []string{
+				"EdDSA",
+				"ES256", "ES384", "ES512",
+				"PS256", "PS384", "PS512",
+				"RS256", "RS384", "RS512",
+			},
+		},
+	},
+}

@@ -27,3 +27,6 @@ internal/credentials/cmd/example/*
 
 *.dot
 *.pem
+*.yml
+
+.storage

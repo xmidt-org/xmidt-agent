@@ -69,7 +69,15 @@ func xmidtAgent(args []string) (*fx.App, error) {
 			provideConfig,
 
 			goschtalt.UnmarshalFunc[sallust.Config]("logger", goschtalt.Optional()),
+			goschtalt.UnmarshalFunc[Identity]("identity"),
+			goschtalt.UnmarshalFunc[OperationalState]("operational_state"),
+			goschtalt.UnmarshalFunc[XmidtCredentials]("xmidt_credentials"),
+			goschtalt.UnmarshalFunc[XmidtService]("xmidt_service"),
+			goschtalt.UnmarshalFunc[Storage]("storage"),
 		),
+
+		credentialsModule(),
+		fsProvide(),
 
 		fx.Invoke(),
 	)
