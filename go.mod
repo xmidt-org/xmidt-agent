@@ -15,7 +15,7 @@ require (
 	github.com/xmidt-org/arrange v0.5.0
 	github.com/xmidt-org/eventor v0.0.0-20230910205925-8ff168bd12ed
 	github.com/xmidt-org/sallust v0.2.2
-	github.com/xmidt-org/wrp-go/v3 v3.2.1
+	github.com/xmidt-org/wrp-go/v3 v3.2.2
 	go.uber.org/fx v1.20.1
 	go.uber.org/zap v1.26.0
 	gopkg.in/dealancer/validate.v2 v2.1.0
