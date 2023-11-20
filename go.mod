@@ -22,11 +22,17 @@ require (
 )
 
 require (
+	github.com/gorilla/websocket v1.5.0 // indirect
+	github.com/rs/xid v1.4.0 // indirect
+)
+
+require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/goschtalt/approx v1.0.0 // indirect
 	github.com/leodido/go-urn v1.2.4 // indirect
 	github.com/miekg/dns v1.1.56 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
+	github.com/mochi-mqtt/server/v2 v2.4.1
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/xmidt-org/httpaux v0.4.0 // indirect
 	go.uber.org/dig v1.17.0 // indirect

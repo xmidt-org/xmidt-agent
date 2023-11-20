@@ -16,6 +16,7 @@ import (
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials"
 	"github.com/xmidt-org/xmidt-agent/internal/jwtxt"
+	"github.com/xmidt-org/xmidt-agent/internal/mqtt"
 
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -72,6 +73,7 @@ func xmidtAgent(args []string) (*fx.App, error) {
 			provideConfig,
 			provideCredentials,
 			provideInstructions,
+			mqtt.New,
 
 			goschtalt.UnmarshalFunc[sallust.Config]("logger", goschtalt.Optional()),
 			goschtalt.UnmarshalFunc[Identity]("identity"),
@@ -84,6 +86,7 @@ func xmidtAgent(args []string) (*fx.App, error) {
 		fsProvide(),
 
 		fx.Invoke(
+
 			// TODO: Remove this.
 			// For now require the credentials to be fetched this way.  Later
 			// Other services will depend on this.
@@ -96,6 +99,17 @@ func xmidtAgent(args []string) (*fx.App, error) {
 					fmt.Println(s)
 				}
 			},
+
+			func(server *mqtt.MqttServer) {
+				go func() { 
+					server.Run()
+				}()
+
+				go func() {
+					server.RunDemo()
+				}()
+			},
+
 		),
 	)
 
