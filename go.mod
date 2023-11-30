@@ -11,7 +11,7 @@ require (
 	github.com/goschtalt/yaml-decoder v0.0.1
 	github.com/goschtalt/yaml-encoder v0.0.3
 	github.com/stretchr/testify v1.8.4
-	github.com/ugorji/go/codec v1.2.11
+	github.com/ugorji/go/codec v1.2.12
 	github.com/xmidt-org/arrange v0.5.0
 	github.com/xmidt-org/eventor v0.0.0-20230910205925-8ff168bd12ed
 	github.com/xmidt-org/sallust v0.2.2
