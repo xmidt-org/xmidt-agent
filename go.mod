@@ -5,26 +5,35 @@ go 1.21.0
 require (
 	github.com/alecthomas/kong v0.8.1
 	github.com/foxcpp/go-mockdns v1.0.0
+	github.com/gobwas/ws v1.3.1
 	github.com/golang-jwt/jwt/v5 v5.2.0
 	github.com/google/uuid v1.5.0
 	github.com/goschtalt/goschtalt v0.23.0
 	github.com/goschtalt/yaml-decoder v0.0.1
 	github.com/goschtalt/yaml-encoder v0.0.3
+	github.com/k0kubun/pp v3.0.1+incompatible
 	github.com/stretchr/testify v1.8.4
 	github.com/ugorji/go/codec v1.2.12
 	github.com/xmidt-org/arrange v0.5.0
 	github.com/xmidt-org/eventor v0.0.0-20230910205925-8ff168bd12ed
+	github.com/xmidt-org/retry v0.0.3
 	github.com/xmidt-org/sallust v0.2.2
 	github.com/xmidt-org/wrp-go/v3 v3.2.3
 	go.uber.org/fx v1.20.1
 	go.uber.org/zap v1.26.0
 	gopkg.in/dealancer/validate.v2 v2.1.0
+	nhooyr.io/websocket v1.8.10
 )
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/gobwas/httphead v0.1.0 // indirect
+	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/goschtalt/approx v1.0.0 // indirect
+	github.com/k0kubun/colorstring v0.0.0-20150214042306-9440f1994b88 // indirect
 	github.com/leodido/go-urn v1.2.4 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-isatty v0.0.16 // indirect
 	github.com/miekg/dns v1.1.56 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
