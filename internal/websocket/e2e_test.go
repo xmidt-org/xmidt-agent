@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -240,8 +241,12 @@ func TestEndToEndConnectionIssues(t *testing.T) {
 
 	var msgCnt, connectCnt, disconnectCnt atomic.Int64
 
+	var mutex sync.Mutex
+
 	got, err := ws.New(
 		ws.FetchURL(func(context.Context) (string, error) {
+			mutex.Lock()
+			defer mutex.Unlock()
 			if s.URL == "" {
 				return "", fmt.Errorf("no url")
 			}
@@ -280,15 +285,19 @@ func TestEndToEndConnectionIssues(t *testing.T) {
 	var started bool
 	for {
 		if connectCnt.Load() >= 3 && !started {
+			mutex.Lock()
 			s.Start()
-			defer s.Close()
+			mutex.Unlock()
+			defer func() {
+				mutex.Lock()
+				s.Close()
+				mutex.Unlock()
+			}()
 			started = true
 		}
 		if disconnectCnt.Load() > 0 {
 			break
 		}
-
-		fmt.Printf("connectCnt: %d, disconnectCnt: %d, msgCnt: %d\n", connectCnt.Load(), disconnectCnt.Load(), msgCnt.Load())
 
 		select {
 		case <-ctx.Done():
