@@ -204,10 +204,10 @@ func (c *Credentials) Credentials() (string, time.Time, error) {
 	return c.token.Token, c.token.ExpiresAt, nil
 }
 
-// Decorate decorates the request with the credentials.  If the credentials
+// Decorate decorates the headers with the credentials.  If the credentials
 // are not valid, an error is returned.
-func (c *Credentials) Decorate(req *http.Request) error {
-	err := c.decorate(req)
+func (c *Credentials) Decorate(headers http.Header) error {
+	err := c.decorate(headers)
 	if c.required && err != nil {
 		return err
 	}
@@ -215,10 +215,10 @@ func (c *Credentials) Decorate(req *http.Request) error {
 	return nil
 }
 
-func (c *Credentials) decorate(req *http.Request) error {
+func (c *Credentials) decorate(headers http.Header) error {
 	var e event.Decorate
 
-	if req == nil {
+	if headers == nil {
 		e.Err = ErrNilRequest
 		return c.dispatch(e)
 	}
@@ -238,7 +238,7 @@ func (c *Credentials) decorate(req *http.Request) error {
 		return c.dispatch(e)
 	}
 
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	headers.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 
 	return c.dispatch(e)
 }

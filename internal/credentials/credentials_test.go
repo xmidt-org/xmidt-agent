@@ -445,12 +445,12 @@ func TestEndToEnd(t *testing.T) {
 	assert.NoError(err)
 	assert.NotNil(req)
 
-	err = c.Decorate(req)
+	err = c.Decorate(req.Header)
 	assert.NoError(err)
 	assert.Equal("Bearer token", strings.TrimSpace(req.Header.Get("Authorization")))
 
 	// Decorate the a second time.
-	_ = c.Decorate(req)
+	_ = c.Decorate(req.Header)
 
 	c.Stop()
 
@@ -554,7 +554,7 @@ func TestDecorate(t *testing.T) {
 	assert.ErrorIs(err, ErrNilRequest)
 
 	req, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
-	err = c.Decorate(req)
+	err = c.Decorate(req.Header)
 	assert.ErrorIs(err, ErrNoToken)
 
 	assert.Equal(2, count)
