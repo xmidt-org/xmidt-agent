@@ -16,11 +16,11 @@ import (
 
 // CLI is the structure that is used to capture the command line arguments.
 type CLI struct {
-	Id   string `optional:"" default:"mac:112233445566"                                   help:"The id of the device."`
-	URL  string `optional:"" default:"https://fabric.example.com/api/v2/device"           help:"The URL for the WS connection."`
-	V4   bool   `optional:"" short:"4" name:"4" help:"Only use IPv4" xor:"ipmode"`
-	V6   bool   `optional:"" short:"6" name:"6" help:"Only use IPv6" xor:"ipmode"`
-	Once bool   `optional:"" help:"Only attempt to connect once."`
+	Id   string `optional:"" default:"mac:112233445566"                         help:"The id of the device."`
+	URL  string `optional:"" default:"https://fabric.example.com/api/v2/device" help:"The URL for the WS connection."`
+	V4   bool   `optional:"" short:"4" name:"4" xor:"ipmode"                    help:"Only use IPv4"`
+	V6   bool   `optional:"" short:"6" name:"6" xor:"ipmode"                    help:"Only use IPv6"`
+	Once bool   `optional:""                                                    help:"Only attempt to connect once."`
 }
 
 func main() {
