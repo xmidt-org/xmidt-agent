@@ -42,3 +42,7 @@ issues:
     - path: .go
       # Accept deprecated packages for now.
       text: "SA1019:"
+
+run:
+  skip-files:
+    - "internal/jwtxt/keypairs_for_test.go"

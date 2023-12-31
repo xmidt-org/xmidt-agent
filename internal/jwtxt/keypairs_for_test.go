@@ -4,30 +4,30 @@
 package jwtxt
 
 const (
-	pemECPublic = "" + //nolint:golint,unused
+	pemECPublic = "" +
 		"-----BEGIN PUBLIC KEY-----\n" +
 		"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE2JebmtU5WHi5yHBHmzhyiEGbg6OL\n" +
 		"r463xYdqs/Nzlh2OkaIikanpi7opOuD6wiqFVd9xaMjA54L5vjb5oLcLuA==\n" +
 		"-----END PUBLIC KEY-----"
 
-	pemECPrivate = "" + //nolint:golint,unused
+	pemECPrivate = "" +
 		"-----BEGIN EC PRIVATE KEY-----\n" +
 		"MHcCAQEEIHJCsQFvPLEV45BXU3DLWEVUPiKSYte8knw7ZtrIj6YxoAoGCCqGSM49\n" +
 		"AwEHoUQDQgAE2JebmtU5WHi5yHBHmzhyiEGbg6OLr463xYdqs/Nzlh2OkaIikanp\n" +
 		"i7opOuD6wiqFVd9xaMjA54L5vjb5oLcLuA==\n" +
 		"-----END EC PRIVATE KEY-----"
 
-	pemEdPublic = "" + //nolint:golint,unused
+	pemEdPublic = "" +
 		"-----BEGIN PUBLIC KEY-----\n" +
 		"MCowBQYDK2VwAyEA0WQIwE/DiCikp79XIkJ0H1vDiERaOieGL/1N8B+k7s8=\n" +
 		"-----END PUBLIC KEY-----\n"
 
-	pemEdPrivate = "" + //nolint:golint,unused
+	pemEdPrivate = "" +
 		"-----BEGIN PRIVATE KEY-----\n" +
 		"MC4CAQAwBQYDK2VwBCIEIHdPSdNde11yNaBYj+q/4044LbOo2lVAb73u7aL13UcH\n" +
 		"-----END PRIVATE KEY-----"
 
-	pemRSAPublic = "" + //nolint:golint,unused
+	pemRSAPublic = "" +
 		"-----BEGIN PUBLIC KEY-----\n" +
 		"MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAx3HGBMr6UCtsABqMkG9s\n" +
 		"w0DLRuRZK9M4b535T4vC3i37+3YCLHB9wvOhEOo6b7h6lJehX9Px7pL3ppWu+tr9\n" +
@@ -38,7 +38,7 @@ const (
 		"7QIDAQAB\n" +
 		"-----END PUBLIC KEY-----\n"
 
-	pemRSAPrivate = "" + //nolint:golint,unused
+	pemRSAPrivate = "" +
 		"-----BEGIN RSA PRIVATE KEY-----\n" +
 		"MIIEowIBAAKCAQEAx3HGBMr6UCtsABqMkG9sw0DLRuRZK9M4b535T4vC3i37+3YC\n" +
 		"LHB9wvOhEOo6b7h6lJehX9Px7pL3ppWu+tr9LuCxW+Nz46gpgKAXvVbbuc7VU2O0\n" +
