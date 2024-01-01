@@ -28,9 +28,12 @@ type credsIn struct {
 	Logger  *zap.Logger
 }
 
-func provideCredentials(in credsIn) (*credentials.Credentials, error) {
+func (in credsIn) Options() ([]credentials.Option, error) {
+	logger := in.Logger.Named("credentials")
+
 	// If the URL is empty, then there is no credentials service to use.
 	if in.Creds.URL == "" {
+		logger.Warn("no credentials service configured")
 		return nil, nil
 	}
 
@@ -38,8 +41,6 @@ func provideCredentials(in credsIn) (*credentials.Credentials, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	logger := in.Logger.Named("credentials")
 
 	opts := []credentials.Option{
 		credentials.URL(in.Creds.URL),
@@ -75,6 +76,14 @@ func provideCredentials(in credsIn) (*credentials.Credentials, error) {
 		)
 	}
 
+	return opts, nil
+}
+
+func provideCredentials(in credsIn) (*credentials.Credentials, error) {
+	opts, err := in.Options()
+	if err != nil || opts == nil {
+		return nil, err
+	}
 	creds, err := credentials.New(opts...)
 	if err != nil {
 		return nil, err
@@ -91,5 +100,5 @@ func provideCredentials(in credsIn) (*credentials.Credentials, error) {
 		},
 	})
 
-	return creds, err
+	return creds, nil
 }
