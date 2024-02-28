@@ -150,10 +150,10 @@ func New(opts ...Option) (*Websocket, error) {
 			n         | 255s-511s |           341.333
 		*/
 		RetryPolicy(&retry.Config{
-			Interval:       time.Second,
-			Multiplier:     2.0,
-			Jitter:         1.0 / 3.0,
-			MaxElapsedTime: 341*time.Second + 333*time.Millisecond,
+			Interval:    time.Second,
+			Multiplier:  2.0,
+			Jitter:      1.0 / 3.0,
+			MaxInterval: 341*time.Second + 333*time.Millisecond,
 		}),
 		WithIPv4(),
 		WithIPv6(),
