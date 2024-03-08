@@ -16,6 +16,7 @@ import (
 	"gopkg.in/dealancer/validate.v2"
 )
 
+// Config is the configuration for the xmidt-agent.
 type Config struct {
 	Identity         Identity
 	OperationalState OperationalState
@@ -25,39 +26,96 @@ type Config struct {
 	Storage          Storage
 }
 
+// Identity contains the information that identifies the device.
 type Identity struct {
-	DeviceID             wrp.DeviceID
-	SerialNumber         string
-	HardwareModel        string
+	// DeviceID is the unique identifier for the device.  Generally this is a
+	// MAC address of the "primary" network interface.
+	DeviceID wrp.DeviceID
+
+	// SerialNumber is the serial number of the device.
+	SerialNumber string
+
+	// Manufacturer is the name of the manufacturer of the device.
+	HardwareModel string
+
+	// HardwareManufacturer is the name of the manufacturer of the hardware.
 	HardwareManufacturer string
-	FirmwareVersion      string
-	PartnerID            string
+
+	// FirmwareVersion is the version of the firmware.
+	FirmwareVersion string
+
+	// PartnerID is the identifier for the partner that the device is associated
+	PartnerID string
 }
 
+// OperationalState contains the information about the device's operational state.
 type OperationalState struct {
+	// LastRebootReason is the reason for the last reboot.
 	LastRebootReason string
-	BootTime         time.Time
+
+	// BootTime is the time the device was last booted.
+	BootTime time.Time
 }
 
+// XmidtCredentials contains the information needed to retrieve the credentials
+// from the XMiDT credential server.
 type XmidtCredentials struct {
-	URL             string
-	HTTPClient      arrangehttp.ClientConfig
-	RefetchPercent  float64
-	FileName        string
+	// URL is the URL of the XMiDT credential server.
+	URL string
+
+	// HTTPClient is the configuration for the HTTP client used to retrieve the
+	// credentials.
+	HTTPClient arrangehttp.ClientConfig
+
+	// RefetchPercent is the percentage of the time between the last fetch and
+	// the expiration time to refetch the credentials.  For example, if the
+	// credentials are valid for 1 hour and the refetch percent is 90, then the
+	// credentials will be refetched after 54 minutes.
+	RefetchPercent float64
+
+	// FileName is the name and path of the file to store the credentials.  There
+	// will be another file with the same name and a ".sha256" extension that
+	// contains the SHA256 hash of the credentials file.
+	FileName string
+
+	// FilePermissions is the permissions to use when creating the credentials
+	// file.
 	FilePermissions fs.FileMode
 }
 
+// XmidtService contains the configuration for the XMiDT service endpoint.
 type XmidtService struct {
-	URL              string
+	// URL is the URL of the XMiDT service endpoint.  This is the endpoint that
+	// the device will connect to or use as the fqdn for the JWT TXT redirector.
+	URL string
+
+	// Backoff is the parameters that limit the retry backoff algorithm.
+	Backoff Backoff
+
+	// JwtTxtRedirector is the configuration for the JWT TXT redirector.  If left
+	// empty the JWT TXT redirector is disabled.
 	JwtTxtRedirector JwtTxtRedirector
-	Backoff          Backoff
 }
 
+// JwtTxtRedirector contains the configuration for the JWT TXT redirector.
 type JwtTxtRedirector struct {
+	// AllowedAlgorithms is the list of allowed algorithms for the JWT TXT
+	// redirector. Only specified algorithms will be used for verification.
+	// Valid values are:
+	//	- "EdDSA"
+	//	- "ES256", "ES384", "ES512"
+	//	- "PS256", "PS384", "PS512"
+	//	- "RS256", "RS384", "RS512"
 	AllowedAlgorithms []string
-	Timeout           time.Duration
-	PEMs              []string
-	PEMFiles          []string
+
+	// Timeout is the timeout for the JWT TXT redirector request.
+	Timeout time.Duration
+
+	// PEMs is the list of PEM-encoded public keys to use for verification.
+	PEMs []string
+
+	// PEMFiles is the list of files containing PEM-encoded public keys to use
+	PEMFiles []string
 }
 
 // Backoff defines the parameters that limit the retry backoff algorithm.
