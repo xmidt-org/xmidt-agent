@@ -67,8 +67,8 @@ github.com/xmidt-org/retry v0.0.3 h1:wvmBnEEn1OKwSZaQtr1RZ2Vey8JIvP72mGTgR+3wPiM
 github.com/xmidt-org/retry v0.0.3/go.mod h1:I7FO3VVrxPckNuotwGYZIxfBnmjMSyOTitTKNL0VkIA=
 github.com/xmidt-org/sallust v0.2.2 h1:MrINLEr7cMj6ENx/O76fvpfd5LNGYnk7OipZAGXPYA0=
 github.com/xmidt-org/sallust v0.2.2/go.mod h1:ytBoypcPw10OmjM6b92Jx3eoqWX4J5zVXOQozGwz4qs=
-github.com/xmidt-org/wrp-go/v3 v3.4.0 h1:CZ11X4LdPPSpk76bddl8PdNyW0TiCaIXtbUmKGhp9HQ=
-github.com/xmidt-org/wrp-go/v3 v3.4.0/go.mod h1:jVMp/NDHgLnteXjVKryCVpqAaEs8HQun8bb19et8XUU=
+github.com/xmidt-org/wrp-go/v3 v3.4.1 h1:WJUBwQPDja/v/nwtH14wJWLh22FEXiAGRuBMfxKPMh8=
+github.com/xmidt-org/wrp-go/v3 v3.4.1/go.mod h1:j1kLLoPJmKkMFz/vlwP238WBoFhJgbPyJDN9W2V1TxY=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 go.uber.org/atomic v1.11.0 h1:ZvwS0R+56ePWxUNi+Atn9dWONBPp/AUETXlHW0DxSjE=
 go.uber.org/atomic v1.11.0/go.mod h1:LUxbIzbOniOlMKjJjyPfpl4v+PKK2cNJn91OQbhoJI0=
