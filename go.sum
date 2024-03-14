@@ -65,8 +65,8 @@ github.com/xmidt-org/retry v0.0.3 h1:wvmBnEEn1OKwSZaQtr1RZ2Vey8JIvP72mGTgR+3wPiM
 github.com/xmidt-org/retry v0.0.3/go.mod h1:I7FO3VVrxPckNuotwGYZIxfBnmjMSyOTitTKNL0VkIA=
 github.com/xmidt-org/sallust v0.2.2 h1:MrINLEr7cMj6ENx/O76fvpfd5LNGYnk7OipZAGXPYA0=
 github.com/xmidt-org/sallust v0.2.2/go.mod h1:ytBoypcPw10OmjM6b92Jx3eoqWX4J5zVXOQozGwz4qs=
-github.com/xmidt-org/wrp-go/v3 v3.4.3 h1:0Rk7UtTP2nNPVHhVFzKC/HF4xV9f36x7q4301p1xC6k=
-github.com/xmidt-org/wrp-go/v3 v3.4.3/go.mod h1:j1kLLoPJmKkMFz/vlwP238WBoFhJgbPyJDN9W2V1TxY=
+github.com/xmidt-org/wrp-go/v3 v3.5.0 h1:2HzhdDticGvMVC8z+JWHBsp2si/aE/WQeZutY+erUr0=
+github.com/xmidt-org/wrp-go/v3 v3.5.0/go.mod h1:j1kLLoPJmKkMFz/vlwP238WBoFhJgbPyJDN9W2V1TxY=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 go.uber.org/dig v1.17.1 h1:Tga8Lz8PcYNsWsyHMZ1Vm0OQOUaJNDyvPImgbAu9YSc=
 go.uber.org/dig v1.17.1/go.mod h1:Us0rSJiThwCv2GteUN0Q7OKvU7n5J4dxZ9JKUXozFdE=
