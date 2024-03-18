@@ -79,6 +79,14 @@ func TestEndToEnd(t *testing.T) {
 				func(event.Disconnect) {
 					disconnectCnt.Add(1)
 				})),
+		ws.WithIPv6(),
+		ws.RetryPolicy(&retry.Config{
+			Interval:    time.Second,
+			Multiplier:  2.0,
+			Jitter:      1.0 / 3.0,
+			MaxInterval: 341*time.Second + 333*time.Millisecond,
+		}),
+		ws.NowFunc(time.Now),
 	)
 	require.NoError(err)
 	require.NotNil(got)
@@ -188,6 +196,14 @@ func TestEndToEndBadData(t *testing.T) {
 						func(event.Disconnect) {
 							disconnectCnt.Add(1)
 						})),
+				ws.WithIPv6(),
+				ws.RetryPolicy(&retry.Config{
+					Interval:    time.Second,
+					Multiplier:  2.0,
+					Jitter:      1.0 / 3.0,
+					MaxInterval: 341*time.Second + 333*time.Millisecond,
+				}),
+				ws.NowFunc(time.Now),
 			)
 			require.NoError(err)
 			require.NotNil(got)
@@ -273,6 +289,14 @@ func TestEndToEndConnectionIssues(t *testing.T) {
 				func(event.Disconnect) {
 					disconnectCnt.Add(1)
 				})),
+		ws.WithIPv6(),
+		ws.RetryPolicy(&retry.Config{
+			Interval:    time.Second,
+			Multiplier:  2.0,
+			Jitter:      1.0 / 3.0,
+			MaxInterval: 341*time.Second + 333*time.Millisecond,
+		}),
+		ws.NowFunc(time.Now),
 	)
 	require.NoError(err)
 	require.NotNil(got)

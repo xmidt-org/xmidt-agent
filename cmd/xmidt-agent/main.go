@@ -7,6 +7,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime/debug"
+	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/goschtalt/goschtalt"
@@ -15,7 +17,8 @@ import (
 	_ "github.com/goschtalt/yaml-encoder"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials"
-	"github.com/xmidt-org/xmidt-agent/internal/jwtxt"
+	"github.com/xmidt-org/xmidt-agent/internal/websocket"
+	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
 
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -41,6 +44,16 @@ type CLI struct {
 	Show  bool     `optional:"" short:"s" help:"Show the configuration and exit."`
 	Graph string   `optional:"" short:"g" help:"Output the dependency graph to the specified file."`
 	Files []string `optional:"" short:"f" help:"Specific configuration files or directories."`
+}
+
+type LifeCycleIn struct {
+	fx.In
+	Logger     *zap.Logger
+	LC         fx.Lifecycle
+	Shutdowner fx.Shutdowner
+	WS         *websocket.Websocket
+	Cred       *credentials.Credentials
+	CancelList []event.CancelFunc
 }
 
 // xmidtAgent is the main entry point for the program.  It is responsible for
@@ -72,6 +85,7 @@ func xmidtAgent(args []string) (*fx.App, error) {
 			provideConfig,
 			provideCredentials,
 			provideInstructions,
+			provideWS,
 
 			goschtalt.UnmarshalFunc[sallust.Config]("logger", goschtalt.Optional()),
 			goschtalt.UnmarshalFunc[Identity]("identity"),
@@ -79,23 +93,13 @@ func xmidtAgent(args []string) (*fx.App, error) {
 			goschtalt.UnmarshalFunc[XmidtCredentials]("xmidt_credentials"),
 			goschtalt.UnmarshalFunc[XmidtService]("xmidt_service"),
 			goschtalt.UnmarshalFunc[Storage]("storage"),
+			goschtalt.UnmarshalFunc[Websocket]("websocket"),
 		),
 
 		fsProvide(),
 
 		fx.Invoke(
-			// TODO: Remove this.
-			// For now require the credentials to be fetched this way.  Later
-			// Other services will depend on this.
-			func(*credentials.Credentials) {},
-
-			// TODO: Remove this, too.
-			func(i *jwtxt.Instructions) {
-				if i != nil {
-					s, _ := i.Endpoint(context.Background())
-					fmt.Println(s)
-				}
-			},
+			lifeCycle,
 		),
 	)
 
@@ -170,29 +174,100 @@ func provideCLIWithOpts(args cliArgs, testOpts bool) (*CLI, error) {
 	return &cli, nil
 }
 
+type LoggerIn struct {
+	fx.In
+	CLI *CLI
+	Cfg sallust.Config
+}
+
 // Create the logger and configure it based on if the program is in
 // debug mode or normal mode.
-func provideLogger(cli *CLI, cfg sallust.Config) (*zap.Logger, error) {
-	if cli.Dev {
-		cfg.Level = "DEBUG"
-		cfg.Development = true
-		cfg.Encoding = "console"
-		cfg.EncoderConfig = sallust.EncoderConfig{
-			TimeKey:        "T",
-			LevelKey:       "L",
-			NameKey:        "N",
-			CallerKey:      "C",
-			FunctionKey:    zapcore.OmitKey,
-			MessageKey:     "M",
-			StacktraceKey:  "S",
-			LineEnding:     zapcore.DefaultLineEnding,
-			EncodeLevel:    "capitalColor",
-			EncodeTime:     "RFC3339",
-			EncodeDuration: "string",
-			EncodeCaller:   "short",
-		}
-		cfg.OutputPaths = []string{"stderr"}
-		cfg.ErrorOutputPaths = []string{"stderr"}
+func provideLogger(in LoggerIn) (*zap.Logger, error) {
+	in.Cfg.EncoderConfig = sallust.EncoderConfig{
+		TimeKey:        "T",
+		LevelKey:       "L",
+		NameKey:        "N",
+		CallerKey:      "C",
+		FunctionKey:    zapcore.OmitKey,
+		MessageKey:     "M",
+		StacktraceKey:  "S",
+		LineEnding:     zapcore.DefaultLineEnding,
+		EncodeLevel:    "capitalColor",
+		EncodeTime:     "RFC3339",
+		EncodeDuration: "string",
+		EncodeCaller:   "short",
 	}
-	return cfg.Build()
+
+	if in.CLI.Dev {
+		in.Cfg.Level = "DEBUG"
+		in.Cfg.Development = true
+		in.Cfg.Encoding = "console"
+		in.Cfg.OutputPaths = append(in.Cfg.OutputPaths, "stderr")
+		in.Cfg.ErrorOutputPaths = append(in.Cfg.ErrorOutputPaths, "stderr")
+	}
+
+	return in.Cfg.Build()
+}
+
+func onStart(cred *credentials.Credentials, ws *websocket.Websocket, logger *zap.Logger) func(context.Context) error {
+	logger = logger.Named("on_start")
+
+	return func(ctx context.Context) error {
+		defer func() {
+			if r := recover(); nil != r {
+				logger.Error("stacktrace from panic", zap.String("stacktrace", string(debug.Stack())), zap.Any("panic", r))
+			}
+		}()
+
+		if ws == nil {
+			logger.Debug("websocket disabled")
+			return nil
+		}
+
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+		// blocks until an attempt to fetch the credentials has been made or the context is canceled
+		cred.WaitUntilFetched(ctx)
+		ws.Start()
+
+		return nil
+	}
+}
+
+func onStop(ws *websocket.Websocket, shutdowner fx.Shutdowner, cancelList []event.CancelFunc, logger *zap.Logger) func(context.Context) error {
+	logger = logger.Named("on_stop")
+
+	return func(_ context.Context) error {
+		defer func() {
+			if r := recover(); nil != r {
+				logger.Error("stacktrace from panic", zap.String("stacktrace", string(debug.Stack())), zap.Any("panic", r))
+			}
+
+			if err := shutdowner.Shutdown(); err != nil {
+				logger.Error("encountered error trying to shutdown app: ", zap.Error(err))
+			}
+		}()
+
+		if ws == nil {
+			logger.Debug("websocket disabled")
+			return nil
+		}
+
+		ws.Stop()
+		for _, c := range cancelList {
+			c()
+		}
+
+		return nil
+	}
+}
+
+func lifeCycle(in LifeCycleIn) {
+	logger := in.Logger.Named("fx_lifecycle")
+	in.LC.Append(
+		fx.Hook{
+			OnStart: onStart(in.Cred, in.WS, logger),
+			OnStop:  onStop(in.WS, in.Shutdowner, in.CancelList, logger),
+		},
+	)
 }

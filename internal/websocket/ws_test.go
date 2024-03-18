@@ -26,6 +26,9 @@ func TestNew(t *testing.T) {
 		return "http://example.com/url", nil
 	}
 
+	wsDefaults := []Option{
+		WithIPv6(),
+	}
 	tests := []struct {
 		description string
 		opts        []Option
@@ -39,7 +42,8 @@ func TestNew(t *testing.T) {
 			expectedErr: errUnknown,
 		}, {
 			description: "common config",
-			opts: []Option{
+			opts: append(
+				wsDefaults,
 				FetchURL(fetcher),
 				DeviceID("mac:112233445566"),
 				AdditionalHeaders(map[string][]string{
@@ -49,7 +53,7 @@ func TestNew(t *testing.T) {
 					h.Add("Credentials-Decorator", "some value")
 					return nil
 				}),
-			},
+			),
 			check: func(assert *assert.Assertions, c *Websocket) {
 				// URL Related
 				assert.Equal("mac:112233445566", string(c.id))
@@ -76,10 +80,11 @@ func TestNew(t *testing.T) {
 			expectedErr: errUnknown,
 		}, {
 			description: "fetcher",
-			opts: []Option{
+			opts: append(
+				wsDefaults,
 				DeviceID("mac:112233445566"),
 				FetchURL(fetcher),
-			},
+			),
 			check: func(assert *assert.Assertions, c *Websocket) {
 				u, err := c.urlFetcher(context.Background())
 				assert.NoError(err)
@@ -129,13 +134,14 @@ func TestNew(t *testing.T) {
 		// Test the now func option
 		{
 			description: "custom now func",
-			opts: []Option{
+			opts: append(
+				wsDefaults,
 				URL("http://example.com"),
 				DeviceID("mac:112233445566"),
 				NowFunc(func() time.Time {
 					return time.Unix(1234, 0)
 				}),
-			},
+			),
 			check: func(assert *assert.Assertions, c *Websocket) {
 				if assert.NotNil(c.nowFunc) {
 					assert.Equal(time.Unix(1234, 0), c.nowFunc())
@@ -189,6 +195,7 @@ func TestMessageListener(t *testing.T) {
 		URL("http://example.com"),
 		DeviceID("mac:112233445566"),
 		AddMessageListener(&m),
+		WithIPv6(),
 	)
 
 	assert.NoError(err)
@@ -211,6 +218,7 @@ func TestConnectListener(t *testing.T) {
 		URL("http://example.com"),
 		DeviceID("mac:112233445566"),
 		AddConnectListener(&m),
+		WithIPv6(),
 	)
 
 	assert.NoError(err)
@@ -233,6 +241,7 @@ func TestDisconnectListener(t *testing.T) {
 		URL("http://example.com"),
 		DeviceID("mac:112233445566"),
 		AddDisconnectListener(&m),
+		WithIPv6(),
 	)
 
 	assert.NoError(err)
@@ -255,6 +264,7 @@ func TestHeartbeatListener(t *testing.T) {
 		URL("http://example.com"),
 		DeviceID("mac:112233445566"),
 		AddHeartbeatListener(&m),
+		WithIPv6(),
 	)
 
 	assert.NoError(err)
@@ -277,13 +287,22 @@ func TestNextMode(t *testing.T) {
 			description: "IPv4 to IPv6",
 			mode:        ipv4,
 			expected:    ipv6,
+			opts: []Option{
+				WithIPv6(true),
+				WithIPv4(true),
+			},
 		}, {
 			description: "IPv6 to IPv4",
 			mode:        ipv6,
 			expected:    ipv4,
+			opts: []Option{
+				WithIPv6(true),
+				WithIPv4(true),
+			},
 		}, {
 			description: "IPv4 to IPv4",
 			opts: []Option{
+				WithIPv4(true),
 				WithIPv6(false),
 			},
 			mode:     ipv4,
@@ -292,6 +311,7 @@ func TestNextMode(t *testing.T) {
 			description: "IPv6 to IPv6",
 			opts: []Option{
 				WithIPv4(false),
+				WithIPv6(true),
 			},
 			mode:     ipv6,
 			expected: ipv6,
