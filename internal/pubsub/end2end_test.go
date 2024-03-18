@@ -78,6 +78,7 @@ var messages = []msgWithExpectations{
 }
 
 type mockHandler struct {
+	lock   sync.Mutex
 	wg     *sync.WaitGroup
 	name   string
 	calls  int
@@ -92,6 +93,9 @@ func (h *mockHandler) WG(wg *sync.WaitGroup) {
 }
 
 func (h *mockHandler) HandleWrp(msg wrp.Message) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
 	h.calls++
 	dest, _ := wrp.ParseLocator(msg.Destination)
 	h.dests = append(h.dests, dest)
@@ -99,7 +103,10 @@ func (h *mockHandler) HandleWrp(msg wrp.Message) {
 	//fmt.Printf("%s done\n", h.name)
 }
 
-func (h mockHandler) assert(a *assert.Assertions) {
+func (h *mockHandler) assert(a *assert.Assertions) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
 	if !a.Equal(len(h.expect), h.calls, "handler %s calls mismatch", h.name) {
 		return
 	}
