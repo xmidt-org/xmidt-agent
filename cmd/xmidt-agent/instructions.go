@@ -4,7 +4,9 @@
 package main
 
 import (
+	"encoding/pem"
 	"os"
+	"strings"
 
 	"github.com/xmidt-org/xmidt-agent/internal/jwtxt"
 	"github.com/xmidt-org/xmidt-agent/internal/jwtxt/event"
@@ -55,8 +57,19 @@ func provideInstructions(in instructionsIn) (*jwtxt.Instructions, error) {
 
 	if len(in.Service.JwtTxtRedirector.PEMs) > 0 {
 		pems := make([][]byte, 0, len(in.Service.JwtTxtRedirector.PEMs))
-		for _, pem := range in.Service.JwtTxtRedirector.PEMs {
-			pems = append(pems, []byte(pem))
+		for _, item := range in.Service.JwtTxtRedirector.PEMs {
+			block, rest := pem.Decode([]byte(item))
+
+			if block == nil || strings.TrimSpace(string(rest)) != "" {
+				return nil, jwtxt.ErrInvalidInput
+			}
+
+			buf := pem.EncodeToMemory(block)
+			if buf == nil {
+				return nil, jwtxt.ErrInvalidInput
+			}
+
+			pems = append(pems, buf)
 		}
 		opts = append(opts, jwtxt.WithPEMs(pems...))
 	}

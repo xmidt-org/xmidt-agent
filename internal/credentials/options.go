@@ -15,11 +15,15 @@ import (
 
 type optionFunc func(*Credentials) error
 
+var _ Option = optionFunc(nil)
+
 func (f optionFunc) apply(c *Credentials) error {
 	return f(c)
 }
 
 type nilOptionFunc func(*Credentials)
+
+var _ Option = nilOptionFunc(nil)
 
 func (f nilOptionFunc) apply(c *Credentials) error {
 	f(c)
