@@ -232,7 +232,6 @@ func (ws *Websocket) run(ctx context.Context) {
 	ws.wg.Add(1)
 	defer ws.wg.Done()
 
-	pingTicker := time.NewTicker(ws.pingInterval)
 	decoder := wrp.NewDecoder(nil, wrp.Msgpack)
 	encoder := wrp.NewEncoder(nil, wrp.Msgpack)
 	mode := ws.nextMode(ipv4)
