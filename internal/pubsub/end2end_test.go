@@ -6,11 +6,13 @@ package pubsub_test
 import (
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
+	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 )
 
 type msgWithExpectations struct {
@@ -74,6 +76,14 @@ var messages = []msgWithExpectations{
 			ContentType: string([]byte{0xbf}),
 		},
 		expectErr: wrp.ErrNotUTF8,
+	}, {
+		// no handlers for this message
+		msg: wrp.Message{
+			Type:        wrp.SimpleEventMessageType,
+			Source:      "self:/ignore-me",
+			Destination: "self:/ignored-service/ignored",
+		},
+		expectErr: wrpkit.ErrNotHandled,
 	},
 }
 
@@ -84,6 +94,7 @@ type mockHandler struct {
 	calls  int
 	dests  []wrp.Locator
 	expect []wrp.Locator
+	rv     []error
 }
 
 func (h *mockHandler) WG(wg *sync.WaitGroup) {
@@ -92,15 +103,21 @@ func (h *mockHandler) WG(wg *sync.WaitGroup) {
 	//fmt.Printf("%s adding %d to the wait group\n", h.name, len(h.expect))
 }
 
-func (h *mockHandler) HandleWrp(msg wrp.Message) {
+func (h *mockHandler) HandleWrp(msg wrp.Message) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
-
+	calls := h.calls
 	h.calls++
+
 	dest, _ := wrp.ParseLocator(msg.Destination)
 	h.dests = append(h.dests, dest)
 	h.wg.Done()
 	//fmt.Printf("%s done\n", h.name)
+	if calls < len(h.rv) {
+		return h.rv[calls]
+	}
+
+	return nil
 }
 
 func (h *mockHandler) assert(a *assert.Assertions) {
@@ -172,18 +189,27 @@ func TestEndToEnd(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
-	transIdValidator := pubsub.HandlerFunc(
-		func(msg wrp.Message) {
+	transIdValidator := wrpkit.HandlerFunc(
+		func(msg wrp.Message) error {
 			if msg.TransactionUUID == "" {
 				assert.Fail("transaction UUID is empty")
 			}
+			return wrpkit.ErrNotHandled
 		})
 
-	noTransIdValidator := pubsub.HandlerFunc(
-		func(msg wrp.Message) {
+	noTransIdValidator := wrpkit.HandlerFunc(
+		func(msg wrp.Message) error {
+			src, err := wrp.ParseLocator(msg.Source)
+			assert.NoError(err)
+
+			if src.Service == "ignore-me" {
+				return wrpkit.ErrNotHandled
+			}
+
 			if msg.TransactionUUID != "" {
 				assert.Fail("transaction UUID is not empty")
 			}
+			return wrpkit.ErrNotHandled
 		})
 
 	var allCancel, singleCancel, serviceCancel, egressCancel pubsub.CancelFunc
@@ -211,7 +237,7 @@ func TestEndToEnd(t *testing.T) {
 
 	for _, m := range messages {
 		msg := m.msg
-		err := ps.Publish(&msg)
+		err := ps.HandleWrp(msg)
 
 		if m.expectErr != nil {
 			assert.ErrorIs(err, m.expectErr)
@@ -226,4 +252,34 @@ func TestEndToEnd(t *testing.T) {
 	singleEventListener.assert(assert)
 	singleServiceListener.assert(assert)
 	egressListener.assert(assert)
+}
+
+func TestTimeout(t *testing.T) {
+	id := wrp.DeviceID("mac:112233445566")
+
+	assert := assert.New(t)
+	require := require.New(t)
+
+	timeoutHandler := wrpkit.HandlerFunc(
+		func(msg wrp.Message) error {
+			time.Sleep(100 * time.Millisecond)
+			return nil
+		})
+
+	ps, err := pubsub.New(id,
+		pubsub.WithPublishTimeout(50*time.Millisecond),
+		pubsub.WithEgressHandler(timeoutHandler),
+	)
+
+	require.NoError(err)
+	require.NotNil(ps)
+
+	msg := wrp.Message{
+		Type:        wrp.SimpleEventMessageType,
+		Source:      "self:/service/ignored",
+		Destination: "event:event_1/ignored",
+	}
+
+	err = ps.HandleWrp(msg)
+	assert.ErrorIs(err, pubsub.ErrTimeout)
 }
