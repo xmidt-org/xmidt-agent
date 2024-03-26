@@ -5,14 +5,18 @@ package pubsub
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 )
 
 func TestNew(t *testing.T) {
-	fn := HandlerFunc(func(wrp.Message) {})
+	fn := wrpkit.HandlerFunc(func(wrp.Message) error {
+		return nil
+	})
 
 	tests := []struct {
 		description string
@@ -114,6 +118,11 @@ func TestNew(t *testing.T) {
 			description: "Empty Event Name",
 			self:        "mac:112233445566",
 			opts:        []Option{WithEventHandler("", fn)},
+			expectedErr: ErrInvalidInput,
+		}, {
+			description: "Invalid timeout",
+			self:        "mac:112233445566",
+			opts:        []Option{WithPublishTimeout(-1 * time.Second)},
 			expectedErr: ErrInvalidInput,
 		},
 	}
