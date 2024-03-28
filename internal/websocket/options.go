@@ -79,7 +79,7 @@ func CredentialsDecorator(f func(http.Header) error) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
 			if f == nil {
-				return fmt.Errorf("%w: negative FetchURLTimeout", ErrMisconfiguredWS)
+				return fmt.Errorf("%w: nil CredentialsDecorator", ErrMisconfiguredWS)
 			}
 
 			ws.credDecorator = f

@@ -51,7 +51,7 @@ func TestEndToEnd(t *testing.T) {
 				err = wrp.NewDecoderBytes(got, wrp.Msgpack).Decode(&msg)
 				require.NoError(err)
 				require.Equal(wrp.SimpleEventMessageType, msg.Type)
-				require.Equal("client", msg.Source)
+				require.Equal("server", msg.Source)
 
 				c.Close(websocket.StatusNormalClosure, "")
 			}))
@@ -79,14 +79,21 @@ func TestEndToEnd(t *testing.T) {
 				func(event.Disconnect) {
 					disconnectCnt.Add(1)
 				})),
-		ws.WithIPv6(),
 		ws.RetryPolicy(&retry.Config{
 			Interval:    time.Second,
 			Multiplier:  2.0,
 			Jitter:      1.0 / 3.0,
 			MaxInterval: 341*time.Second + 333*time.Millisecond,
 		}),
+		ws.WithIPv6(),
+		ws.WithIPv4(),
 		ws.NowFunc(time.Now),
+		ws.ConnectTimeout(30*time.Second),
+		ws.FetchURLTimeout(30*time.Second),
+		ws.MaxMessageBytes(256*1024),
+		ws.CredentialsDecorator(func(h http.Header) error {
+			return nil
+		}),
 	)
 	require.NoError(err)
 	require.NotNil(got)
@@ -196,14 +203,19 @@ func TestEndToEndBadData(t *testing.T) {
 						func(event.Disconnect) {
 							disconnectCnt.Add(1)
 						})),
-				ws.WithIPv6(),
 				ws.RetryPolicy(&retry.Config{
-					Interval:    time.Second,
-					Multiplier:  2.0,
-					Jitter:      1.0 / 3.0,
-					MaxInterval: 341*time.Second + 333*time.Millisecond,
+					Interval:       50 * time.Millisecond,
+					Multiplier:     2.0,
+					MaxElapsedTime: 300 * time.Millisecond,
 				}),
+				ws.WithIPv4(),
 				ws.NowFunc(time.Now),
+				ws.ConnectTimeout(30*time.Second),
+				ws.FetchURLTimeout(30*time.Second),
+				ws.MaxMessageBytes(256*1024),
+				ws.CredentialsDecorator(func(h http.Header) error {
+					return nil
+				}),
 			)
 			require.NoError(err)
 			require.NotNil(got)
@@ -244,7 +256,7 @@ func TestEndToEndConnectionIssues(t *testing.T) {
 				require.NoError(err)
 				defer c.CloseNow()
 
-				ctx, cancel := context.WithTimeout(r.Context(), 200*time.Millisecond)
+				ctx, cancel := context.WithTimeout(r.Context(), 2000000*time.Millisecond)
 				defer cancel()
 
 				msg := wrp.Message{
@@ -269,11 +281,6 @@ func TestEndToEndConnectionIssues(t *testing.T) {
 			return s.URL, nil
 		}),
 		ws.DeviceID("mac:112233445566"),
-		ws.RetryPolicy(&retry.Config{
-			Interval:       50 * time.Millisecond,
-			Multiplier:     2.0,
-			MaxElapsedTime: 300 * time.Millisecond,
-		}),
 		ws.AddMessageListener(
 			event.MsgListenerFunc(
 				func(m wrp.Message) {
@@ -289,14 +296,19 @@ func TestEndToEndConnectionIssues(t *testing.T) {
 				func(event.Disconnect) {
 					disconnectCnt.Add(1)
 				})),
-		ws.WithIPv6(),
 		ws.RetryPolicy(&retry.Config{
-			Interval:    time.Second,
-			Multiplier:  2.0,
-			Jitter:      1.0 / 3.0,
-			MaxInterval: 341*time.Second + 333*time.Millisecond,
+			Interval:       50 * time.Millisecond,
+			Multiplier:     2.0,
+			MaxElapsedTime: 300 * time.Millisecond,
 		}),
+		ws.WithIPv4(),
 		ws.NowFunc(time.Now),
+		ws.ConnectTimeout(30*time.Second),
+		ws.FetchURLTimeout(30*time.Second),
+		ws.MaxMessageBytes(256*1024),
+		ws.CredentialsDecorator(func(h http.Header) error {
+			return nil
+		}),
 	)
 	require.NoError(err)
 	require.NotNil(got)

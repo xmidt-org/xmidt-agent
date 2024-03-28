@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
 )
@@ -53,6 +54,8 @@ func TestNew(t *testing.T) {
 					h.Add("Credentials-Decorator", "some value")
 					return nil
 				}),
+				NowFunc(time.Now),
+				RetryPolicy(retry.Config{}),
 			),
 			check: func(assert *assert.Assertions, c *Websocket) {
 				// URL Related
@@ -84,6 +87,11 @@ func TestNew(t *testing.T) {
 				wsDefaults,
 				DeviceID("mac:112233445566"),
 				FetchURL(fetcher),
+				CredentialsDecorator(func(h http.Header) error {
+					return nil
+				}),
+				NowFunc(time.Now),
+				RetryPolicy(retry.Config{}),
 			),
 			check: func(assert *assert.Assertions, c *Websocket) {
 				u, err := c.urlFetcher(context.Background())
@@ -141,6 +149,10 @@ func TestNew(t *testing.T) {
 				NowFunc(func() time.Time {
 					return time.Unix(1234, 0)
 				}),
+				CredentialsDecorator(func(h http.Header) error {
+					return nil
+				}),
+				RetryPolicy(retry.Config{}),
 			),
 			check: func(assert *assert.Assertions, c *Websocket) {
 				if assert.NotNil(c.nowFunc) {
@@ -196,6 +208,11 @@ func TestMessageListener(t *testing.T) {
 		DeviceID("mac:112233445566"),
 		AddMessageListener(&m),
 		WithIPv6(),
+		CredentialsDecorator(func(h http.Header) error {
+			return nil
+		}),
+		NowFunc(time.Now),
+		RetryPolicy(retry.Config{}),
 	)
 
 	assert.NoError(err)
@@ -219,6 +236,11 @@ func TestConnectListener(t *testing.T) {
 		DeviceID("mac:112233445566"),
 		AddConnectListener(&m),
 		WithIPv6(),
+		CredentialsDecorator(func(h http.Header) error {
+			return nil
+		}),
+		NowFunc(time.Now),
+		RetryPolicy(retry.Config{}),
 	)
 
 	assert.NoError(err)
@@ -242,6 +264,11 @@ func TestDisconnectListener(t *testing.T) {
 		DeviceID("mac:112233445566"),
 		AddDisconnectListener(&m),
 		WithIPv6(),
+		CredentialsDecorator(func(h http.Header) error {
+			return nil
+		}),
+		NowFunc(time.Now),
+		RetryPolicy(retry.Config{}),
 	)
 
 	assert.NoError(err)
@@ -265,6 +292,11 @@ func TestHeartbeatListener(t *testing.T) {
 		DeviceID("mac:112233445566"),
 		AddHeartbeatListener(&m),
 		WithIPv6(),
+		CredentialsDecorator(func(h http.Header) error {
+			return nil
+		}),
+		NowFunc(time.Now),
+		RetryPolicy(retry.Config{}),
 	)
 
 	assert.NoError(err)
@@ -277,6 +309,13 @@ func TestHeartbeatListener(t *testing.T) {
 }
 
 func TestNextMode(t *testing.T) {
+	defaults := []Option{
+		CredentialsDecorator(func(h http.Header) error {
+			return nil
+		}),
+		NowFunc(time.Now),
+		RetryPolicy(retry.Config{}),
+	}
 	tests := []struct {
 		description string
 		opts        []Option
@@ -287,32 +326,32 @@ func TestNextMode(t *testing.T) {
 			description: "IPv4 to IPv6",
 			mode:        ipv4,
 			expected:    ipv6,
-			opts: []Option{
+			opts: append(defaults,
 				WithIPv6(true),
 				WithIPv4(true),
-			},
+			),
 		}, {
 			description: "IPv6 to IPv4",
 			mode:        ipv6,
 			expected:    ipv4,
-			opts: []Option{
+			opts: append(defaults,
 				WithIPv6(true),
 				WithIPv4(true),
-			},
+			),
 		}, {
 			description: "IPv4 to IPv4",
-			opts: []Option{
+			opts: append(defaults,
 				WithIPv4(true),
 				WithIPv6(false),
-			},
+			),
 			mode:     ipv4,
 			expected: ipv4,
 		}, {
 			description: "IPv6 to IPv6",
-			opts: []Option{
+			opts: append(defaults,
 				WithIPv4(false),
 				WithIPv6(true),
-			},
+			),
 			mode:     ipv6,
 			expected: ipv6,
 		},

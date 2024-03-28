@@ -123,6 +123,10 @@ func New(opts ...Option) (*Websocket, error) {
 		validateDeviceID(),
 		validateURL(),
 		validateIPMode(),
+		validateFetchURL(),
+		validateCredentialsDecorator(),
+		validateNowFunc(),
+		validRetryPolicy(),
 	)
 
 	for _, opt := range opts {
