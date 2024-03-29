@@ -6,11 +6,13 @@ package main
 import (
 	"fmt"
 	"io/fs"
+	"net/http"
 	"os"
 	"time"
 
 	"github.com/goschtalt/goschtalt"
 	"github.com/xmidt-org/arrange/arrangehttp"
+	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/wrp-go/v3"
 	"gopkg.in/dealancer/validate.v2"
@@ -18,12 +20,52 @@ import (
 
 // Config is the configuration for the xmidt-agent.
 type Config struct {
+	Websocket        Websocket
 	Identity         Identity
 	OperationalState OperationalState
 	XmidtCredentials XmidtCredentials
 	XmidtService     XmidtService
 	Logger           sallust.Config
 	Storage          Storage
+}
+
+type Websocket struct {
+	// Disable determines whether or not to disable xmidt-agent's websocket
+	Disable bool
+	// URLPath is the device registration url path
+	URLPath string
+	// AdditionalHeaders are any additional headers for the WS connection.
+	AdditionalHeaders http.Header
+	// FetchURLTimeout is the timeout for the fetching the WS url. If this is not set, the default is 30 seconds.
+	FetchURLTimeout time.Duration
+	// PingInterval is the ping interval allowed for the WS connection.
+	PingInterval time.Duration
+	// PingTimeout is the ping timeout for the WS connection.
+	PingTimeout time.Duration
+	// ConnectTimeout is the connect timeout for the WS connection.
+	ConnectTimeout time.Duration
+	// KeepAliveInterval is the keep alive interval for the WS connection.
+	KeepAliveInterval time.Duration
+	// IdleConnTimeout is the idle connection timeout for the WS connection.
+	IdleConnTimeout time.Duration
+	// TLSHandshakeTimeout is the TLS handshake timeout for the WS connection.
+	TLSHandshakeTimeout time.Duration
+	// ExpectContinueTimeout is the expect continue timeout for the WS connection.
+	ExpectContinueTimeout time.Duration
+	// MaxMessageBytes is the largest allowable message to send or receive.
+	MaxMessageBytes int64
+	// (optional) DisableV4 determines whether or not to allow IPv4 for the WS connection.
+	// If this is not set, the default is false (IPv4 is enabled).
+	// Either V4 or V6 can be disabled, but not both.
+	DisableV4 bool
+	// (optional) DisableV6 determines whether or not to allow IPv6 for the WS connection.
+	// If this is not set, the default is false (IPv6 is enabled).
+	// Either V4 or V6 can be disabled, but not both.
+	DisableV6 bool
+	// RetryPolicy sets the retry policy factory used for delaying between retry attempts for reconnection.
+	RetryPolicy retry.Config
+	// Once sets whether or not to only attempt to connect once.
+	Once bool
 }
 
 // Identity contains the information that identifies the device.
@@ -207,6 +249,45 @@ var defaultConfig = Config{
 				"PS256", "PS384", "PS512",
 				"RS256", "RS384", "RS512",
 			},
+		},
+	},
+	Websocket: Websocket{
+		URLPath:               "api/v2/device",
+		FetchURLTimeout:       30 * time.Second,
+		PingInterval:          30 * time.Second,
+		PingTimeout:           90 * time.Second,
+		ConnectTimeout:        30 * time.Second,
+		KeepAliveInterval:     30 * time.Second,
+		IdleConnTimeout:       10 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		MaxMessageBytes:       256 * 1024,
+		/*
+			This retry policy gives us a very good approximation of the prior
+			policy.  The important things about this policy are:
+
+			1. The backoff increases up to the max.
+			2. There is jitter that spreads the load so windows do not overlap.
+
+			iteration | parodus   | this implementation
+			----------+-----------+----------------
+			0         | 0-1s      |   0.666 -  1.333
+			1         | 1s-3s     |   1.333 -  2.666
+			2         | 3s-7s     |   2.666 -  5.333
+			3         | 7s-15s    |   5.333 -  10.666
+			4         | 15s-31s   |  10.666 -  21.333
+			5         | 31s-63s   |  21.333 -  42.666
+			6         | 63s-127s  |  42.666 -  85.333
+			7         | 127s-255s |  85.333 - 170.666
+			8         | 255s-511s | 170.666 - 341.333
+			9         | 255s-511s |           341.333
+			n         | 255s-511s |           341.333
+		*/
+		RetryPolicy: retry.Config{
+			Interval:    time.Second,
+			Multiplier:  2.0,
+			Jitter:      1.0 / 3.0,
+			MaxInterval: 341*time.Second + 333*time.Millisecond,
 		},
 	},
 }

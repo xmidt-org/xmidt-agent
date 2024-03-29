@@ -6,6 +6,7 @@ package websocket
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"sync"
@@ -23,6 +24,11 @@ var (
 	ErrClosed          = errors.New("websocket closed")
 	ErrInvalidMsgType  = errors.New("invalid message type")
 )
+
+// emptyBuffer is solely used as an address of a global empty buffer.
+// This sentinel value will reset pointers of the writePump's encoder
+// such that the gc can clean things up.
+var emptyBuffer = []byte{}
 
 type Websocket struct {
 	// id is the device ID for the WS connection.
@@ -113,58 +119,14 @@ func (f optionFunc) apply(c *Websocket) error {
 func New(opts ...Option) (*Websocket, error) {
 	var ws Websocket
 
-	defaults := []Option{
-		NowFunc(time.Now),
-		FetchURLTimeout(30 * time.Second),
-		PingInterval(30 * time.Second),
-		PingTimeout(90 * time.Second),
-		ConnectTimeout(30 * time.Second),
-		KeepAliveInterval(30 * time.Second),
-		IdleConnTimeout(10 * time.Second),
-		TLSHandshakeTimeout(10 * time.Second),
-		ExpectContinueTimeout(1 * time.Second),
-		MaxMessageBytes(256 * 1024),
-		WithIPv4(),
-		WithIPv6(),
-		Once(false),
-
-		/*
-			This retry policy gives us a very good approximation of the prior
-			policy.  The important things about this policy are:
-
-			1. The backoff increases up to the max.
-			2. There is jitter that spreads the load so windows do not overlap.
-
-			iteration | parodus   | this implementation
-			----------+-----------+----------------
-			0         | 0-1s      |   0.666 -  1.333
-			1         | 1s-3s     |   1.333 -  2.666
-			2         | 3s-7s     |   2.666 -  5.333
-			3         | 7s-15s    |   5.333 -  10.666
-			4         | 15s-31s   |  10.666 -  21.333
-			5         | 31s-63s   |  21.333 -  42.666
-			6         | 63s-127s  |  42.666 -  85.333
-			7         | 127s-255s |  85.333 - 170.666
-			8         | 255s-511s | 170.666 - 341.333
-			9         | 255s-511s |           341.333
-			n         | 255s-511s |           341.333
-		*/
-		RetryPolicy(&retry.Config{
-			Interval:    time.Second,
-			Multiplier:  2.0,
-			Jitter:      1.0 / 3.0,
-			MaxInterval: 341*time.Second + 333*time.Millisecond,
-		}),
-		WithIPv4(),
-		WithIPv6(),
-	}
-
-	opts = append(defaults, opts...)
-
 	opts = append(opts,
 		validateDeviceID(),
 		validateURL(),
 		validateIPMode(),
+		validateFetchURL(),
+		validateCredentialsDecorator(),
+		validateNowFunc(),
+		validRetryPolicy(),
 	)
 
 	for _, opt := range opts {
@@ -226,6 +188,7 @@ func (ws *Websocket) run(ctx context.Context) {
 	defer ws.wg.Done()
 
 	decoder := wrp.NewDecoder(nil, wrp.Msgpack)
+	encoder := wrp.NewEncoder(nil, wrp.Msgpack)
 	mode := ws.nextMode(ipv4)
 
 	policy := ws.retryPolicyFactory.NewPolicy(ctx)
@@ -238,6 +201,9 @@ func (ws *Websocket) run(ctx context.Context) {
 			Started: ws.nowFunc(),
 			Mode:    mode.ToEvent(),
 		}
+
+		// If auth fails, then continue with openfail xmidt connection
+		ws.credDecorator(ws.additionalHeaders)
 
 		conn, _, dialErr := ws.dial(ctx, mode) //nolint:bodyclose
 		cEvent.At = ws.nowFunc()
@@ -258,7 +224,7 @@ func (ws *Websocket) run(ctx context.Context) {
 			// Read loop
 			for {
 				var msg wrp.Message
-				typ, reader, err := conn.Reader(ctx)
+				typ, reader, err := ws.conn.Reader(ctx)
 				if err == nil {
 					if typ != nhws.MessageBinary {
 						err = ErrInvalidMsgType
@@ -291,6 +257,27 @@ func (ws *Websocket) run(ctx context.Context) {
 				ws.msgListeners.Visit(func(l event.MsgListener) {
 					l.OnMessage(msg)
 				})
+
+				// TODO - This section simply sends back the received wrp msg as a respond to the client's request. This will be replaced
+				var frameContents []byte
+
+				// if the request was in a format other than Msgpack, or if the caller did not pass
+				// Contents, then do the encoding here.
+				encoder.ResetBytes(&frameContents)
+				err = encoder.Encode(msg)
+				encoder.ResetBytes(&emptyBuffer)
+				if err != nil {
+					ws.disconnectListeners.Visit(func(l event.DisconnectListener) {
+						l.OnDisconnect(event.Disconnect{
+							At:  ws.nowFunc(),
+							Err: fmt.Errorf("xmidt-agent failed to response to wrp message: %s", err),
+						})
+					})
+
+					continue
+				}
+
+				ws.conn.Write(ctx, nhws.MessageBinary, frameContents)
 			}
 		}
 
@@ -338,7 +325,7 @@ func (ws *Websocket) dial(ctx context.Context, mode ipMode) (*nhws.Conn, *http.R
 	}
 
 	conn.SetReadLimit(ws.maxMessageBytes)
-	return conn, resp, err
+	return conn, resp, nil
 }
 
 type custRT struct {

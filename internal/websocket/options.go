@@ -18,10 +18,15 @@ import (
 func DeviceID(id wrp.DeviceID) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
+			if id == "" {
+				return fmt.Errorf("%w: empty DeviceID", ErrMisconfiguredWS)
+			}
+
 			ws.id = id
 			if ws.additionalHeaders == nil {
 				ws.additionalHeaders = http.Header{}
 			}
+
 			ws.additionalHeaders.Set("X-Webpa-Device-Name", string(id))
 			return nil
 		})
@@ -31,6 +36,10 @@ func DeviceID(id wrp.DeviceID) Option {
 func URL(url string) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
+			if url == "" {
+				return fmt.Errorf("%w: empty URL", ErrMisconfiguredWS)
+			}
+
 			ws.urlFetcher = func(context.Context) (string, error) {
 				return url, nil
 			}
@@ -42,6 +51,10 @@ func URL(url string) Option {
 func FetchURL(f func(context.Context) (string, error)) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
+			if f == nil {
+				return fmt.Errorf("%w: nil FetchURL", ErrMisconfiguredWS)
+			}
+
 			ws.urlFetcher = f
 			return nil
 		})
@@ -55,6 +68,7 @@ func FetchURLTimeout(d time.Duration) Option {
 			if d < 0 {
 				return fmt.Errorf("%w: negative FetchURLTimeout", ErrMisconfiguredWS)
 			}
+
 			ws.urlFetchingTimeout = d
 			return nil
 		})
@@ -64,6 +78,10 @@ func FetchURLTimeout(d time.Duration) Option {
 func CredentialsDecorator(f func(http.Header) error) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
+			if f == nil {
+				return fmt.Errorf("%w: nil CredentialsDecorator", ErrMisconfiguredWS)
+			}
+
 			ws.credDecorator = f
 			return nil
 		})
@@ -74,6 +92,10 @@ func CredentialsDecorator(f func(http.Header) error) Option {
 func PingInterval(d time.Duration) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
+			if d < 0 {
+				return fmt.Errorf("%w: negative PingInterval", ErrMisconfiguredWS)
+			}
+
 			ws.pingInterval = d
 			return nil
 		})
@@ -84,6 +106,10 @@ func PingInterval(d time.Duration) Option {
 func PingTimeout(d time.Duration) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
+			if d < 0 {
+				return fmt.Errorf("%w: negative PingTimeout", ErrMisconfiguredWS)
+			}
+
 			ws.pingTimeout = d
 			return nil
 		})
@@ -94,6 +120,10 @@ func PingTimeout(d time.Duration) Option {
 func KeepAliveInterval(d time.Duration) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
+			if d < 0 {
+				return fmt.Errorf("%w: negative KeepAliveInterval", ErrMisconfiguredWS)
+			}
+
 			ws.keepAliveInterval = d
 			return nil
 		})
@@ -104,6 +134,10 @@ func KeepAliveInterval(d time.Duration) Option {
 func TLSHandshakeTimeout(d time.Duration) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
+			if d < 0 {
+				return fmt.Errorf("%w: negative TLSHandshakeTimeout", ErrMisconfiguredWS)
+			}
+
 			ws.tlsHandshakeTimeout = d
 			return nil
 		})
@@ -114,6 +148,10 @@ func TLSHandshakeTimeout(d time.Duration) Option {
 func IdleConnTimeout(d time.Duration) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
+			if d < 0 {
+				return fmt.Errorf("%w: negative IdleConnTimeout", ErrMisconfiguredWS)
+			}
+
 			ws.idleConnTimeout = d
 			return nil
 		})
@@ -124,6 +162,10 @@ func IdleConnTimeout(d time.Duration) Option {
 func ExpectContinueTimeout(d time.Duration) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
+			if d < 0 {
+				return fmt.Errorf("%w: negative ExpectContinueTimeout", ErrMisconfiguredWS)
+			}
+
 			ws.expectContinueTimeout = d
 			return nil
 		})
@@ -159,6 +201,7 @@ func ConnectTimeout(d time.Duration) Option {
 			if d < 0 {
 				return fmt.Errorf("%w: negative ConnectTimeout", ErrMisconfiguredWS)
 			}
+
 			ws.connectTimeout = d
 			return nil
 		})
@@ -173,6 +216,7 @@ func AdditionalHeaders(headers http.Header) Option {
 					ws.additionalHeaders.Add(k, value)
 				}
 			}
+
 			return nil
 		})
 }
@@ -194,6 +238,7 @@ func NowFunc(f func() time.Time) Option {
 			if f == nil {
 				return fmt.Errorf("%w: nil NowFunc", ErrMisconfiguredWS)
 			}
+
 			ws.nowFunc = f
 			return nil
 		})
@@ -204,6 +249,10 @@ func NowFunc(f func() time.Time) Option {
 func RetryPolicy(pf retry.PolicyFactory) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
+			if pf == nil {
+				return fmt.Errorf("%w: nil RetryPolicy", ErrMisconfiguredWS)
+			}
+
 			ws.retryPolicyFactory = pf
 			return nil
 		})
@@ -213,6 +262,10 @@ func RetryPolicy(pf retry.PolicyFactory) Option {
 func MaxMessageBytes(bytes int64) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
+			if bytes < 0 {
+				return fmt.Errorf("%w: negative MaxMessageBytes", ErrMisconfiguredWS)
+			}
+
 			ws.maxMessageBytes = bytes
 			return nil
 		})

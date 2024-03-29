@@ -56,7 +56,7 @@ func provideCredentials(in credsIn) (*credentials.Credentials, error) {
 		credentials.RefetchPercent(in.Creds.RefetchPercent),
 		credentials.AddFetchListener(event.FetchListenerFunc(
 			func(e event.Fetch) {
-				logger.Info("fetch",
+				logger.Debug("fetch",
 					zap.String("origin", e.Origin),
 					zap.Time("at", e.At),
 					zap.Duration("duration", e.Duration),
