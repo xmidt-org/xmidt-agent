@@ -14,6 +14,9 @@ import (
 	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
 	"go.nanomsg.org/mangos/v3"
 	"go.nanomsg.org/mangos/v3/protocol/pull"
+
+	// register transports
+	_ "go.nanomsg.org/mangos/v3/transport/all"
 )
 
 var (
@@ -125,10 +128,17 @@ func (a *Adapter) Start() error {
 func (s *Adapter) Stop() {
 	s.lock.Lock()
 	shutdown := s.shutdown
-	s.lock.Unlock()
 
 	if shutdown != nil {
 		shutdown()
+	}
+
+	s.shutdown = nil
+
+	s.lock.Unlock()
+
+	for _, ext := range s.subServices {
+		ext.cancel()
 	}
 
 	s.wg.Wait()
@@ -187,13 +197,14 @@ func (a *Adapter) receive(ctx context.Context) {
 		case wrp.ServiceRegistrationMessageType:
 			fmt.Println("Registering service: ", msg.ServiceName)
 			a.register(ctx, msg)
-		case wrp.ServiceAliveMessageType:
+		case wrp.Invalid0MessageType,
+			wrp.Invalid1MessageType,
+			wrp.ServiceAliveMessageType:
 			// Ignore these messages; they should really not be sent to the
 			// adapter.  The reason being is the client of this adapter can
 			// determine if a service is alive by the presence of the keepalive
 			// messages this adapter sends.
-		case wrp.Invalid0MessageType, wrp.Invalid1MessageType:
-			// Don't propagate these messages.
+			// Simply drop the invalid ones.
 			continue
 		default:
 			_ = a.forward(msg)
@@ -204,7 +215,7 @@ func (a *Adapter) receive(ctx context.Context) {
 func (a *Adapter) register(ctx context.Context, msg wrp.Message) error {
 	name := msg.ServiceName
 
-	s, err := newExternal(ctx, name, msg.URL,
+	ext, err := newExternal(ctx, name, msg.URL,
 		a.keepaliveInterval,
 		a.sendTimeout,
 		a.pubsub,
@@ -230,7 +241,7 @@ func (a *Adapter) register(ctx context.Context, msg wrp.Message) error {
 	}
 
 	a.lock.Lock()
-	a.subServices[name] = s
+	a.subServices[name] = ext
 	a.lock.Unlock()
 
 	return nil

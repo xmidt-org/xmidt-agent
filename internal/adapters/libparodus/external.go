@@ -92,31 +92,25 @@ func newExternal(ctx context.Context,
 		return nil, err
 	}
 
-	ex.terminate = func() {
-		_ = sock.Close()
-		terminate()
-	}
-
 	err = sock.Dial(url)
 	if err != nil {
-		ex.terminate()
+		_ = sock.Close()
+		terminate()
 		return nil, err
 	}
 
 	ex.sock = sock
 
 	ctx, cancel := context.WithCancel(ctx)
-	ex.terminate = func() {
-		cancel()
-		_ = sock.Close()
-		terminate()
-	}
 
 	psCancel, err := ps.SubscribeService(ex.name, &ex)
 	if err != nil {
-		ex.terminate()
+		cancel()
+		_ = sock.Close()
+		terminate()
 		return nil, err
 	}
+
 	ex.terminate = func() {
 		psCancel()
 		cancel()
@@ -153,25 +147,22 @@ func (s *external) keepalive(ctx context.Context) {
 	s.lock.Lock()
 	err := s.sock.Send(authAcceptedMsg)
 	s.lock.Unlock()
-	if err != nil {
-		s.cancel()
-		return
-	}
+	if err == nil {
+		for {
+			select {
+			case <-ctx.Done(): //context canceled
+				break
+			case <-time.After(s.heartbeatInterval):
+			}
 
-	for {
-		select {
-		case <-ctx.Done(): //context canceled
-			break
-		case <-time.After(s.heartbeatInterval):
-		}
+			s.lock.Lock()
+			err := s.sock.Send(serviceAliveMsg)
+			s.lock.Unlock()
 
-		s.lock.Lock()
-		err := s.sock.Send(serviceAliveMsg)
-		s.lock.Unlock()
-
-		if err != nil {
-			// The heartbeat failed.  Cancel the subscription & exit.
-			break
+			if err != nil {
+				// The heartbeat failed.  Cancel the subscription & exit.
+				break
+			}
 		}
 	}
 
