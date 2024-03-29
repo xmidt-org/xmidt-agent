@@ -31,7 +31,7 @@ type Adapter struct {
 	wg          sync.WaitGroup
 	shutdown    context.CancelFunc
 	listening   chan error
-	subServices map[string]*sub
+	subServices map[string]*external
 
 	parodusServiceURL string
 	keepaliveInterval time.Duration
@@ -71,7 +71,7 @@ func New(url string, pubsub *pubsub.PubSub, opts ...Option) (*Adapter, error) {
 		parodusServiceURL: url,
 		pubsub:            pubsub,
 		listening:         make(chan error),
-		subServices:       make(map[string]*sub),
+		subServices:       make(map[string]*external),
 	}
 
 	opts = append(defaults, opts...)
@@ -204,7 +204,7 @@ func (a *Adapter) receive(ctx context.Context) {
 func (a *Adapter) register(ctx context.Context, msg wrp.Message) error {
 	name := msg.ServiceName
 
-	s, err := newSub(ctx, name, msg.URL,
+	s, err := newExternal(ctx, name, msg.URL,
 		a.keepaliveInterval,
 		a.sendTimeout,
 		a.pubsub,
