@@ -24,4 +24,5 @@ jobs:
     with:
       release-type: program
       release-main-package: ./cmd/xmidt-agent
+      release-custom-file: true
     secrets: inherit
