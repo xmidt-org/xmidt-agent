@@ -31,6 +31,10 @@ Files: MAINTAINERS.md
 Copyright: SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
 License: Apache-2.0
 
+Files: NOTICE
+Copyright: SPDX-FileCopyrightText: 2024 Comcast Cable Communications Management, LLC
+License: Apache-2.0
+
 Files: README.md
 Copyright: SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
 License: Apache-2.0
