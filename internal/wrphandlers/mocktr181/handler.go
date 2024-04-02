@@ -5,11 +5,10 @@ package mocktr181
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
-	"strings"
 
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
@@ -47,19 +46,32 @@ type Handler struct {
 	egress     wrpkit.Handler
 	source     string
 	filePath   string
-	parameters *Parameters
+	parameters *MockParameters
+}
+
+type MockParameter struct {
+	Name     string
+	Value    string
+	Access   string
+	DataType int // add json labels here
+	Delay    int
+}
+
+type MockParameters struct {
+	Parameters []MockParameter
+}
+
+type Payload struct {
+	Command    string      `json:"command"`
+	Names      []string    `json:"names"`
+	Parameters []Parameter `json:"parameters"`
 }
 
 type Parameter struct {
-	name      string
-	value     string
-	access    string
-	paramType int // add json labels here
-	delay     int
-}
-
-type Parameters struct { // TODO rename
-	parameters []Parameter
+	Name       string                 `json:"name"`
+	Value      string                 `json:"value"`
+	DataType   int                    `json:"dataType"`
+	Attributes map[string]interface{} `json:"attributes"`
 }
 
 // New creates a new instance of the Handler struct.  The parameter next is the
@@ -98,53 +110,62 @@ func New(next, egress wrpkit.Handler, source string, opts ...Option) (*Handler, 
 	return &h, nil
 }
 
-// HandleWrp is called to process a message.  If the message is not from an allowed
-// partner, a response is sent to the source of the message if applicable.
+// HandleWrp is called to process a tr181 command
 func (h Handler) HandleWrp(msg wrp.Message) error {
-	// TODO - parse message for requested parameters (not really sure what this looks like)
-	for _, allowed := range h.partners {
-		for _, got := range msg.PartnerIDs {
-			got = strings.TrimSpace(got)
-			if allowed == got || allowed == wildcard {
-				// We found a match, so continue processing the message.
-				return h.next.HandleWrp(msg)
-			}
-		}
+	payload := make(map[string]interface{})
+	err := json.Unmarshal(msg.Payload, &payload)
+	if err != nil {
+		// TODO - need logger
+		return err
 	}
 
-	// At this point, the message is not from an allowed partner, so send a
-	// response if needed.  Otherwise, return an error.
+	command := payload["command"].(string)
+	var payloadResponse []byte
+	var statusCode int64
 
-	if !msg.Type.RequiresTransaction() {
-		return ErrUnauthorized
+	switch command {
+	case "GET":
+		statusCode, payloadResponse = h.get(payload["names"].([]string))
+
+	case "SET":
+		statusCode = h.set(payload["parameters"].([]Parameter))
+
+	default:
+
 	}
 
-	got := strings.Join(msg.PartnerIDs, "','")
-	want := strings.Join(h.partners, "','")
-
-	//no next?  we just send the mocktr181 response here?
 	response := msg
 	response.Destination = msg.Source
 	response.Source = h.source
 	response.ContentType = "text/plain"
-	response.Payload = []byte(fmt.Sprintf("Partner(s) '%s' not allowed.  Allowed: '%s'", got, want))
+	response.Payload = payloadResponse
 
-	code := int64(statusCode)
-	response.Status = &code
+	response.Status = &statusCode
 
-	sendErr := h.egress.HandleWrp(response)
+	err = h.egress.HandleWrp(response)
 
-	return errors.Join(ErrUnauthorized, sendErr)
+	return err
 }
 
-func (h Handler) loadFile() (*Parameters, error) {
+func (h Handler) get(names []string) (int64, []byte) {
+	var payload []byte
+
+	return http.StatusAccepted, payload
+}
+
+func (h Handler) set(parameters []Parameter) int64 {
+
+	return http.StatusOK
+}
+
+func (h Handler) loadFile() (*MockParameters, error) {
 	jsonFile, err := os.Open(h.filePath)
 	if err != nil {
 		return nil, err
 	}
 	defer jsonFile.Close()
 
-	var parameters Parameters
+	var parameters MockParameters
 	byteValue, _ := io.ReadAll(jsonFile)
 	err = json.Unmarshal(byteValue, &parameters)
 	if err != nil {
