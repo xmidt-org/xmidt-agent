@@ -92,7 +92,6 @@ func TestEndToEnd(t *testing.T) {
 			Jitter:      1.0 / 3.0,
 			MaxInterval: 341*time.Second + 333*time.Millisecond,
 		}),
-		ws.WithIPv6(),
 		ws.WithIPv4(),
 		ws.NowFunc(time.Now),
 		ws.ConnectTimeout(30*time.Second),
@@ -110,7 +109,7 @@ func TestEndToEnd(t *testing.T) {
 	// Allow multiple calls to start.
 	got.Start()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2000*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
 	for {
