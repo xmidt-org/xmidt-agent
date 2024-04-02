@@ -23,6 +23,8 @@ import (
 )
 
 func TestEndToEnd(t *testing.T) {
+	var finished bool
+
 	assert := assert.New(t)
 	require := require.New(t)
 
@@ -44,6 +46,11 @@ func TestEndToEnd(t *testing.T) {
 				require.NoError(err)
 
 				mt, got, err := c.Read(ctx)
+				// server will halt until the websocket closes resulting in a EOF
+				if finished {
+					return
+				}
+
 				require.NoError(err)
 				require.Equal(websocket.MessageBinary, mt)
 				require.NotEmpty(got)
@@ -51,7 +58,7 @@ func TestEndToEnd(t *testing.T) {
 				err = wrp.NewDecoderBytes(got, wrp.Msgpack).Decode(&msg)
 				require.NoError(err)
 				require.Equal(wrp.SimpleEventMessageType, msg.Type)
-				require.Equal("server", msg.Source)
+				require.Equal("client", msg.Source)
 
 				c.Close(websocket.StatusNormalClosure, "")
 			}))
@@ -103,7 +110,7 @@ func TestEndToEnd(t *testing.T) {
 	// Allow multiple calls to start.
 	got.Start()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 2000*time.Millisecond)
 	defer cancel()
 
 	for {
@@ -136,8 +143,9 @@ func TestEndToEnd(t *testing.T) {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	time.Sleep(10 * time.Millisecond)
+	finished = true
 	got.Stop()
+	time.Sleep(10 * time.Millisecond)
 }
 
 func TestEndToEndBadData(t *testing.T) {
@@ -256,7 +264,7 @@ func TestEndToEndConnectionIssues(t *testing.T) {
 				require.NoError(err)
 				defer c.CloseNow()
 
-				ctx, cancel := context.WithTimeout(r.Context(), 2000000*time.Millisecond)
+				ctx, cancel := context.WithTimeout(r.Context(), 200*time.Millisecond)
 				defer cancel()
 
 				msg := wrp.Message{

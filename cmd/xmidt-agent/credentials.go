@@ -43,6 +43,8 @@ func provideCredentials(in credsIn) (*credentials.Credentials, error) {
 
 	opts := []credentials.Option{
 		credentials.URL(in.Creds.URL),
+		// enabling `Required` allows the xmidt-agent to send connect events for auth related errors
+		credentials.Required(),
 		credentials.HTTPClient(client),
 		credentials.MacAddress(in.ID.DeviceID),
 		credentials.SerialNumber(in.ID.SerialNumber),
