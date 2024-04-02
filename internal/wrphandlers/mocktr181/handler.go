@@ -9,23 +9,17 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
+	"go.uber.org/zap"
 )
 
 var (
 	ErrInvalidInput     = fmt.Errorf("invalid input")
 	ErrInvalidFileInput = fmt.Errorf("misconfigured file input")
 	ErrUnableToReadFile = fmt.Errorf("unable to read file")
-)
-
-const (
-	// statusCode is the status code to return when a message is not authorized.
-	statusCode = 403
-
-	// wildcard is the wildcard partner id that matches all partner ids.
-	wildcard = "*"
 )
 
 // Option is a functional option type for WS.
@@ -47,14 +41,16 @@ type Handler struct {
 	source     string
 	filePath   string
 	parameters *MockParameters
+	logger     *zap.Logger
 }
 
 type MockParameter struct {
-	Name     string
-	Value    string
-	Access   string
-	DataType int // add json labels here
-	Delay    int
+	Name       string
+	Value      string
+	Access     string
+	DataType   int // add json labels here
+	Attributes map[string]interface{}
+	Delay      int
 }
 
 type MockParameters struct {
@@ -65,6 +61,10 @@ type Payload struct {
 	Command    string      `json:"command"`
 	Names      []string    `json:"names"`
 	Parameters []Parameter `json:"parameters"`
+}
+
+type Parameters struct {
+	Parameters []Parameter
 }
 
 type Parameter struct {
@@ -79,7 +79,7 @@ type Parameter struct {
 // the handler that will be called to send the response if/when the next handler
 // fails to handle the message.  The parameter source is the source to use in
 // the response message.
-func New(next, egress wrpkit.Handler, source string, opts ...Option) (*Handler, error) {
+func New(next, egress wrpkit.Handler, source string, logger *zap.Logger, opts ...Option) (*Handler, error) {
 	// TODO - load config from file system
 
 	h := Handler{
@@ -98,6 +98,7 @@ func New(next, egress wrpkit.Handler, source string, opts ...Option) (*Handler, 
 
 	parameters, err := h.loadFile()
 	if err != nil {
+		h.logger.Error("unable to load mock parameters", zap.Error(err))
 		return nil, ErrUnableToReadFile
 	}
 
@@ -115,13 +116,14 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 	payload := make(map[string]interface{})
 	err := json.Unmarshal(msg.Payload, &payload)
 	if err != nil {
-		// TODO - need logger
+		h.logger.Error("unable to unmarshal msg payload", zap.Error(err))
 		return err
 	}
 
-	command := payload["command"].(string)
 	var payloadResponse []byte
 	var statusCode int64
+
+	command := payload["command"].(string)
 
 	switch command {
 	case "GET":
@@ -131,7 +133,8 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 		statusCode = h.set(payload["parameters"].([]Parameter))
 
 	default:
-
+		// currently only get and set are implemented for existing mocktr181
+		statusCode = http.StatusOK
 	}
 
 	response := msg
@@ -148,12 +151,40 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 }
 
 func (h Handler) get(names []string) (int64, []byte) {
-	var payload []byte
+	result := []Parameter{}
+
+	for _, name := range names {
+		for _, mockParameter := range h.parameters.Parameters {
+			if strings.HasPrefix(mockParameter.Name, name) {
+				result = append(result, Parameter{
+					Name:       mockParameter.Name,
+					Value:      mockParameter.Value,
+					DataType:   mockParameter.DataType,
+					Attributes: mockParameter.Attributes,
+				})
+			}
+		}
+	}
+
+	payload, err := json.Marshal(result)
+	if err != nil {
+		h.logger.Error("unable to marshal get result", zap.Error(err))
+		return http.StatusInternalServerError, payload
+	}
 
 	return http.StatusAccepted, payload
 }
 
 func (h Handler) set(parameters []Parameter) int64 {
+	for _, parameter := range parameters {
+		for _, mockParameter := range h.parameters.Parameters {
+			if strings.HasPrefix(mockParameter.Name, parameter.Name) {
+				mockParameter.Value = parameter.Value
+				mockParameter.DataType = parameter.DataType
+				mockParameter.Attributes = parameter.Attributes
+			}
+		}
+	}
 
 	return http.StatusOK
 }
@@ -161,6 +192,7 @@ func (h Handler) set(parameters []Parameter) int64 {
 func (h Handler) loadFile() (*MockParameters, error) {
 	jsonFile, err := os.Open(h.filePath)
 	if err != nil {
+		h.logger.Error("unable to open mock parameter file", zap.Error(err))
 		return nil, err
 	}
 	defer jsonFile.Close()
@@ -169,6 +201,7 @@ func (h Handler) loadFile() (*MockParameters, error) {
 	byteValue, _ := io.ReadAll(jsonFile)
 	err = json.Unmarshal(byteValue, &parameters)
 	if err != nil {
+		h.logger.Error("unable to unmarshal mock parameter file", zap.Error(err))
 		return nil, err
 	}
 
