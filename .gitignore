@@ -30,9 +30,14 @@ cmd/xmidt-agent/xmidt-agent
 
 internal/jwtxt/cmd/example/*
 internal/credentials/cmd/example/*
+internal/adapters/libparodus/cmd/example/example
 
 *.dot
 *.pem
 *.yml
 
 .storage
+
+dist/*
+
+cmd/xmidt-agent/dist/*
