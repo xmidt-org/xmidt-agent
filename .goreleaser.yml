@@ -35,8 +35,6 @@ changelog:
 sboms:
   - id: archive
     artifacts: archive
-  - id: binary
-    artifacts: binary
   - id: source
     artifacts: source
 
