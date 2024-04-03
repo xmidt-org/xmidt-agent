@@ -5,6 +5,7 @@ package mocktr181
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,13 +14,14 @@ import (
 
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
-	"go.uber.org/zap"
 )
 
 var (
-	ErrInvalidInput     = fmt.Errorf("invalid input")
-	ErrInvalidFileInput = fmt.Errorf("misconfigured file input")
-	ErrUnableToReadFile = fmt.Errorf("unable to read file")
+	ErrInvalidInput           = fmt.Errorf("invalid input")
+	ErrInvalidFileInput       = fmt.Errorf("misconfigured file input")
+	ErrUnableToReadFile       = fmt.Errorf("unable to read file")
+	ErrInvalidPayload         = fmt.Errorf("invalid request payload")
+	ErrInvalidResponsePayload = fmt.Errorf("invalid response payload")
 )
 
 // Option is a functional option type for WS.
@@ -38,7 +40,6 @@ type Handler struct {
 	source     string
 	filePath   string
 	parameters []MockParameter
-	logger     *zap.Logger
 	enabled    bool
 }
 
@@ -75,13 +76,12 @@ type Parameter struct {
 // New creates a new instance of the Handler struct.  The parameter egress is
 // the handler that will be called to send the response.  The parameter source is the source to use in
 // the response message.
-func New(egress wrpkit.Handler, source string, logger *zap.Logger, opts ...Option) (*Handler, error) {
+func New(egress wrpkit.Handler, source string, opts ...Option) (*Handler, error) {
 	// TODO - load config from file system
 
 	h := Handler{
 		egress: egress,
 		source: source,
-		logger: logger.Named("mocktr181"),
 	}
 
 	for _, opt := range opts {
@@ -94,8 +94,7 @@ func New(egress wrpkit.Handler, source string, logger *zap.Logger, opts ...Optio
 
 	parameters, err := h.loadFile()
 	if err != nil {
-		h.logger.Error("unable to load mock data", zap.Error(err))
-		return nil, ErrUnableToReadFile
+		return nil, errors.Join(ErrUnableToReadFile, err)
 	}
 
 	h.parameters = parameters
@@ -114,9 +113,9 @@ func (h Handler) Enabled() bool {
 // HandleWrp is called to process a tr181 command
 func (h Handler) HandleWrp(msg wrp.Message) error {
 	payload := new(Tr181Payload)
+	var commandErr error
 	err := json.Unmarshal(msg.Payload, &payload)
 	if err != nil {
-		h.logger.Error("unable to unmarshal msg payload", zap.Error(err))
 		return err
 	}
 
@@ -127,7 +126,7 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 
 	switch command {
 	case "GET":
-		statusCode, payloadResponse = h.get(payload.Names)
+		statusCode, payloadResponse, commandErr = h.get(payload.Names)
 
 	case "SET":
 		statusCode = h.set(payload.Parameters)
@@ -147,10 +146,10 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 
 	err = h.egress.HandleWrp(response)
 
-	return err
+	return errors.Join(err, commandErr)
 }
 
-func (h Handler) get(names []string) (int64, []byte) {
+func (h Handler) get(names []string) (int64, []byte, error) {
 	result := []Parameter{}
 
 	for _, name := range names {
@@ -168,11 +167,10 @@ func (h Handler) get(names []string) (int64, []byte) {
 
 	payload, err := json.Marshal(result)
 	if err != nil {
-		h.logger.Error("unable to marshal get result", zap.Error(err))
-		return http.StatusInternalServerError, payload
+		return http.StatusInternalServerError, payload, errors.Join(ErrInvalidResponsePayload, err)
 	}
 
-	return http.StatusOK, payload
+	return http.StatusOK, payload, nil
 }
 
 func (h Handler) set(parameters []Parameter) int64 {
@@ -194,8 +192,7 @@ func (h Handler) set(parameters []Parameter) int64 {
 func (h Handler) loadFile() ([]MockParameter, error) {
 	jsonFile, err := os.Open(h.filePath)
 	if err != nil {
-		h.logger.Error("unable to open mock parameter file", zap.Error(err))
-		return nil, err
+		return nil, errors.Join(ErrUnableToReadFile, err)
 	}
 	defer jsonFile.Close()
 
@@ -203,8 +200,7 @@ func (h Handler) loadFile() ([]MockParameter, error) {
 	byteValue, _ := io.ReadAll(jsonFile)
 	err = json.Unmarshal(byteValue, &parameters)
 	if err != nil {
-		h.logger.Error("unable to unmarshal mock parameter file", zap.Error(err))
-		return nil, err
+		return nil, errors.Join(ErrInvalidFileInput, err)
 	}
 
 	return parameters, nil

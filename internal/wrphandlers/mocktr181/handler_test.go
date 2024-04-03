@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
-	"go.uber.org/zap"
 )
 
 func TestHandler_HandleWrp(t *testing.T) {
@@ -97,7 +96,7 @@ func TestHandler_HandleWrp(t *testing.T) {
 				Enabled(true),
 			}
 
-			h, err := New(egress, "some-source", zap.NewExample(), mockDefaults...)
+			h, err := New(egress, "some-source", mockDefaults...)
 			require.NoError(err)
 
 			err = h.HandleWrp(tc.msg)
