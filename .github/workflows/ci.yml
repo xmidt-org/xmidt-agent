@@ -22,7 +22,8 @@ jobs:
   ci:
     uses: xmidt-org/shared-go/.github/workflows/ci.yml@6a6e2837365277508a83af5aabe4f17d801a1cab # v4.3.1
     with:
-      release-type: program
+      release-type:         program
       release-main-package: ./cmd/xmidt-agent
-      release-custom-file: true
+      release-custom-file:  true
+      release-docker:       true
     secrets: inherit
