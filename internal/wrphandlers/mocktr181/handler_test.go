@@ -83,12 +83,6 @@ func TestHandler_HandleWrp(t *testing.T) {
 			require := require.New(t)
 			var h *Handler
 
-			nextCallCount := 0
-			next := wrpkit.HandlerFunc(func(wrp.Message) error {
-				nextCallCount++
-				return tc.nextResult
-			})
-
 			egressCallCount := 0
 			egress := wrpkit.HandlerFunc(func(msg wrp.Message) error {
 				egressCallCount++
@@ -103,13 +97,12 @@ func TestHandler_HandleWrp(t *testing.T) {
 				Enabled(true),
 			}
 
-			h, err := New(next, egress, "some-source", zap.NewExample(), mockDefaults...)
+			h, err := New(egress, "some-source", zap.NewExample(), mockDefaults...)
 			require.NoError(err)
 
 			err = h.HandleWrp(tc.msg)
 			assert.ErrorIs(err, tc.expectedErr)
 
-			assert.Equal(tc.nextCallCount, nextCallCount)
 			assert.Equal(tc.egressCallCount, egressCallCount)
 		})
 	}

@@ -33,10 +33,7 @@ func (f optionFunc) apply(c *Handler) error {
 	return f(c)
 }
 
-// Handler sends a response when a message is required to have a response, but
-// was not handled by the next handler in the chain.
 type Handler struct {
-	next       wrpkit.Handler
 	egress     wrpkit.Handler
 	source     string
 	filePath   string
@@ -75,16 +72,13 @@ type Parameter struct {
 	Attributes map[string]interface{} `json:"attributes"`
 }
 
-// New creates a new instance of the Handler struct.  The parameter next is the
-// handler that will be called and monitored for errors.  The parameter egress is
-// the handler that will be called to send the response if/when the next handler
-// fails to handle the message.  The parameter source is the source to use in
+// New creates a new instance of the Handler struct.  The parameter egress is
+// the handler that will be called to send the response.  The parameter source is the source to use in
 // the response message.
-func New(next, egress wrpkit.Handler, source string, logger *zap.Logger, opts ...Option) (*Handler, error) {
+func New(egress wrpkit.Handler, source string, logger *zap.Logger, opts ...Option) (*Handler, error) {
 	// TODO - load config from file system
 
 	h := Handler{
-		next:   next,
 		egress: egress,
 		source: source,
 		logger: logger,
@@ -106,7 +100,7 @@ func New(next, egress wrpkit.Handler, source string, logger *zap.Logger, opts ..
 
 	h.parameters = parameters
 
-	if h.next == nil || h.egress == nil || h.source == "" {
+	if h.egress == nil || h.source == "" {
 		return nil, ErrInvalidInput
 	}
 
