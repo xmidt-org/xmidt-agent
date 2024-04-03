@@ -366,9 +366,10 @@ func TestNextMode(t *testing.T) {
 				URL("http://example.com"),
 			)
 			got, err := New(opts...)
+			got.mode = tc.mode
 			require.NoError(err)
 			require.NotNil(got)
-			assert.Equal(tc.expected, got.nextMode(tc.mode))
+			assert.Equal(tc.expected, got.nextMode())
 		})
 	}
 }
