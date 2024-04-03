@@ -40,7 +40,7 @@ type Handler struct {
 	egress     wrpkit.Handler
 	source     string
 	filePath   string
-	parameters *MockParameters
+	parameters []MockParameter
 	logger     *zap.Logger
 }
 
@@ -57,7 +57,7 @@ type MockParameters struct {
 	Parameters []MockParameter
 }
 
-type Payload struct {
+type Tr181Payload struct {
 	Command    string      `json:"command"`
 	Names      []string    `json:"names"`
 	Parameters []Parameter `json:"parameters"`
@@ -113,7 +113,7 @@ func New(next, egress wrpkit.Handler, source string, logger *zap.Logger, opts ..
 
 // HandleWrp is called to process a tr181 command
 func (h Handler) HandleWrp(msg wrp.Message) error {
-	payload := make(map[string]interface{})
+	payload := new(Tr181Payload)
 	err := json.Unmarshal(msg.Payload, &payload)
 	if err != nil {
 		h.logger.Error("unable to unmarshal msg payload", zap.Error(err))
@@ -123,14 +123,14 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 	var payloadResponse []byte
 	var statusCode int64
 
-	command := payload["command"].(string)
+	command := payload.Command
 
 	switch command {
 	case "GET":
-		statusCode, payloadResponse = h.get(payload["names"].([]string))
+		statusCode, payloadResponse = h.get(payload.Names)
 
 	case "SET":
-		statusCode = h.set(payload["parameters"].([]Parameter))
+		statusCode = h.set(payload.Parameters)
 
 	default:
 		// currently only get and set are implemented for existing mocktr181
@@ -154,7 +154,7 @@ func (h Handler) get(names []string) (int64, []byte) {
 	result := []Parameter{}
 
 	for _, name := range names {
-		for _, mockParameter := range h.parameters.Parameters {
+		for _, mockParameter := range h.parameters {
 			if strings.HasPrefix(mockParameter.Name, name) {
 				result = append(result, Parameter{
 					Name:       mockParameter.Name,
@@ -172,24 +172,26 @@ func (h Handler) get(names []string) (int64, []byte) {
 		return http.StatusInternalServerError, payload
 	}
 
-	return http.StatusAccepted, payload
+	return http.StatusOK, payload
 }
 
 func (h Handler) set(parameters []Parameter) int64 {
 	for _, parameter := range parameters {
-		for _, mockParameter := range h.parameters.Parameters {
+		for _, mockParameter := range h.parameters {
 			if strings.HasPrefix(mockParameter.Name, parameter.Name) {
-				mockParameter.Value = parameter.Value
-				mockParameter.DataType = parameter.DataType
-				mockParameter.Attributes = parameter.Attributes
+				if mockParameter.Access == "rw" {
+					mockParameter.Value = parameter.Value
+					mockParameter.DataType = parameter.DataType
+					mockParameter.Attributes = parameter.Attributes
+				}
 			}
 		}
 	}
 
-	return http.StatusOK
+	return http.StatusAccepted
 }
 
-func (h Handler) loadFile() (*MockParameters, error) {
+func (h Handler) loadFile() ([]MockParameter, error) {
 	jsonFile, err := os.Open(h.filePath)
 	if err != nil {
 		h.logger.Error("unable to open mock parameter file", zap.Error(err))
@@ -197,7 +199,7 @@ func (h Handler) loadFile() (*MockParameters, error) {
 	}
 	defer jsonFile.Close()
 
-	var parameters MockParameters
+	var parameters []MockParameter
 	byteValue, _ := io.ReadAll(jsonFile)
 	err = json.Unmarshal(byteValue, &parameters)
 	if err != nil {
@@ -205,5 +207,5 @@ func (h Handler) loadFile() (*MockParameters, error) {
 		return nil, err
 	}
 
-	return &parameters, nil
+	return parameters, nil
 }

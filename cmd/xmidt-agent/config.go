@@ -175,7 +175,7 @@ type Storage struct {
 }
 
 type MockTr181 struct {
-	FilePath string 
+	FilePath string
 }
 
 // Collect and process the configuration files and env vars and
