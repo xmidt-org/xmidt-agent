@@ -176,6 +176,7 @@ type Storage struct {
 
 type MockTr181 struct {
 	FilePath string
+	Enabled  bool
 }
 
 // Collect and process the configuration files and env vars and
@@ -297,5 +298,6 @@ var defaultConfig = Config{
 	},
 	MockTr181: MockTr181{
 		FilePath: "./mock_tr181.json",
+		Enabled:  true,
 	},
 }

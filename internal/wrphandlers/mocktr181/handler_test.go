@@ -24,7 +24,7 @@ func TestHandler_HandleWrp(t *testing.T) {
 		egressCallCount int
 		msg             wrp.Message
 		expectedErr     error
-		validate        func(*assert.Assertions, wrp.Message) error
+		validate        func(*assert.Assertions, wrp.Message, *Handler) error
 	}{
 		{
 			description:     "get success with multiple results",
@@ -36,12 +36,13 @@ func TestHandler_HandleWrp(t *testing.T) {
 				Destination: "event:event_1/ignored",
 				Payload:     []byte("{\"command\":\"GET\",\"names\":[\"Device.DeviceInfo.\"]}"),
 			},
-			validate: func(a *assert.Assertions, msg wrp.Message) error {
+			validate: func(a *assert.Assertions, msg wrp.Message, h *Handler) error {
 				a.Equal(int64(http.StatusOK), *msg.Status)
 				var result []Parameters
 				err := json.Unmarshal(msg.Payload, &result)
 				a.NoError(err)
 				a.Equal(102, len(result))
+				a.True(h.Enabled())
 				return nil
 			},
 		}, {
@@ -53,8 +54,9 @@ func TestHandler_HandleWrp(t *testing.T) {
 				Destination: "event:event_1/ignored",
 				Payload:     []byte("{\"command\":\"SET\",\"parameters\":[{\"name\":\"Device.WiFi.Radio.10000.Name\",\"dataType\":0,\"value\":\"anothername\",\"attributes\":{\"notify\":0}}]}"),
 			},
-			validate: func(a *assert.Assertions, msg wrp.Message) error {
+			validate: func(a *assert.Assertions, msg wrp.Message, h *Handler) error {
 				a.Equal(int64(http.StatusAccepted), *msg.Status)
+				a.True(h.Enabled())
 
 				return nil
 			},
@@ -67,8 +69,9 @@ func TestHandler_HandleWrp(t *testing.T) {
 				Destination: "event:event_1/ignored",
 				Payload:     []byte("{\"command\":\"SET\",\"parameters\":[{\"name\":\"Device.Bridging.MaxBridgeEntries\",\"dataType\":0,\"value\":\"anothername\",\"attributes\":{\"notify\":0}}]}"),
 			},
-			validate: func(a *assert.Assertions, msg wrp.Message) error {
+			validate: func(a *assert.Assertions, msg wrp.Message, h *Handler) error {
 				a.Equal(int64(http.StatusAccepted), *msg.Status)
+				a.True(h.Enabled())
 
 				return nil
 			},
@@ -78,6 +81,7 @@ func TestHandler_HandleWrp(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			assert := assert.New(t)
 			require := require.New(t)
+			var h *Handler
 
 			nextCallCount := 0
 			next := wrpkit.HandlerFunc(func(wrp.Message) error {
@@ -89,13 +93,14 @@ func TestHandler_HandleWrp(t *testing.T) {
 			egress := wrpkit.HandlerFunc(func(msg wrp.Message) error {
 				egressCallCount++
 				if tc.validate != nil {
-					assert.NoError(tc.validate(assert, msg))
+					assert.NoError(tc.validate(assert, msg, h))
 				}
 				return tc.egressResult
 			})
 
 			mockDefaults := []Option{
 				FilePath("mock_tr181_test.json"),
+				Enabled(true),
 			}
 
 			h, err := New(next, egress, "some-source", zap.NewExample(), mockDefaults...)

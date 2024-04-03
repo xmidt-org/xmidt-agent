@@ -42,6 +42,7 @@ type Handler struct {
 	filePath   string
 	parameters []MockParameter
 	logger     *zap.Logger
+	enabled    bool
 }
 
 type MockParameter struct {
@@ -86,6 +87,7 @@ func New(next, egress wrpkit.Handler, source string, logger *zap.Logger, opts ..
 		next:   next,
 		egress: egress,
 		source: source,
+		logger: logger,
 	}
 
 	for _, opt := range opts {
@@ -98,7 +100,7 @@ func New(next, egress wrpkit.Handler, source string, logger *zap.Logger, opts ..
 
 	parameters, err := h.loadFile()
 	if err != nil {
-		h.logger.Error("unable to load mock parameters", zap.Error(err))
+		h.logger.Error("unable to load mock data", zap.Error(err))
 		return nil, ErrUnableToReadFile
 	}
 
@@ -109,6 +111,10 @@ func New(next, egress wrpkit.Handler, source string, logger *zap.Logger, opts ..
 	}
 
 	return &h, nil
+}
+
+func (h Handler) Enabled() bool {
+	return h.enabled
 }
 
 // HandleWrp is called to process a tr181 command

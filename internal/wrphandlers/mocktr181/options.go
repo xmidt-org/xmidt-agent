@@ -7,7 +7,7 @@ import (
 	"fmt"
 )
 
-// Sets the file location for the mocktr181 parameters
+// Sets the file location for the mocktr181 data
 func FilePath(filePath string) Option {
 	return optionFunc(
 		func(h *Handler) error {
@@ -17,6 +17,14 @@ func FilePath(filePath string) Option {
 
 			h.filePath = filePath
 
+			return nil
+		})
+}
+
+func Enabled(enabled bool) Option {
+	return optionFunc(
+		func(h *Handler) error {
+			h.enabled = enabled
 			return nil
 		})
 }
