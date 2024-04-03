@@ -15,6 +15,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v3"
 	ws "github.com/xmidt-org/xmidt-agent/internal/websocket"
@@ -22,11 +23,22 @@ import (
 	"nhooyr.io/websocket"
 )
 
-func TestEndToEnd(t *testing.T) {
-	var finished bool
+type EndToEndTestSuite struct {
+	suite.Suite
+	finished  bool
+	websocket *ws.Websocket
+}
 
-	assert := assert.New(t)
-	require := require.New(t)
+// Make sure that VariableThatShouldStartAtFive is set to five
+// before each test
+func (ts *EndToEndTestSuite) AfterTest(suiteName, testName string) {
+	ts.finished = true
+	ts.websocket.Stop()
+}
+
+func (ts *EndToEndTestSuite) TestEndToEnd() {
+	assert := assert.New(ts.T())
+	require := require.New(ts.T())
 
 	s := httptest.NewServer(
 		http.HandlerFunc(
@@ -47,7 +59,7 @@ func TestEndToEnd(t *testing.T) {
 
 				mt, got, err := c.Read(ctx)
 				// server will halt until the websocket closes resulting in a EOF
-				if finished {
+				if ts.finished {
 					return
 				}
 
@@ -66,7 +78,7 @@ func TestEndToEnd(t *testing.T) {
 
 	var msgCnt, connectCnt, disconnectCnt atomic.Int64
 
-	got, err := ws.New(
+	websocket, err := ws.New(
 		ws.URL(s.URL),
 		ws.DeviceID("mac:112233445566"),
 		ws.AddMessageListener(
@@ -102,12 +114,13 @@ func TestEndToEnd(t *testing.T) {
 		}),
 	)
 	require.NoError(err)
-	require.NotNil(got)
+	require.NotNil(websocket)
 
-	got.Start()
+	ts.websocket = websocket
+	ts.websocket.Start()
 
 	// Allow multiple calls to start.
-	got.Start()
+	ts.websocket.Start()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
@@ -124,7 +137,7 @@ func TestEndToEnd(t *testing.T) {
 		}
 	}
 
-	got.Send(context.Background(),
+	ts.websocket.Send(context.Background(),
 		wrp.Message{
 			Type:   wrp.SimpleEventMessageType,
 			Source: "client",
@@ -142,9 +155,10 @@ func TestEndToEnd(t *testing.T) {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	finished = true
-	got.Stop()
-	time.Sleep(10 * time.Millisecond)
+}
+
+func TestEndToEnd(t *testing.T) {
+	suite.Run(t, new(EndToEndTestSuite))
 }
 
 func TestEndToEndBadData(t *testing.T) {
