@@ -5,6 +5,7 @@ package websocket_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -59,7 +60,9 @@ func (ts *EndToEndTestSuite) TestEndToEnd() {
 
 				mt, got, err := c.Read(ctx)
 				// server will halt until the websocket closes resulting in a EOF
-				if ts.finished {
+				var closeErr websocket.CloseError
+				if ts.finished && errors.As(err, &closeErr) {
+					assert.Equal(closeErr.Code, websocket.StatusNormalClosure)
 					return
 				}
 
