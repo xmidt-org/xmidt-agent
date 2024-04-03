@@ -81,7 +81,7 @@ func New(egress wrpkit.Handler, source string, logger *zap.Logger, opts ...Optio
 	h := Handler{
 		egress: egress,
 		source: source,
-		logger: logger,
+		logger: logger.Named("mocktr181"),
 	}
 
 	for _, opt := range opts {
