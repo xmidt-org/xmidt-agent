@@ -182,7 +182,7 @@ func providePubSubHandler(in pubsubIn) (out pubsubOut, err error) {
 		var mocktr pubsub.CancelFunc
 
 		mockDefaults := []mocktr181.Option{
-			mocktr181.FilePath("mock_tr181_test.json"),
+			mocktr181.FilePath(in.MockTr181.FilePath),
 			mocktr181.Enabled(in.MockTr181.Enabled),
 		}
 		mocktr181Handler, err := mocktr181.New(ps, string(in.DeviceID), mockDefaults...)

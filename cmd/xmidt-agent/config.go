@@ -307,6 +307,5 @@ var defaultConfig = Config{
 	},
 	MockTr181: MockTr181{
 		FilePath: "./mock_tr181.json",
-		Enabled:  true,
 	},
 }
