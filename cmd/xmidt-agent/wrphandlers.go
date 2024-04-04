@@ -124,31 +124,30 @@ func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 		pubsub.WithEgressHandler(in.Egress, &egress),
 	}
 
-	var ps *pubsub.PubSub
-	if in.MockTr181.Enabled {
-		var mocktr pubsub.CancelFunc
+	ps, err := pubsub.New(
+		in.DeviceID,
+		opts...,
+	)
+	if err != nil {
+		return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
+	}
 
+	if in.MockTr181.Enabled {
 		mockDefaults := []mocktr181.Option{
 			mocktr181.FilePath(in.MockTr181.FilePath),
 			mocktr181.Enabled(in.MockTr181.Enabled),
 		}
 		mocktr181Handler, err := mocktr181.New(ps, string(in.DeviceID), mockDefaults...)
 		if err != nil {
-			return pubsubOut{}, nil
+			return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
 		}
 
-		opts = append(opts,
-			pubsub.WithServiceHandler("mocktr181", mocktr181Handler, &mocktr),
-		)
-		cancelList = append(cancelList, mocktr)
-	}
+		mocktr, err := ps.SubscribeService("mocktr181", mocktr181Handler)
+		if err != nil {
+			return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
+		}
 
-	ps, err := pubsub.New(
-		in.DeviceID,
-		opts...,
-	)
-	if err != nil {
-		err = errors.Join(ErrWRPHandlerConfig, err)
+		cancelList = append(cancelList, mocktr)
 	}
 
 	return pubsubOut{
