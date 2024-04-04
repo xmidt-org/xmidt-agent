@@ -6,7 +6,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/url"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/xmidt-org/xmidt-agent/internal/jwtxt"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
+	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
@@ -36,8 +36,10 @@ type wsIn struct {
 
 type wsOut struct {
 	fx.Out
-	WS         *websocket.Websocket
-	CancelList []event.CancelFunc
+	WSHandler               wrpkit.Handler
+	WS                      *websocket.Websocket
+	WRPHandlerAdaptorCancel event.CancelFunc
+	EventCancelList         []event.CancelFunc
 }
 
 func provideWS(in wsIn) (wsOut, error) {
@@ -45,6 +47,7 @@ func provideWS(in wsIn) (wsOut, error) {
 		return wsOut{}, nil
 	}
 
+	// Configuration options
 	opts := []websocket.Option{
 		websocket.DeviceID(in.DeviceID),
 		websocket.FetchURLTimeout(in.Websocket.FetchURLTimeout),
@@ -66,26 +69,28 @@ func provideWS(in wsIn) (wsOut, error) {
 		websocket.RetryPolicy(in.Websocket.RetryPolicy),
 	}
 
+	// Listener options
 	var (
-		cancelList       []event.CancelFunc
-		msg, con, discon event.CancelFunc
+		msg, con, discon, wrphandlerAdaptor event.CancelFunc
+		cancelList                          = []event.CancelFunc{wrphandlerAdaptor}
 	)
 	if in.CLI.Dev {
+		logger := in.Logger.Named("websocket")
 		opts = append(opts,
 			websocket.AddMessageListener(
 				event.MsgListenerFunc(
 					func(m wrp.Message) {
-						in.Logger.Info("message listener", zap.Any("msg", m))
+						logger.Info("message listener", zap.Any("msg", m))
 					}), &msg),
 			websocket.AddConnectListener(
 				event.ConnectListenerFunc(
 					func(e event.Connect) {
-						in.Logger.Info("connect listener", zap.Any("event", e))
+						logger.Info("connect listener", zap.Any("event", e))
 					}), &con),
 			websocket.AddDisconnectListener(
 				event.DisconnectListenerFunc(
 					func(e event.Disconnect) {
-						in.Logger.Info("disconnect listener", zap.Any("event", e))
+						logger.Info("disconnect listener", zap.Any("event", e))
 					}), &discon),
 		)
 		cancelList = append(cancelList, msg, con, discon)
@@ -93,12 +98,13 @@ func provideWS(in wsIn) (wsOut, error) {
 
 	ws, err := websocket.New(opts...)
 	if err != nil {
-		err = fmt.Errorf("%w: %s", ErrWebsocketConfig, err)
+		err = errors.Join(ErrWebsocketConfig, err)
 	}
 
 	return wsOut{
-		WS:         ws,
-		CancelList: cancelList,
+		WS:                      ws,
+		EventCancelList:         cancelList,
+		WRPHandlerAdaptorCancel: wrphandlerAdaptor,
 	}, err
 }
 

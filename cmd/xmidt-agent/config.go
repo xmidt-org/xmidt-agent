@@ -20,6 +20,7 @@ import (
 
 // Config is the configuration for the xmidt-agent.
 type Config struct {
+	Pubsub           Pubsub
 	Websocket        Websocket
 	Identity         Identity
 	OperationalState OperationalState
@@ -28,6 +29,11 @@ type Config struct {
 	Logger           sallust.Config
 	Storage          Storage
 	MockTr181        MockTr181
+}
+
+type Pubsub struct {
+	// PublishTimeout sets the timeout for publishing a message
+	PublishTimeout time.Duration
 }
 
 type Websocket struct {
@@ -295,6 +301,9 @@ var defaultConfig = Config{
 			Jitter:      1.0 / 3.0,
 			MaxInterval: 341*time.Second + 333*time.Millisecond,
 		},
+	},
+	Pubsub: Pubsub{
+		PublishTimeout: 200 * time.Millisecond,
 	},
 	MockTr181: MockTr181{
 		FilePath: "./mock_tr181.json",

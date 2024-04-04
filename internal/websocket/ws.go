@@ -6,7 +6,6 @@ package websocket
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net"
 	"net/http"
 	"sync"
@@ -159,6 +158,10 @@ func (ws *Websocket) Start() {
 // Stop stops the websocket connection.
 func (ws *Websocket) Stop() {
 	ws.m.Lock()
+	if ws.conn != nil {
+		ws.conn.Close(nhws.StatusNormalClosure, "")
+	}
+
 	shutdown := ws.shutdown
 	ws.m.Unlock()
 
@@ -167,6 +170,12 @@ func (ws *Websocket) Stop() {
 	}
 
 	ws.wg.Wait()
+}
+
+// AddMessageListener adds a message listener to the WS connection.
+// The listener will be called for every message received from the WS.
+func (ws *Websocket) AddMessageListener(listener event.MsgListener, cancel ...*event.CancelFunc) event.CancelFunc {
+	return event.CancelFunc(ws.msgListeners.Add(listener))
 }
 
 // Send sends the provided WRP message through the existing websocket.  This
@@ -188,7 +197,6 @@ func (ws *Websocket) run(ctx context.Context) {
 	defer ws.wg.Done()
 
 	decoder := wrp.NewDecoder(nil, wrp.Msgpack)
-	encoder := wrp.NewEncoder(nil, wrp.Msgpack)
 	mode := ws.nextMode(ipv4)
 
 	policy := ws.retryPolicyFactory.NewPolicy(ctx)
@@ -257,27 +265,6 @@ func (ws *Websocket) run(ctx context.Context) {
 				ws.msgListeners.Visit(func(l event.MsgListener) {
 					l.OnMessage(msg)
 				})
-
-				// TODO - This section simply sends back the received wrp msg as a respond to the client's request. This will be replaced
-				var frameContents []byte
-
-				// if the request was in a format other than Msgpack, or if the caller did not pass
-				// Contents, then do the encoding here.
-				encoder.ResetBytes(&frameContents)
-				err = encoder.Encode(msg)
-				encoder.ResetBytes(&emptyBuffer)
-				if err != nil {
-					ws.disconnectListeners.Visit(func(l event.DisconnectListener) {
-						l.OnDisconnect(event.Disconnect{
-							At:  ws.nowFunc(),
-							Err: fmt.Errorf("xmidt-agent failed to response to wrp message: %s", err),
-						})
-					})
-
-					continue
-				}
-
-				ws.conn.Write(ctx, nhws.MessageBinary, frameContents)
 			}
 		}
 

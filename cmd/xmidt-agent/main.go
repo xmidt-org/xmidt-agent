@@ -17,6 +17,7 @@ import (
 	_ "github.com/goschtalt/yaml-encoder"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials"
+	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
 
@@ -48,12 +49,13 @@ type CLI struct {
 
 type LifeCycleIn struct {
 	fx.In
-	Logger     *zap.Logger
-	LC         fx.Lifecycle
-	Shutdowner fx.Shutdowner
-	WS         *websocket.Websocket
-	Cred       *credentials.Credentials
-	CancelList []event.CancelFunc
+	Logger           *zap.Logger
+	LC               fx.Lifecycle
+	Shutdowner       fx.Shutdowner
+	WS               *websocket.Websocket
+	Cred             *credentials.Credentials
+	EventCancelList  []event.CancelFunc
+	PubSubCancelList []pubsub.CancelFunc
 }
 
 // xmidtAgent is the main entry point for the program.  It is responsible for
@@ -94,10 +96,12 @@ func xmidtAgent(args []string) (*fx.App, error) {
 			goschtalt.UnmarshalFunc[XmidtService]("xmidt_service"),
 			goschtalt.UnmarshalFunc[Storage]("storage"),
 			goschtalt.UnmarshalFunc[Websocket]("websocket"),
-			goschtalt.UnmarshalFunc[MockTr181]("mocktr181"),
+			goschtalt.UnmarshalFunc[MockTr181]("mock_tr_181"),
+			goschtalt.UnmarshalFunc[Pubsub]("pubsub"),
 		),
 
 		fsProvide(),
+		provideWRPHandlers(),
 
 		fx.Invoke(
 			lifeCycle,
@@ -235,7 +239,7 @@ func onStart(cred *credentials.Credentials, ws *websocket.Websocket, logger *zap
 	}
 }
 
-func onStop(ws *websocket.Websocket, shutdowner fx.Shutdowner, cancelList []event.CancelFunc, logger *zap.Logger) func(context.Context) error {
+func onStop(ws *websocket.Websocket, shutdowner fx.Shutdowner, eventCancelList []event.CancelFunc, pubsubCancelList []pubsub.CancelFunc, logger *zap.Logger) func(context.Context) error {
 	logger = logger.Named("on_stop")
 
 	return func(_ context.Context) error {
@@ -255,7 +259,11 @@ func onStop(ws *websocket.Websocket, shutdowner fx.Shutdowner, cancelList []even
 		}
 
 		ws.Stop()
-		for _, c := range cancelList {
+		for _, c := range eventCancelList {
+			c()
+		}
+
+		for _, c := range pubsubCancelList {
 			c()
 		}
 
@@ -268,7 +276,7 @@ func lifeCycle(in LifeCycleIn) {
 	in.LC.Append(
 		fx.Hook{
 			OnStart: onStart(in.Cred, in.WS, logger),
-			OnStop:  onStop(in.WS, in.Shutdowner, in.CancelList, logger),
+			OnStop:  onStop(in.WS, in.Shutdowner, in.EventCancelList, in.PubSubCancelList, logger),
 		},
 	)
 }
