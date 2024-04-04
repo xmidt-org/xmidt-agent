@@ -41,6 +41,8 @@ type Websocket struct {
 	Disable bool
 	// URLPath is the device registration url path
 	URLPath string
+	// BackUpURL is the back up XMiDT service endpoint in case `XmidtCredentials.URL` fails.
+	BackUpURL string
 	// AdditionalHeaders are any additional headers for the WS connection.
 	AdditionalHeaders http.Header
 	// FetchURLTimeout is the timeout for the fetching the WS url. If this is not set, the default is 30 seconds.

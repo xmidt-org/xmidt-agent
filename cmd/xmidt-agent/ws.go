@@ -38,6 +38,7 @@ type wsOut struct {
 	fx.Out
 	WSHandler               wrpkit.Handler
 	WS                      *websocket.Websocket
+	Egress                  websocket.Egress
 	WRPHandlerAdapterCancel event.CancelFunc
 	EventCancelList         []event.CancelFunc
 }
@@ -51,7 +52,9 @@ func provideWS(in wsIn) (wsOut, error) {
 	opts := []websocket.Option{
 		websocket.DeviceID(in.DeviceID),
 		websocket.FetchURLTimeout(in.Websocket.FetchURLTimeout),
-		websocket.FetchURL(fetchURL(in.Websocket.URLPath, in.JWTXT.Endpoint)),
+		websocket.FetchURL(
+			fetchURL(in.Websocket.URLPath, in.Websocket.BackUpURL,
+				in.JWTXT.Endpoint)),
 		websocket.PingInterval(in.Websocket.PingInterval),
 		websocket.PingTimeout(in.Websocket.PingTimeout),
 		websocket.ConnectTimeout(in.Websocket.ConnectTimeout),
@@ -105,13 +108,18 @@ func provideWS(in wsIn) (wsOut, error) {
 		WS:                      ws,
 		EventCancelList:         cancelList,
 		WRPHandlerAdapterCancel: wrphandlerAdapter,
+		Egress:                  ws,
 	}, err
 }
 
-func fetchURL(path string, f func(context.Context) (string, error)) func(context.Context) (string, error) {
+func fetchURL(path, backUpURL string, f func(context.Context) (string, error)) func(context.Context) (string, error) {
 	return func(ctx context.Context) (string, error) {
 		baseURL, err := f(ctx)
 		if err != nil {
+			if backUpURL != "" {
+				return url.JoinPath(backUpURL, path)
+			}
+
 			return "", err
 		}
 

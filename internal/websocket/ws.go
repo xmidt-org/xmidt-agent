@@ -24,10 +24,12 @@ var (
 	ErrInvalidMsgType  = errors.New("invalid message type")
 )
 
-// emptyBuffer is solely used as an address of a global empty buffer.
-// This sentinel value will reset pointers of the writePump's encoder
-// such that the gc can clean things up.
-var emptyBuffer = []byte{}
+// Egress interface is the egress route used to handle wrp messages that
+// targets something other than this device
+type Egress interface {
+	// HandleWrp is called whenever a message targets something other than this device.
+	HandleWrp(m wrp.Message) error
+}
 
 type Websocket struct {
 	// id is the device ID for the WS connection.
@@ -170,6 +172,10 @@ func (ws *Websocket) Stop() {
 	}
 
 	ws.wg.Wait()
+}
+
+func (ws *Websocket) HandleWrp(m wrp.Message) error {
+	return ws.Send(context.Background(), m)
 }
 
 // AddMessageListener adds a message listener to the WS connection.

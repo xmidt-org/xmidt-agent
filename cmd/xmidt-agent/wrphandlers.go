@@ -12,7 +12,6 @@ import (
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/auth"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/missing"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/mocktr181"
-	wshandler "github.com/xmidt-org/xmidt-agent/internal/wrphandlers/websocket"
 	"go.uber.org/fx"
 )
 
@@ -23,7 +22,6 @@ var (
 func provideWRPHandlers() fx.Option {
 	return fx.Options(
 		fx.Provide(
-			provideWSHandler,
 			providePubSubHandler,
 			provideMissingHandler,
 			provideAuthHandler,
@@ -35,9 +33,7 @@ func provideWRPHandlers() fx.Option {
 type wsAdapterIn struct {
 	fx.In
 
-	// Configuration
-	WSConfg Websocket
-	WS      *websocket.Websocket
+	WS *websocket.Websocket
 
 	// wrphandlers
 	AuthHandler             *auth.Handler
@@ -45,10 +41,6 @@ type wsAdapterIn struct {
 }
 
 func provideWSEventorToHandlerAdapter(in wsAdapterIn) {
-	if in.WSConfg.Disable {
-		return
-	}
-
 	in.WS.AddMessageListener(
 		event.MsgListenerFunc(func(m wrp.Message) {
 			_ = in.AuthHandler.HandleWrp(m)
@@ -57,54 +49,25 @@ func provideWSEventorToHandlerAdapter(in wsAdapterIn) {
 	)
 }
 
-type wsHandlerIn struct {
-	fx.In
-
-	// Configuration
-	WSConfg Websocket
-
-	WS *websocket.Websocket
-}
-
-func provideWSHandler(in wsHandlerIn) (h *wshandler.Handler, err error) {
-	defer func() {
-		if err != nil {
-			err = errors.Join(ErrWRPHandlerConfig, err)
-		}
-	}()
-
-	if in.WSConfg.Disable {
-		return nil, nil
-	}
-
-	return wshandler.New(in.WS)
-}
-
 type missingIn struct {
 	fx.In
 
 	// Configuration
 	// Note, DeviceID and PartnerID is pulled from the Identity configuration
 	DeviceID wrp.DeviceID
-	WSConfg  Websocket
 
 	// wrphandlers
-	WSHandler *wshandler.Handler
-	Pubsub    *pubsub.PubSub
+	Egress websocket.Egress
+	Pubsub *pubsub.PubSub
 }
 
-func provideMissingHandler(in missingIn) (h *missing.Handler, err error) {
-	defer func() {
-		if err != nil {
-			err = errors.Join(ErrWRPHandlerConfig, err)
-		}
-	}()
-
-	if in.WSConfg.Disable {
-		return nil, nil
+func provideMissingHandler(in missingIn) (*missing.Handler, error) {
+	h, err := missing.New(in.Pubsub, in.Egress, string(in.DeviceID))
+	if err != nil {
+		err = errors.Join(ErrWRPHandlerConfig, err)
 	}
 
-	return missing.New(in.Pubsub, in.WSHandler, string(in.DeviceID))
+	return h, err
 }
 
 type authIn struct {
@@ -114,25 +77,20 @@ type authIn struct {
 	// Note, DeviceID and PartnerID is pulled from the Identity configuration
 	DeviceID  wrp.DeviceID
 	PartnerID string
-	WSConfg   Websocket
 
 	// wrphandlers
-	WSHandler      *wshandler.Handler
+
+	Egress         websocket.Egress
 	MissingHandler *missing.Handler
 }
 
-func provideAuthHandler(in authIn) (h *auth.Handler, err error) {
-	defer func() {
-		if err != nil {
-			err = errors.Join(ErrWRPHandlerConfig, err)
-		}
-	}()
-
-	if in.WSConfg.Disable {
-		return nil, nil
+func provideAuthHandler(in authIn) (*auth.Handler, error) {
+	h, err := auth.New(in.MissingHandler, in.Egress, string(in.DeviceID), in.PartnerID)
+	if err != nil {
+		err = errors.Join(ErrWRPHandlerConfig, err)
 	}
 
-	return auth.New(in.MissingHandler, in.WSHandler, string(in.DeviceID), in.PartnerID)
+	return h, err
 }
 
 type pubsubIn struct {
@@ -143,10 +101,9 @@ type pubsubIn struct {
 	DeviceID  wrp.DeviceID
 	Pubsub    Pubsub
 	MockTr181 MockTr181
-	WSConfg   Websocket
 
 	// wrphandlers
-	WSHandler *wshandler.Handler
+	Egress websocket.Egress
 }
 
 type pubsubOut struct {
@@ -156,17 +113,7 @@ type pubsubOut struct {
 	PubSubCancelList []pubsub.CancelFunc
 }
 
-func providePubSubHandler(in pubsubIn) (out pubsubOut, err error) {
-	defer func() {
-		if err != nil {
-			err = errors.Join(ErrWRPHandlerConfig, err)
-		}
-	}()
-
-	if in.WSConfg.Disable {
-		return pubsubOut{}, nil
-	}
-
+func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 	var (
 		egress     pubsub.CancelFunc
 		cancelList = []pubsub.CancelFunc{egress}
@@ -174,7 +121,7 @@ func providePubSubHandler(in pubsubIn) (out pubsubOut, err error) {
 
 	opts := []pubsub.Option{
 		pubsub.WithPublishTimeout(in.Pubsub.PublishTimeout),
-		pubsub.WithEgressHandler(in.WSHandler, &egress),
+		pubsub.WithEgressHandler(in.Egress, &egress),
 	}
 
 	var ps *pubsub.PubSub
@@ -196,10 +143,13 @@ func providePubSubHandler(in pubsubIn) (out pubsubOut, err error) {
 		cancelList = append(cancelList, mocktr)
 	}
 
-	ps, err = pubsub.New(
+	ps, err := pubsub.New(
 		in.DeviceID,
 		opts...,
 	)
+	if err != nil {
+		err = errors.Join(ErrWRPHandlerConfig, err)
+	}
 
 	return pubsubOut{
 		PubSub:           ps,
