@@ -258,6 +258,7 @@ var defaultConfig = Config{
 		},
 	},
 	Websocket: Websocket{
+		Enabled:               true,
 		URLPath:               "api/v2/device",
 		FetchURLTimeout:       30 * time.Second,
 		PingInterval:          30 * time.Second,
