@@ -28,11 +28,11 @@ func provideWRPHandlers() fx.Option {
 			provideMissingHandler,
 			provideAuthHandler,
 		),
-		fx.Invoke(provideWSEventorToHandlerAdaptor),
+		fx.Invoke(provideWSEventorToHandlerAdapter),
 	)
 }
 
-type wsAdaptorIn struct {
+type wsAdapterIn struct {
 	fx.In
 
 	// Configuration
@@ -41,10 +41,10 @@ type wsAdaptorIn struct {
 
 	// wrphandlers
 	AuthHandler             *auth.Handler
-	WRPHandlerAdaptorCancel event.CancelFunc
+	WRPHandlerAdapterCancel event.CancelFunc
 }
 
-func provideWSEventorToHandlerAdaptor(in wsAdaptorIn) {
+func provideWSEventorToHandlerAdapter(in wsAdapterIn) {
 	if in.WSConfg.Disable {
 		return
 	}
@@ -53,7 +53,7 @@ func provideWSEventorToHandlerAdaptor(in wsAdaptorIn) {
 		event.MsgListenerFunc(func(m wrp.Message) {
 			_ = in.AuthHandler.HandleWrp(m)
 		}),
-		&in.WRPHandlerAdaptorCancel,
+		&in.WRPHandlerAdapterCancel,
 	)
 }
 
@@ -195,6 +195,7 @@ func providePubSubHandler(in pubsubIn) (out pubsubOut, err error) {
 		)
 		cancelList = append(cancelList, mocktr)
 	}
+
 	ps, err = pubsub.New(
 		in.DeviceID,
 		opts...,

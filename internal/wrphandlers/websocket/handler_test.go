@@ -24,6 +24,7 @@ import (
 
 func TestHandler_HandleWrp(t *testing.T) {
 	var msgReceivedCnt, connectCnt, disconnectCnt atomic.Int64
+
 	opts := []websocket.Option{
 		websocket.DeviceID("mac:112233445566"),
 		websocket.AddConnectListener(
@@ -98,6 +99,7 @@ func TestHandler_HandleWrp(t *testing.T) {
 			msg:         wrp.Message{Type: wrp.UnknownMessageType, Source: "server"},
 		},
 	}
+
 	for _, tc := range tests {
 		t.Run(tc.description, func(t *testing.T) {
 			assert := assert.New(t)
@@ -146,6 +148,7 @@ func TestHandler_HandleWrp(t *testing.T) {
 					}))
 
 			var wrpHandler *wsh.Handler
+
 			testOpts := append(opts,
 				websocket.URL(s.URL),
 				websocket.AddMessageListener(

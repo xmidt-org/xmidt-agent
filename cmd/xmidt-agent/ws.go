@@ -38,7 +38,7 @@ type wsOut struct {
 	fx.Out
 	WSHandler               wrpkit.Handler
 	WS                      *websocket.Websocket
-	WRPHandlerAdaptorCancel event.CancelFunc
+	WRPHandlerAdapterCancel event.CancelFunc
 	EventCancelList         []event.CancelFunc
 }
 
@@ -71,8 +71,8 @@ func provideWS(in wsIn) (wsOut, error) {
 
 	// Listener options
 	var (
-		msg, con, discon, wrphandlerAdaptor event.CancelFunc
-		cancelList                          = []event.CancelFunc{wrphandlerAdaptor}
+		msg, con, discon, wrphandlerAdapter event.CancelFunc
+		cancelList                          = []event.CancelFunc{wrphandlerAdapter}
 	)
 	if in.CLI.Dev {
 		logger := in.Logger.Named("websocket")
@@ -104,7 +104,7 @@ func provideWS(in wsIn) (wsOut, error) {
 	return wsOut{
 		WS:                      ws,
 		EventCancelList:         cancelList,
-		WRPHandlerAdaptorCancel: wrphandlerAdaptor,
+		WRPHandlerAdapterCancel: wrphandlerAdapter,
 	}, err
 }
 
