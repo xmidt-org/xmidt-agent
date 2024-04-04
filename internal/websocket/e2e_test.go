@@ -17,9 +17,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/xmidt-agent/internal/nhooyr.io/websocket"
 	ws "github.com/xmidt-org/xmidt-agent/internal/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
-	"nhooyr.io/websocket"
 )
 
 func TestEndToEnd(t *testing.T) {

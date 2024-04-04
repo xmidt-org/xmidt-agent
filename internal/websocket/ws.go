@@ -15,8 +15,8 @@ import (
 	"github.com/xmidt-org/eventor"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v3"
+	nhws "github.com/xmidt-org/xmidt-agent/internal/nhooyr.io/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
-	nhws "nhooyr.io/websocket"
 )
 
 var (
