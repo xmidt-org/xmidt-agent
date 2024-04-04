@@ -31,8 +31,8 @@ type Config struct {
 }
 
 type Websocket struct {
-	// Disable determines whether or not to disable xmidt-agent's websocket
-	Disable bool
+	// Enabled determines whether or not to enable xmidt-agent's websocket
+	Enabled bool
 	// URLPath is the device registration url path
 	URLPath string
 	// AdditionalHeaders are any additional headers for the WS connection.

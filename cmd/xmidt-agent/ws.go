@@ -41,7 +41,7 @@ type wsOut struct {
 }
 
 func provideWS(in wsIn) (wsOut, error) {
-	if in.Websocket.Disable {
+	if !in.Websocket.Enabled {
 		return wsOut{}, nil
 	}
 
