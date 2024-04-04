@@ -6,9 +6,9 @@ package websocket_test
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -123,15 +123,14 @@ func TestHandler_HandleWrp(t *testing.T) {
 						defer cancel()
 
 						err = c.Write(ctx, nhws.MessageBinary, wrp.MustEncode(&tc.msg, wrp.Msgpack))
-						// temp fix until this issue is patched https://go-review.googlesource.com/c/go/+/287592
-						if err != nil && strings.Contains(err.Error(), "use of closed network connection") {
+						if errors.Is(err, net.ErrClosed) {
 							return
 						}
 
 						require.NoError(err)
 
 						mt, buf, err := c.Read(ctx)
-						if err != nil && strings.Contains(err.Error(), "use of closed network connection") {
+						if errors.Is(err, net.ErrClosed) {
 							return
 						}
 
