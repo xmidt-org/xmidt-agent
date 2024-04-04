@@ -27,6 +27,7 @@ type Config struct {
 	XmidtService     XmidtService
 	Logger           sallust.Config
 	Storage          Storage
+	MockTr181        MockTr181
 }
 
 type Websocket struct {
@@ -173,6 +174,11 @@ type Storage struct {
 	Durable   string
 }
 
+type MockTr181 struct {
+	FilePath string
+	Enabled  bool
+}
+
 // Collect and process the configuration files and env vars and
 // produce a configuration object.
 func provideConfig(cli *CLI) (*goschtalt.Config, error) {
@@ -289,5 +295,9 @@ var defaultConfig = Config{
 			Jitter:      1.0 / 3.0,
 			MaxInterval: 341*time.Second + 333*time.Millisecond,
 		},
+	},
+	MockTr181: MockTr181{
+		FilePath: "./mock_tr181.json",
+		Enabled:  true,
 	},
 }

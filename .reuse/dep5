@@ -42,3 +42,7 @@ License: Apache-2.0
 Files: .whitesource
 Copyright: SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
 License: Apache-2.0
+
+Files: *.json
+Copyright: SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
+License: Apache-2.0

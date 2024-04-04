@@ -94,6 +94,7 @@ func xmidtAgent(args []string) (*fx.App, error) {
 			goschtalt.UnmarshalFunc[XmidtService]("xmidt_service"),
 			goschtalt.UnmarshalFunc[Storage]("storage"),
 			goschtalt.UnmarshalFunc[Websocket]("websocket"),
+			goschtalt.UnmarshalFunc[MockTr181]("mocktr181"),
 		),
 
 		fsProvide(),
