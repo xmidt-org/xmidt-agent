@@ -113,7 +113,7 @@ func (h Handler) Enabled() bool {
 // HandleWrp is called to process a tr181 command
 func (h Handler) HandleWrp(msg wrp.Message) error {
 	payload := new(Tr181Payload)
-	var commandErr error
+
 	err := json.Unmarshal(msg.Payload, &payload)
 	if err != nil {
 		return err
@@ -126,7 +126,10 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 
 	switch command {
 	case "GET":
-		statusCode, payloadResponse, commandErr = h.get(payload.Names)
+		statusCode, payloadResponse, err = h.get(payload.Names)
+		if err != nil {
+			return err
+		}
 
 	case "SET":
 		statusCode = h.set(payload.Parameters)
@@ -146,7 +149,7 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 
 	err = h.egress.HandleWrp(response)
 
-	return errors.Join(err, commandErr)
+	return err
 }
 
 func (h Handler) get(names []string) (int64, []byte, error) {
