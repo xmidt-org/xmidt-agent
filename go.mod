@@ -21,7 +21,6 @@ require (
 	go.uber.org/fx v1.21.0
 	go.uber.org/zap v1.27.0
 	gopkg.in/dealancer/validate.v2 v2.1.0
-	nhooyr.io/websocket v1.8.10
 )
 
 require (

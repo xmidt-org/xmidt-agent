@@ -46,3 +46,7 @@ License: Apache-2.0
 Files: *.json
 Copyright: SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
 License: Apache-2.0
+
+Files: internal/nhooyr.io/websocket/stringer.go
+Copyright: SPDX-FileCopyrightText: 2023 Anmol Sethi <hi@nhooyr.io>
+License: ISC
