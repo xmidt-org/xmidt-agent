@@ -26,22 +26,17 @@ issues:
       linters:
         - dupl
         - funlen
-
-    - path: main\.go
-      # Accept TLSClientConfig with InsecureSkipVerify
-      text: "G402:"
-
-    - path: main\.go
-      # Accept pprof is automatically exposed
-      text: "G108:"
-
-    - path: outboundSender\.go
-      # Accept sha1 for signature
-      text: "G505:"
-
-    - path: .go
-      # Accept deprecated packages for now.
-      text: "SA1019:"
+    - path: internal/credentials/cmd/example/main.go
+      linters:
+        - gosec
+    - path: internal/nhooyr.io
+      linters:
+        - bodyclose
+        - errorlint
+        - gosec
+        - goconst
+        - misspell
+        - prealloc
 
 run:
   skip-files:
