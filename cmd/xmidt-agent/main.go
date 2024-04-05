@@ -24,7 +24,6 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 const (
@@ -188,22 +187,9 @@ type LoggerIn struct {
 // Create the logger and configure it based on if the program is in
 // debug mode or normal mode.
 func provideLogger(in LoggerIn) (*zap.Logger, error) {
-	in.Cfg.EncoderConfig = sallust.EncoderConfig{
-		TimeKey:        "T",
-		LevelKey:       "L",
-		NameKey:        "N",
-		CallerKey:      "C",
-		FunctionKey:    zapcore.OmitKey,
-		MessageKey:     "M",
-		StacktraceKey:  "S",
-		LineEnding:     zapcore.DefaultLineEnding,
-		EncodeLevel:    "capitalColor",
-		EncodeTime:     "RFC3339",
-		EncodeDuration: "string",
-		EncodeCaller:   "short",
-	}
-
 	if in.CLI.Dev {
+		in.Cfg.EncoderConfig.EncodeLevel = "capitalColor"
+		in.Cfg.EncoderConfig.EncodeTime = "RFC3339"
 		in.Cfg.Level = "DEBUG"
 		in.Cfg.Development = true
 		in.Cfg.Encoding = "console"
