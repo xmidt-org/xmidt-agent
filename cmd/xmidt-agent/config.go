@@ -266,7 +266,7 @@ var defaultConfig = Config{
 		},
 	},
 	Websocket: Websocket{
-		URLPath:               "api/v2/device",
+		URLPath:               "/api/v2/device",
 		FetchURLTimeout:       30 * time.Second,
 		PingInterval:          30 * time.Second,
 		PingTimeout:           90 * time.Second,
