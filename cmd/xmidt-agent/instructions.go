@@ -23,8 +23,9 @@ type instructionsIn struct {
 }
 type instructionsOut struct {
 	fx.Out
-	JWTXT    *jwtxt.Instructions
-	DeviceID wrp.DeviceID
+	JWTXT     *jwtxt.Instructions
+	DeviceID  wrp.DeviceID
+	PartnerID string
 }
 
 func provideInstructions(in instructionsIn) (instructionsOut, error) {
@@ -93,6 +94,7 @@ func provideInstructions(in instructionsIn) (instructionsOut, error) {
 	jwtxt, err := jwtxt.New(opts...)
 
 	return instructionsOut{
-		JWTXT:    jwtxt,
-		DeviceID: in.ID.DeviceID}, err
+		JWTXT:     jwtxt,
+		DeviceID:  in.ID.DeviceID,
+		PartnerID: in.ID.PartnerID}, err
 }
