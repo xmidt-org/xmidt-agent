@@ -79,6 +79,22 @@ func (c *Conn) CloseRead(ctx context.Context) context.Context {
 	return ctx
 }
 
+// SetPingListener calls the provided function when a ping is received.
+func (c *Conn) SetPingListener(f func(context.Context, []byte)) {
+	if f == nil {
+		f = func(context.Context, []byte) {}
+	}
+	c.pingListener = f
+}
+
+// SetPongListener calls the provided function when a pong is sent.
+func (c *Conn) SetPongListener(f func(context.Context, []byte)) {
+	if f == nil {
+		f = func(context.Context, []byte) {}
+	}
+	c.pongListener = f
+}
+
 // SetReadLimit sets the max number of bytes to read for a single message.
 // It applies to the Reader and Read methods.
 //
@@ -297,8 +313,10 @@ func (c *Conn) handleControl(ctx context.Context, h header) (err error) {
 
 	switch h.opcode {
 	case opPing:
+		c.pingListener(ctx, b)
 		return c.writeControl(ctx, opPong, b)
 	case opPong:
+		c.pongListener(ctx, b)
 		c.activePingsMu.Lock()
 		pong, ok := c.activePings[string(b)]
 		c.activePingsMu.Unlock()

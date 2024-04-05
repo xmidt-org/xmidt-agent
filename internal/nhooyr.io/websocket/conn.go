@@ -82,6 +82,8 @@ type Conn struct {
 	pingCounter   int32
 	activePingsMu sync.Mutex
 	activePings   map[string]chan<- struct{}
+	pingListener  func(context.Context, []byte)
+	pongListener  func(context.Context, []byte)
 }
 
 type connConfig struct {
@@ -112,6 +114,9 @@ func newConn(cfg connConfig) *Conn {
 		closed:      make(chan struct{}),
 		activePings: make(map[string]chan<- struct{}),
 	}
+	// set default ping, pong handler
+	c.SetPingListener(nil)
+	c.SetPongListener(nil)
 
 	c.readMu = newMu(c)
 	c.writeFrameMu = newMu(c)
