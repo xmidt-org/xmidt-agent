@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 Anmol Sethi <hi@nhooyr.io>
+// SPDX-License-Identifier: ISC
+
 package xsync
 
 import (

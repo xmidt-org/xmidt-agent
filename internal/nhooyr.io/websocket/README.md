@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2023 Anmol Sethi <hi@nhooyr.io>
+SPDX-License-Identifier: ISC
+-->
+
 # websocket
 
 [![Go Reference](https://pkg.go.dev/badge/nhooyr.io/websocket.svg)](https://pkg.go.dev/nhooyr.io/websocket)

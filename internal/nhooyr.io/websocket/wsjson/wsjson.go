@@ -1,4 +1,7 @@
 // Package wsjson provides helpers for reading and writing JSON messages.
+// SPDX-FileCopyrightText: 2023 Anmol Sethi <hi@nhooyr.io>
+// SPDX-License-Identifier: ISC
+
 package wsjson // import "nhooyr.io/websocket/wsjson"
 
 import (

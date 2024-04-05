@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 Anmol Sethi <hi@nhooyr.io>
+// SPDX-License-Identifier: ISC
+
 package util
 
 // WriterFunc is used to implement one off io.Writers.

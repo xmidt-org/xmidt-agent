@@ -1,4 +1,7 @@
 #!/bin/sh
+# SPDX-FileCopyrightText: 2023 Anmol Sethi <hi@nhooyr.io>
+# SPDX-License-Identifier: ISC
+
 set -eu
 cd -- "$(dirname "$0")"
 
