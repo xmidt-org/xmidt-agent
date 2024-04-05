@@ -20,6 +20,7 @@ import (
 
 // Config is the configuration for the xmidt-agent.
 type Config struct {
+	Pubsub           Pubsub
 	Websocket        Websocket
 	Identity         Identity
 	OperationalState OperationalState
@@ -30,11 +31,18 @@ type Config struct {
 	MockTr181        MockTr181
 }
 
+type Pubsub struct {
+	// PublishTimeout sets the timeout for publishing a message
+	PublishTimeout time.Duration
+}
+
 type Websocket struct {
 	// Disable determines whether or not to disable xmidt-agent's websocket
 	Disable bool
 	// URLPath is the device registration url path
 	URLPath string
+	// BackUpURL is the back up XMiDT service endpoint in case `XmidtCredentials.URL` fails.
+	BackUpURL string
 	// AdditionalHeaders are any additional headers for the WS connection.
 	AdditionalHeaders http.Header
 	// FetchURLTimeout is the timeout for the fetching the WS url. If this is not set, the default is 30 seconds.
@@ -296,8 +304,10 @@ var defaultConfig = Config{
 			MaxInterval: 341*time.Second + 333*time.Millisecond,
 		},
 	},
+	Pubsub: Pubsub{
+		PublishTimeout: 200 * time.Millisecond,
+	},
 	MockTr181: MockTr181{
 		FilePath: "./mock_tr181.json",
-		Enabled:  true,
 	},
 }
