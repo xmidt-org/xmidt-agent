@@ -4,6 +4,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io/fs"
 	"net/http"
@@ -12,9 +13,11 @@ import (
 
 	"github.com/goschtalt/goschtalt"
 	"github.com/xmidt-org/arrange/arrangehttp"
+	"github.com/xmidt-org/arrange/arrangetls"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/wrp-go/v3"
+	"go.uber.org/zap/zapcore"
 	"gopkg.in/dealancer/validate.v2"
 )
 
@@ -253,8 +256,22 @@ var defaultConfig = Config{
 		RefetchPercent:  90.0,
 		FileName:        "credentials.msgpack",
 		FilePermissions: fs.FileMode(0600),
+		HTTPClient: arrangehttp.ClientConfig{
+			Timeout: 20 * time.Second,
+			Transport: arrangehttp.TransportConfig{
+				DisableKeepAlives: true,
+				MaxIdleConns:      1,
+			},
+			TLS: &arrangetls.Config{
+				MinVersion: tls.VersionTLS13,
+			},
+		},
 	},
 	XmidtService: XmidtService{
+		Backoff: Backoff{
+			MinDelay: 7 * time.Second,
+			MaxDelay: 10 * time.Minute,
+		},
 		JwtTxtRedirector: JwtTxtRedirector{
 			Timeout: 10 * time.Second,
 			AllowedAlgorithms: []string{
@@ -306,6 +323,27 @@ var defaultConfig = Config{
 	},
 	Pubsub: Pubsub{
 		PublishTimeout: 200 * time.Millisecond,
+	},
+	Logger: sallust.Config{
+		EncoderConfig: sallust.EncoderConfig{
+			TimeKey:        "T",
+			LevelKey:       "L",
+			NameKey:        "N",
+			CallerKey:      "C",
+			FunctionKey:    zapcore.OmitKey,
+			MessageKey:     "M",
+			StacktraceKey:  "S",
+			LineEnding:     zapcore.DefaultLineEnding,
+			EncodeLevel:    "capital",
+			EncodeTime:     "RFC3339Nano",
+			EncodeDuration: "string",
+			EncodeCaller:   "short",
+		},
+		Rotation: &sallust.Rotation{
+			MaxSize:    1,  // 1MB max/file
+			MaxAge:     30, // 30 days max
+			MaxBackups: 10, // max 10 files
+		},
 	},
 	MockTr181: MockTr181{
 		FilePath: "./mock_tr181.json",
