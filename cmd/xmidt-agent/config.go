@@ -340,9 +340,9 @@ var defaultConfig = Config{
 			EncodeCaller:   "short",
 		},
 		Rotation: &sallust.Rotation{
-			MaxSize:    1  // 1MB max/file
-			MaxAge:     30,              // 30 days max
-			MaxBackups: 10,              // max 10 files
+			MaxSize:    1,  // 1MB max/file
+			MaxAge:     30, // 30 days max
+			MaxBackups: 10, // max 10 files
 		},
 	},
 	MockTr181: MockTr181{
