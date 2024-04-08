@@ -153,12 +153,12 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 }
 
 func (h Handler) get(names []string) (int64, []byte, error) {
-	result := []Parameter{}
+	result := Tr181Payload{}
 
 	for _, name := range names {
 		for _, mockParameter := range h.parameters {
 			if strings.HasPrefix(mockParameter.Name, name) {
-				result = append(result, Parameter{
+				result.Parameters = append(result.Parameters, Parameter{
 					Name:       mockParameter.Name,
 					Value:      mockParameter.Value,
 					DataType:   mockParameter.DataType,

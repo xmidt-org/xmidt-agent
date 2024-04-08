@@ -37,10 +37,10 @@ func TestHandler_HandleWrp(t *testing.T) {
 			},
 			validate: func(a *assert.Assertions, msg wrp.Message, h *Handler) error {
 				a.Equal(int64(http.StatusOK), *msg.Status)
-				var result []Parameters
+				var result Tr181Payload
 				err := json.Unmarshal(msg.Payload, &result)
 				a.NoError(err)
-				a.Equal(102, len(result))
+				a.Equal(102, len(result.Parameters))
 				a.True(h.Enabled())
 				return nil
 			},
