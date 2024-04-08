@@ -65,6 +65,8 @@ github.com/xmidt-org/eventor v1.0.0 h1:FiX4UsU4gztIcAn8UJAZwJjNleOeeDyBxuBS4nGeu
 github.com/xmidt-org/eventor v1.0.0/go.mod h1:NpaRwPEiiaB5oEdFI41o6Lf4iQHAVwCdtwKb3z7R8mY=
 github.com/xmidt-org/httpaux v0.4.0 h1:cAL/MzIBpSsv4xZZeq/Eu1J5M3vfNe49xr41mP3COKU=
 github.com/xmidt-org/httpaux v0.4.0/go.mod h1:UypqZwuZV1nn8D6+K1JDb+im9IZrLNg/2oO/Bgiybxc=
+github.com/xmidt-org/idock v0.5.0 h1:Jcg69umVrp/doczBmwwUNHeJb1m3oZ606+9wPbIvOjo=
+github.com/xmidt-org/idock v0.5.0/go.mod h1:o+3ZNRz6F953p0RlmJBeaWxC74KvnoerjuNWFbNzK6k=
 github.com/xmidt-org/retry v0.0.3 h1:wvmBnEEn1OKwSZaQtr1RZ2Vey8JIvP72mGTgR+3wPiM=
 github.com/xmidt-org/retry v0.0.3/go.mod h1:I7FO3VVrxPckNuotwGYZIxfBnmjMSyOTitTKNL0VkIA=
 github.com/xmidt-org/sallust v0.2.2 h1:MrINLEr7cMj6ENx/O76fvpfd5LNGYnk7OipZAGXPYA0=

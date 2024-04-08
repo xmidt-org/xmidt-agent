@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
 // SPDX-License-Identifier: Apache-2.0
 
-package main
+package xmidt_agent
 
 import (
 	"context"
@@ -102,12 +102,12 @@ func Test_xmidtAgent(t *testing.T) {
 
 			if tc.panic {
 				assert.Panics(func() {
-					_, _ = xmidtAgent(tc.args)
+					_, _ = XmidtAgent(tc.args, false)
 				})
 				return
 			}
 
-			app, err := xmidtAgent(tc.args)
+			app, err := XmidtAgent(tc.args, false)
 
 			assert.ErrorIs(err, tc.expectedErr)
 			if tc.expectedErr != nil {

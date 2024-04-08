@@ -34,6 +34,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/xmidt-org/httpaux v0.4.0 // indirect
+	github.com/xmidt-org/idock v0.5.0
 	go.uber.org/dig v1.17.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/mod v0.16.0 // indirect
