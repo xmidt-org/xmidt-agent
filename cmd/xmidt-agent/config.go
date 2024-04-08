@@ -186,8 +186,9 @@ type Storage struct {
 }
 
 type MockTr181 struct {
-	FilePath string
-	Enabled  bool
+	FilePath    string
+	Enabled     bool
+	ServiceName string
 }
 
 // Collect and process the configuration files and env vars and
@@ -346,6 +347,7 @@ var defaultConfig = Config{
 		},
 	},
 	MockTr181: MockTr181{
-		FilePath: "./mock_tr181.json",
+		FilePath:    "./mock_tr181.json",
+		ServiceName: "config",
 	},
 }

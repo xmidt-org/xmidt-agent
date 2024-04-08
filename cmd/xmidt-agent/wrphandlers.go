@@ -142,7 +142,7 @@ func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 			return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
 		}
 
-		mocktr, err := ps.SubscribeService("mocktr181", mocktr181Handler)
+		mocktr, err := ps.SubscribeService(in.MockTr181.ServiceName, mocktr181Handler)
 		if err != nil {
 			return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
 		}
