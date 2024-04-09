@@ -24,6 +24,13 @@ require (
 )
 
 require (
+	github.com/k0kubun/pp/v3 v3.2.0 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-isatty v0.0.16 // indirect
+	golang.org/x/text v0.14.0 // indirect
+)
+
+require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gorilla/websocket v1.5.1 // indirect
@@ -32,6 +39,7 @@ require (
 	github.com/miekg/dns v1.1.57 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/segmentio/ksuid v1.0.4
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/xmidt-org/httpaux v0.4.0 // indirect
 	github.com/xmidt-org/idock v0.5.0

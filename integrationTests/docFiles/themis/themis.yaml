@@ -1,0 +1,135 @@
+# SPDX-FileCopyrightText: 2022 Comcast Cable Communications Management, LLC
+# SPDX-License-Identifier: Apache-2.0
+---
+# The unique fully-qualified-domain-name of the server.  It is provided to
+# the X-Scytale-Server header for showing what server fulfilled the request
+# sent.
+# (Optional)
+server: (( grab $HOSTNAME || "themis" ))
+
+########################################
+#   Labeling/Tracing via HTTP Headers Configuration
+########################################
+
+# Provides this build number to the X-Scytale-Build header for
+# showing machine version information.  The build number SHOULD
+# match the scheme `version-build` but there is not a strict requirement.
+# (Optional)
+build: (( grab $BUILD || "unkown" ))
+
+# stage is used for doing complex spruce manipulation
+# change this will only effect spruce and the vars referencing it
+stage: (( grab $STAGE || "development" ))
+
+servers:
+  key:
+    address: :6500
+    disableHTTPKeepAlives: true
+    header:
+      X-Midt-Server:
+        - (( grab server ))
+      X-Midt-Version:
+        - (( grab build ))
+  issuer:
+    address: :6501
+    disableHTTPKeepAlives: true
+    header:
+      X-Midt-Server:
+        - (( grab server ))
+      X-Midt-Version:
+        - (( grab build ))
+  claims:
+    address: :6502
+    disableHTTPKeepAlives: true
+    header:
+      X-Midt-Server:
+        - (( grab server ))
+      X-Midt-Version:
+        - (( grab build ))
+        -
+  metrics:
+    address: :6503
+    disableHTTPKeepAlives: true
+
+  health:
+    address: :6504
+    disableHTTPKeepAlives: true
+    header:
+      X-Midt-Server:
+        - (( grab server ))
+      X-Midt-Version:
+        - (( grab build ))
+health:
+  disableLogging: false
+  custom:
+    server: (( grab server ))
+
+prometheus:
+  defaultNamespace: xmidt
+  defaultSubsystem: themis
+
+token:
+  alg: RS256
+  nonce: true
+  notBeforeDelta: -15s
+  duration: 24h
+  claims:
+    - key: mac
+      header: X-Midt-Mac-Address
+      parameter: mac
+    - key: serial
+      header: X-Midt-Serial-Number
+      parameter: serial
+    - key: uuid
+      header: X-Midt-Uuid
+      parameter: uuid
+    - key: iss
+      value: "themis"
+    - key: trust
+      value: 1000
+    - key: sub
+      value: "client-supplied"
+    - key: aud
+      value: "XMiDT"
+    - key: capabilities
+      value:
+        - x1:issuer:test:.*:all
+  metadata:
+    - key: mac
+      header: X-Midt-Mac-Address
+      parameter: mac
+    - key: serial
+      header: X-Midt-Serial-Number
+      parameter: serial
+    - key: uuid
+      header: X-Midt-Uuid
+      parameter: uuid
+  partnerID:
+    claim: partner-id
+    header: X-Midt-Partner-ID
+    parameter: pid
+    default: (( grab $PARTNER_ID || "comcast" ))
+
+  key:
+    kid: (( grab $KID_NAME || "docker" ))
+    type: rsa
+    bits: 1024
+
+log:
+  file: "stdout"
+  level: (( grab $LOG_LEVEL || "INFO" ))
+
+# tracing provides configuration around traces using OpenTelemetry.
+# (Optional). By default, a 'noop' tracer provider is used and tracing is disabled.
+tracing:
+  # provider is the provider name. Currently, stdout, jaegar and zipkin are supported.
+  # 'noop' can also be used as provider to explicitly disable tracing.
+  provider: (( grab $TRACING_PROVIDER_NAME || "noop" ))
+
+  # skipTraceExport only applies when provider is stdout. Set skipTraceExport to true
+  # so that trace information is not written to stdout.
+  # skipTraceExport: true
+
+  # endpoint is where trace information should be routed. Applies to zipkin and jaegar.
+  endpoint: (( grab $TRACING_PROVIDER_ENDPOINT || "http://zipkin:9411/api/v2/spans" ))
+  
