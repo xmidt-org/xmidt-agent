@@ -154,6 +154,7 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 
 func (h Handler) get(names []string) (int64, []byte, error) {
 	result := Tr181Payload{}
+	statusCode := int64(http.StatusOK)
 
 	for _, name := range names {
 		for _, mockParameter := range h.parameters {
@@ -173,7 +174,11 @@ func (h Handler) get(names []string) (int64, []byte, error) {
 		return http.StatusInternalServerError, payload, errors.Join(ErrInvalidResponsePayload, err)
 	}
 
-	return http.StatusOK, payload, nil
+	if len(result.Parameters) == 0 {
+		statusCode = int64(520)
+	}
+
+	return statusCode, payload, nil
 }
 
 func (h Handler) set(parameters []Parameter) int64 {

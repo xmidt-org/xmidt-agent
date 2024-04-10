@@ -45,6 +45,25 @@ func TestHandler_HandleWrp(t *testing.T) {
 				return nil
 			},
 		}, {
+			description:     "get with no mataching parameter",
+			egressCallCount: 1,
+			expectedErr:     nil,
+			msg: wrp.Message{
+				Type:        wrp.SimpleEventMessageType,
+				Source:      "dns:tr1d1um.example.com/service/ignored",
+				Destination: "event:event_1/ignored",
+				Payload:     []byte("{\"command\":\"GET\",\"names\":[\"NoSuchParameter\"]}"),
+			},
+			validate: func(a *assert.Assertions, msg wrp.Message, h *Handler) error {
+				a.Equal(int64(520), *msg.Status)
+				var result Tr181Payload
+				err := json.Unmarshal(msg.Payload, &result)
+				a.NoError(err)
+				a.Equal(0, len(result.Parameters))
+				a.True(h.Enabled())
+				return nil
+			},
+		}, {
 			description:     "set, success",
 			egressCallCount: 1,
 			msg: wrp.Message{
