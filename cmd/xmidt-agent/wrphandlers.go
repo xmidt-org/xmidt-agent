@@ -13,6 +13,7 @@ import (
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/missing"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/mocktr181"
 	"go.uber.org/fx"
+	"go.uber.org/zap"
 )
 
 var (
@@ -33,7 +34,9 @@ func provideWRPHandlers() fx.Option {
 type wsAdapterIn struct {
 	fx.In
 
-	WS *websocket.Websocket
+	CLI    *CLI
+	Logger *zap.Logger
+	WS     *websocket.Websocket
 
 	// wrphandlers
 	AuthHandler             *auth.Handler
@@ -41,9 +44,13 @@ type wsAdapterIn struct {
 }
 
 func provideWSEventorToHandlerAdapter(in wsAdapterIn) {
+	logger := in.Logger.Named("websocket").Named("wrphandler")
 	in.WS.AddMessageListener(
 		event.MsgListenerFunc(func(m wrp.Message) {
-			_ = in.AuthHandler.HandleWrp(m)
+			err := in.AuthHandler.HandleWrp(m)
+			if in.CLI.Dev {
+				logger.Info("message listener", zap.Any("msg", m), zap.Error(err))
+			}
 		}),
 		&in.WRPHandlerAdapterCancel,
 	)
