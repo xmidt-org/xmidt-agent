@@ -74,8 +74,8 @@ func provideWS(in wsIn) (wsOut, error) {
 
 	// Listener options
 	var (
-		msg, con, discon, wrphandlerAdapter event.CancelFunc
-		cancelList                          = []event.CancelFunc{wrphandlerAdapter}
+		msg, con, discon, heartbeat, wrphandlerAdapter event.CancelFunc
+		cancelList                                     = []event.CancelFunc{wrphandlerAdapter}
 	)
 	if in.CLI.Dev {
 		logger := in.Logger.Named("websocket")
@@ -95,8 +95,12 @@ func provideWS(in wsIn) (wsOut, error) {
 					func(e event.Disconnect) {
 						logger.Info("disconnect listener", zap.Any("event", e))
 					}), &discon),
+			websocket.AddHeartbeatListener(
+				event.HeartbeatListenerFunc(func(e event.Heartbeat) {
+					logger.Info("heartbeat listener", zap.Any("event", e))
+				}), &heartbeat),
 		)
-		cancelList = append(cancelList, msg, con, discon)
+		cancelList = append(cancelList, msg, con, discon, heartbeat)
 	}
 
 	ws, err := websocket.New(opts...)

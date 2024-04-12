@@ -233,6 +233,22 @@ func (ws *Websocket) run(ctx context.Context) {
 			// Store the connection so writing can take place.
 			ws.m.Lock()
 			ws.conn = conn
+			ws.conn.SetPingListener((func(context.Context, []byte) {
+				ws.heartbeatListeners.Visit(func(l event.HeartbeatListener) {
+					l.OnHeartbeat(event.Heartbeat{
+						At:   ws.nowFunc(),
+						Type: event.PING,
+					})
+				})
+			}))
+			ws.conn.SetPongListener(func(ctx context.Context, b []byte) {
+				ws.heartbeatListeners.Visit(func(l event.HeartbeatListener) {
+					l.OnHeartbeat(event.Heartbeat{
+						At:   ws.nowFunc(),
+						Type: event.PONG,
+					})
+				})
+			})
 			ws.m.Unlock()
 
 			// Read loop
