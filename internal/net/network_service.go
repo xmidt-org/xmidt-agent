@@ -1,7 +1,26 @@
 package net
 
 import (
+	"go.uber.org/fx"
 	"net"
+)
+
+type NetworkServiceIn struct {
+	fx.In
+}
+
+type NetworkServiceOut struct {
+	fx.Out
+	NetworkService *NetworkService
+}
+
+var NetworkServiceModule = fx.Module("networkService",
+	fx.Provide(
+		func(in NetworkServiceIn) *NetworkService {
+			return &NetworkService{
+				n: NewNetworkWrapper(),
+			}
+		}),
 )
 
 type NetworkService struct {
