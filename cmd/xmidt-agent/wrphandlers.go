@@ -49,7 +49,7 @@ func provideWSEventorToHandlerAdapter(in wsAdapterIn) {
 		event.MsgListenerFunc(func(m wrp.Message) {
 			err := in.AuthHandler.HandleWrp(m)
 			if in.CLI.Dev {
-				logger.Info("message listener", zap.Any("msg", m), zap.Error(err))
+				logger.Error("message listener", zap.Any("msg", m), zap.Error(err))
 			}
 		}),
 		&in.WRPHandlerAdapterCancel,
