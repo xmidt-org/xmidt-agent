@@ -24,8 +24,8 @@ github.com/gorilla/websocket v1.5.1 h1:gmztn0JnHVt9JZquRuzLw3g4wouNVzKL15iLr/zn/
 github.com/gorilla/websocket v1.5.1/go.mod h1:x3kM2JMyaluk02fnUJpQuwD2dCS5NDG2ZHL0uE0tcaY=
 github.com/goschtalt/approx v1.0.0 h1:q8DMVEOSgwjFUYsupwhLApMWhfbaxRfWeSKT2uTU214=
 github.com/goschtalt/approx v1.0.0/go.mod h1:Mh0VbpeEgO2Qo2PKGrSuz241D/nj9q7OPegJNWzrbIU=
-github.com/goschtalt/goschtalt v0.24.1 h1:+9UkHxuRmRI3G850kwGF03GQRk3j0JzAaxNzdkrJsVw=
-github.com/goschtalt/goschtalt v0.24.1/go.mod h1:VeN+P4rFr9WbdB6uBJR+N5WBU7aFLU+fzoEMiO/6/C4=
+github.com/goschtalt/goschtalt v0.25.0 h1:xf/VhUr8ieHbRG6uf2J4LGqTjdThVTWRJT/4OSCAxiU=
+github.com/goschtalt/goschtalt v0.25.0/go.mod h1:VeN+P4rFr9WbdB6uBJR+N5WBU7aFLU+fzoEMiO/6/C4=
 github.com/goschtalt/yaml-decoder v0.0.1 h1:fwXf5OoC2tUm6+FOzMizvh6UITFALw6OWxJTVNgbJwg=
 github.com/goschtalt/yaml-decoder v0.0.1/go.mod h1:b+hYjmM/e9rzRhPB8EKlb+LUwrgntMrOpqEAel3wRGQ=
 github.com/goschtalt/yaml-encoder v0.0.3 h1:vfQ3vXZNvoEFPa3NzOWNtweYVa+2qMh8eqhXByLi2t0=
