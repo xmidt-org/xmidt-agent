@@ -24,7 +24,7 @@ var (
 	ErrInvalidResponsePayload = fmt.Errorf("invalid response payload")
 )
 
-// Option is a functional option type for WS.
+// Option is a functional option type for mocktr181 Handler.
 type Option interface {
 	apply(*Handler) error
 }
