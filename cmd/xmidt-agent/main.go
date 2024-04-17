@@ -12,9 +12,6 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/goschtalt/goschtalt"
-	_ "github.com/goschtalt/goschtalt/pkg/typical"
-	_ "github.com/goschtalt/yaml-decoder"
-	_ "github.com/goschtalt/yaml-encoder"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials"
 	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
