@@ -12,11 +12,16 @@ import (
 	"time"
 
 	"github.com/goschtalt/goschtalt"
+	_ "github.com/goschtalt/goschtalt/pkg/typical"
+	_ "github.com/goschtalt/properties-decoder"
+	_ "github.com/goschtalt/yaml-decoder"
+	_ "github.com/goschtalt/yaml-encoder"
 	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/arrange/arrangetls"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/xmidt-agent/internal/configuration"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/dealancer/validate.v2"
 )
@@ -32,6 +37,7 @@ type Config struct {
 	Logger           sallust.Config
 	Storage          Storage
 	MockTr181        MockTr181
+	Externals        []configuration.External
 }
 
 type Pubsub struct {
@@ -209,6 +215,16 @@ func provideConfig(cli *CLI) (*goschtalt.Config, error) {
 			goschtalt.AsDefault()),
 	)
 	if err != nil {
+		return nil, err
+	}
+
+	// Externals are a list of individually processed external configuration
+	// files.  Each external configuration file is processed and the resulting
+	// map is used to populate the configuration.
+	//
+	// This is done after the initial configuration has been calculated because
+	// the external configurations are listed in the configuration.
+	if err = configuration.Apply(gs, "externals", false); err != nil {
 		return nil, err
 	}
 
