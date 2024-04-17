@@ -200,5 +200,7 @@ func (h *Handler) trimQueue() {
 	// when maxQueueSize is 0, len(h.pq) > 1 allows qos to send 1 message at a time
 	for len(h.pq) > 1 && (int(unsafe.Sizeof(h.pq)) > h.maxQueueSize) {
 		heap.Remove(&h.pq, len(h.pq)-1)
+		// remove 1 get signal for every trimmed message
+		<-h.items
 	}
 }
