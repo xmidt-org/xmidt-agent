@@ -12,6 +12,7 @@ import (
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/auth"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/missing"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/mocktr181"
+	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/qos"
 	"go.uber.org/fx"
 )
 
@@ -25,6 +26,7 @@ func provideWRPHandlers() fx.Option {
 			providePubSubHandler,
 			provideMissingHandler,
 			provideAuthHandler,
+			provideQOSHandler,
 		),
 		fx.Invoke(provideWSEventorToHandlerAdapter),
 	)
@@ -37,7 +39,7 @@ type wsAdapterIn struct {
 
 	// wrphandlers
 	AuthHandler             *auth.Handler
-	WRPHandlerAdapterCancel event.CancelFunc
+	WRPHandlerAdapterCancel event.CancelFunc `name:"wrphandlerAdapter"`
 }
 
 func provideWSEventorToHandlerAdapter(in wsAdapterIn) {
@@ -49,6 +51,34 @@ func provideWSEventorToHandlerAdapter(in wsAdapterIn) {
 	)
 }
 
+type qosIn struct {
+	fx.In
+
+	WS *websocket.Websocket
+
+	// wrphandlers
+	QOSStartAdapter event.CancelFunc `name:"qosStartAdapter"`
+	QOSEndAdapter   event.CancelFunc `name:"qosEndAdapter"`
+}
+
+func provideQOSHandler(in qosIn) (*qos.Handler, error) {
+	h, err := qos.New(in.WS)
+	in.WS.AddConnectListener(
+		event.ConnectListenerFunc(func(event.Connect) {
+			h.Start()
+		}),
+		&in.QOSStartAdapter,
+	)
+	in.WS.AddDisconnectListener(
+		event.DisconnectListenerFunc(func(event.Disconnect) {
+			h.Stop()
+		}),
+		&in.QOSEndAdapter,
+	)
+
+	return h, err
+}
+
 type missingIn struct {
 	fx.In
 
@@ -57,7 +87,7 @@ type missingIn struct {
 	DeviceID wrp.DeviceID
 
 	// wrphandlers
-	Egress websocket.Egress
+	Egress *qos.Handler
 	Pubsub *pubsub.PubSub
 }
 
@@ -80,7 +110,7 @@ type authIn struct {
 
 	// wrphandlers
 
-	Egress         websocket.Egress
+	Egress         *qos.Handler
 	MissingHandler *missing.Handler
 }
 
@@ -103,7 +133,7 @@ type pubsubIn struct {
 	MockTr181 MockTr181
 
 	// wrphandlers
-	Egress websocket.Egress
+	Egress *qos.Handler
 }
 
 type pubsubOut struct {

@@ -14,7 +14,6 @@ import (
 	"github.com/xmidt-org/xmidt-agent/internal/jwtxt"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
-	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
@@ -22,6 +21,24 @@ import (
 var (
 	ErrWebsocketConfig = errors.New("websocket configuration error")
 )
+
+func provideWSWithAdapters() fx.Option {
+	return fx.Options(
+		fx.Provide(
+			provideWS,
+			provideWSAdapterCancels,
+		),
+	)
+}
+
+type wsCancelsOut struct {
+	fx.Out
+	WRPHandlerAdapter event.CancelFunc `name:"wrphandlerAdapter"`
+	QOSStartAdapter   event.CancelFunc `name:"qosStartAdapter"`
+	QOSsEndAdapter    event.CancelFunc `name:"qosEndAdapter"`
+}
+
+func provideWSAdapterCancels() (out wsCancelsOut) { return }
 
 type wsIn struct {
 	fx.In
@@ -32,15 +49,18 @@ type wsIn struct {
 	JWTXT     *jwtxt.Instructions
 	Cred      *credentials.Credentials
 	Websocket Websocket
+
+	// eventor adapters
+	WRPHandlerAdapterCancel event.CancelFunc `name:"wrphandlerAdapter"`
+	QOSStartAdapter         event.CancelFunc `name:"qosStartAdapter"`
+	QOSEndAdapter           event.CancelFunc `name:"qosEndAdapter"`
 }
 
 type wsOut struct {
 	fx.Out
-	WSHandler               wrpkit.Handler
-	WS                      *websocket.Websocket
-	Egress                  websocket.Egress
-	WRPHandlerAdapterCancel event.CancelFunc
-	EventCancelList         []event.CancelFunc
+	WS              *websocket.Websocket
+	Egress          websocket.Egress
+	EventCancelList []event.CancelFunc
 }
 
 func provideWS(in wsIn) (wsOut, error) {
@@ -74,8 +94,12 @@ func provideWS(in wsIn) (wsOut, error) {
 
 	// Listener options
 	var (
-		msg, con, discon, heartbeat, wrphandlerAdapter event.CancelFunc
-		cancelList                                     = []event.CancelFunc{wrphandlerAdapter}
+		msg, con, discon, heartbeat event.CancelFunc
+		cancelList                  = []event.CancelFunc{
+			in.WRPHandlerAdapterCancel,
+			in.QOSStartAdapter,
+			in.QOSEndAdapter,
+		}
 	)
 	if in.CLI.Dev {
 		logger := in.Logger.Named("websocket")
@@ -109,10 +133,9 @@ func provideWS(in wsIn) (wsOut, error) {
 	}
 
 	return wsOut{
-		WS:                      ws,
-		EventCancelList:         cancelList,
-		WRPHandlerAdapterCancel: wrphandlerAdapter,
-		Egress:                  ws,
+		WS:              ws,
+		EventCancelList: cancelList,
+		Egress:          ws,
 	}, err
 }
 

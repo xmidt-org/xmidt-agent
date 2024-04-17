@@ -165,6 +165,8 @@ func (ws *Websocket) Stop() {
 	}
 
 	shutdown := ws.shutdown
+	// allows ws to restart
+	ws.shutdown = nil
 	ws.m.Unlock()
 
 	if shutdown != nil {
@@ -182,6 +184,18 @@ func (ws *Websocket) HandleWrp(m wrp.Message) error {
 // The listener will be called for every message received from the WS.
 func (ws *Websocket) AddMessageListener(listener event.MsgListener, cancel ...*event.CancelFunc) event.CancelFunc {
 	return event.CancelFunc(ws.msgListeners.Add(listener))
+}
+
+// AddDisconnectListener adds a disconnect listener to the WS connection.
+// The listener will be called for every ws disconnect.
+func (ws *Websocket) AddDisconnectListener(listener event.DisconnectListener, cancel ...*event.CancelFunc) event.CancelFunc {
+	return event.CancelFunc(ws.disconnectListeners.Add(listener))
+}
+
+// AddConnectListener adds a connect listener to the WS connection.
+// The listener will be called for every ws connection.
+func (ws *Websocket) AddConnectListener(listener event.ConnectListener, cancel ...*event.CancelFunc) event.CancelFunc {
+	return event.CancelFunc(ws.connectListeners.Add(listener))
 }
 
 // Send sends the provided WRP message through the existing websocket.  This

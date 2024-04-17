@@ -86,7 +86,6 @@ func xmidtAgent(args []string) (*fx.App, error) {
 			provideConfig,
 			provideCredentials,
 			provideInstructions,
-			provideWS,
 
 			goschtalt.UnmarshalFunc[sallust.Config]("logger", goschtalt.Optional()),
 			goschtalt.UnmarshalFunc[Identity]("identity"),
@@ -103,6 +102,7 @@ func xmidtAgent(args []string) (*fx.App, error) {
 
 		fsProvide(),
 		provideWRPHandlers(),
+		provideWSWithAdapters(),
 
 		fx.Invoke(
 			lifeCycle,
