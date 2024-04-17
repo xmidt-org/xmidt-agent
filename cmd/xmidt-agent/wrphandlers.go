@@ -54,7 +54,8 @@ func provideWSEventorToHandlerAdapter(in wsAdapterIn) {
 type qosIn struct {
 	fx.In
 
-	WS *websocket.Websocket
+	QOS QOS
+	WS  *websocket.Websocket
 
 	// wrphandlers
 	QOSStartAdapter event.CancelFunc `name:"qosStartAdapter"`
@@ -62,7 +63,7 @@ type qosIn struct {
 }
 
 func provideQOSHandler(in qosIn) (*qos.Handler, error) {
-	h, err := qos.New(in.WS)
+	h, err := qos.New(in.WS, qos.MaxQueueSize(in.QOS.MaxQueueSize))
 	in.WS.AddConnectListener(
 		event.ConnectListenerFunc(func(event.Connect) {
 			h.Start()

@@ -6,8 +6,9 @@ package qos
 import (
 	"container/heap"
 	"context"
-	"fmt"
+	"errors"
 	"sync"
+	"unsafe"
 
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
@@ -15,14 +16,28 @@ import (
 )
 
 var (
-	ErrInvalidInput = fmt.Errorf("invalid input")
+	ErrInvalidInput    = errors.New("invalid input")
+	ErrMisconfiguredWS = errors.New("misconfigured WS")
 )
+
+// Option is a functional option type for WS.
+type Option interface {
+	apply(*Handler) error
+}
+
+type optionFunc func(*Handler) error
+
+func (f optionFunc) apply(c *Handler) error {
+	return f(c)
+}
 
 // Handler queues incoming messages and forwards them to the next wrphandler
 type Handler struct {
 	next wrpkit.Handler
 	// queue that'll be used to forward messages to the next wrphandler
 	pq PriorityQueue
+	// queue max size
+	maxQueueSize int
 
 	m  sync.Mutex
 	wg sync.WaitGroup
@@ -36,16 +51,25 @@ type Handler struct {
 
 // New creates a new instance of the Handler struct.  The parameter next is the
 // handler that will be called and monitored for errors.
-func New(next websocket.Egress) (*Handler, error) {
+func New(next websocket.Egress, opts ...Option) (*Handler, error) {
 	if next == nil {
 		return nil, ErrInvalidInput
 	}
 
-	return &Handler{
+	h := &Handler{
 		next:  next,
 		items: make(chan []bool, 1),
 		empty: make(chan bool, 1),
-	}, nil
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			if err := opt.apply(h); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return h, nil
 }
 
 // Start starts the queue ingestion and a long running goroutine to maintain
@@ -141,6 +165,7 @@ func (h *Handler) getSignal(ctx context.Context) bool {
 func (h *Handler) putMsg(i *Item) {
 	h.m.Lock()
 	heap.Push(&h.pq, i)
+	h.trimQueue()
 	h.m.Unlock()
 
 	h.putSignal()
@@ -153,6 +178,7 @@ func (h *Handler) putPrioritizedMsg(i *Item) {
 	h.m.Lock()
 	heap.Push(&h.pq, i)
 	h.pq.Swap(0, i.index)
+	h.trimQueue()
 	h.m.Unlock()
 
 	h.putSignal()
@@ -167,4 +193,12 @@ func (h *Handler) putSignal() {
 	}
 
 	h.items <- append(items, true)
+}
+
+// trimQueue pops the message with lowest priority and last in line
+func (h *Handler) trimQueue() {
+	// when maxQueueSize is 0, len(h.pq) > 1 allows qos to send 1 message at a time
+	for len(h.pq) > 1 && (int(unsafe.Sizeof(h.pq)) > h.maxQueueSize) {
+		heap.Remove(&h.pq, len(h.pq)-1)
+	}
 }

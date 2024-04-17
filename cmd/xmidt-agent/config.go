@@ -37,7 +37,12 @@ type Config struct {
 	Logger           sallust.Config
 	Storage          Storage
 	MockTr181        MockTr181
+	QOS              QOS
 	Externals        []configuration.External
+}
+
+type QOS struct {
+	MaxQueueSize int
 }
 
 type Pubsub struct {
@@ -365,5 +370,8 @@ var defaultConfig = Config{
 	MockTr181: MockTr181{
 		FilePath:    "./mock_tr181.json",
 		ServiceName: "config",
+	},
+	QOS: QOS{
+		MaxQueueSize: 1 * 1024 * 1024, // 1MB max/queue,
 	},
 }
