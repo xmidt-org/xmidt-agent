@@ -95,7 +95,7 @@ func xmidtAgent(args []string) (*fx.App, error) {
 			goschtalt.UnmarshalFunc[Pubsub]("pubsub"),
 			goschtalt.UnmarshalFunc[QOS]("qos"),
 
-			NetworkServiceModule,
+			provideNetworkService,
 		),
 
 		fsProvide(),
