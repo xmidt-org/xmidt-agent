@@ -165,8 +165,6 @@ func (ws *Websocket) Stop() {
 	}
 
 	shutdown := ws.shutdown
-	// allows ws to restart
-	ws.shutdown = nil
 	ws.m.Unlock()
 
 	if shutdown != nil {
