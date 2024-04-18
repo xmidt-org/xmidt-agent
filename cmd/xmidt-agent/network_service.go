@@ -8,5 +8,7 @@ import (
 )
 
 func provideNetworkService() net.NetworkInterface {
-	return net.NewNetworkWrapper()
+	return &net.NetworkService{
+		N: net.NewNetworkWrapper(),
+	}
 }
