@@ -24,13 +24,17 @@ func TestSetLevel(t *testing.T) {
 
 	level := zcfg.Level
 
-	logLevelService, err := New(level)
+	logLevel, err := New(level)
 	assert.NoError(t, err)
-
+	logLevelService := logLevel.(*LogLevelService)
 	assert.Equal(t, "ERROR", logLevelService.level.Level().CapitalString())
 
-	logLevelService.SetLevel("debug", 1*time.Second)
+	err = logLevelService.SetLevel("some-nonsense", 1*time.Second)
+	assert.NotNil(t, err)
+	assert.Equal(t, "ERROR", logLevelService.level.Level().CapitalString())
 
+	err = logLevelService.SetLevel("DEBUG", 1*time.Second)
+	assert.NoError(t, err)
 	assert.Equal(t, "DEBUG", logLevelService.level.Level().CapitalString())
 
 	time.Sleep(2 * time.Second)

@@ -12,6 +12,7 @@ import (
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/auth"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/missing"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/mocktr181"
+	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/xmidt_agent_crud"
 	"go.uber.org/fx"
 )
 
@@ -149,6 +150,18 @@ func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 
 		cancelList = append(cancelList, mocktr)
 	}
+
+	xmidtAgentCrudHandler, err := xmidt_agent_crud.New()
+	if err != nil {
+		return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
+	}
+
+	mocktr, err := ps.SubscribeService(in.MockTr181.ServiceName, mocktr181Handler)
+	if err != nil {
+		return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
+	}
+
+	cancelList = append(cancelList, mocktr)
 
 	return pubsubOut{
 		PubSub:           ps,

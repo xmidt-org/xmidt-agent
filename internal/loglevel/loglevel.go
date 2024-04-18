@@ -4,35 +4,48 @@
 package loglevel
 
 import (
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
 )
 
+type LogLevel interface {
+	SetLevel(string, time.Duration) error
+}
+
 type LogLevelService struct {
-	level zap.AtomicLevel
+	level     zap.AtomicLevel
 	origLevel []byte
 }
 
-func New(level zap.AtomicLevel) (*LogLevelService, error) {
+func New(level zap.AtomicLevel) (LogLevel, error) {
 	origLevel, err := level.MarshalText()
-	if (err != nil) {
+	if err != nil {
 		return nil, err
 	}
 
 	return &LogLevelService{
-		level: level,
+		level:     level,
 		origLevel: origLevel,
 	}, nil
 }
 
-func (l *LogLevelService) SetLevel(level string, duration time.Duration) {
-	l.level.UnmarshalText([]byte(level))
+// note that zap will set log level to "INFO" if level is empty
+func (l *LogLevelService) SetLevel(level string, duration time.Duration) error {
+	level = strings.ToLower(level)
+
+	err := l.level.UnmarshalText([]byte(level))
+	if err != nil {
+		return err
+	}
 
 	t := time.NewTimer(duration)
 
 	go func() {
-        <-t.C
-        l.level.UnmarshalText(l.origLevel)
-    }()
+		<-t.C
+		l.level.UnmarshalText(l.origLevel)
+	}()
+
+	return nil
 }

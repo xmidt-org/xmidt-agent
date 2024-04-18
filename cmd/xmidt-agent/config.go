@@ -38,6 +38,7 @@ type Config struct {
 	Storage          Storage
 	MockTr181        MockTr181
 	Externals        []configuration.External
+	XmidtAgentCrud   XmidtAgentCrud
 }
 
 type Pubsub struct {
@@ -176,6 +177,10 @@ type JwtTxtRedirector struct {
 
 	// PEMFiles is the list of files containing PEM-encoded public keys to use
 	PEMFiles []string
+}
+
+type XmidtAgentCrud struct {
+	ServiceName string
 }
 
 // Backoff defines the parameters that limit the retry backoff algorithm.
@@ -365,5 +370,8 @@ var defaultConfig = Config{
 	MockTr181: MockTr181{
 		FilePath:    "./mock_tr181.json",
 		ServiceName: "config",
+	},
+	XmidtAgentCrud: XmidtAgentCrud {
+		ServiceName: "xmidt_agent",
 	},
 }
