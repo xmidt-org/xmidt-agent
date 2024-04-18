@@ -193,6 +193,19 @@ func WithIPv6(with ...bool) Option {
 		})
 }
 
+// SendTimeout sets the send timeout for the WS connection.
+func SendTimeout(d time.Duration) Option {
+	return optionFunc(
+		func(ws *Websocket) error {
+			if d < 0 {
+				return fmt.Errorf("%w: negative SendTimeout", ErrMisconfiguredWS)
+			}
+
+			ws.sendTimeout = d
+			return nil
+		})
+}
+
 // ConnectTimeout sets the timeout for the WS connection.  If this is not set,
 // the default is 30 seconds.
 func ConnectTimeout(d time.Duration) Option {

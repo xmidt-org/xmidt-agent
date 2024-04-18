@@ -57,6 +57,7 @@ func provideWS(in wsIn) (wsOut, error) {
 				in.JWTXT.Endpoint)),
 		websocket.PingInterval(in.Websocket.PingInterval),
 		websocket.PingTimeout(in.Websocket.PingTimeout),
+		websocket.SendTimeout(in.Websocket.SendTimeout),
 		websocket.ConnectTimeout(in.Websocket.ConnectTimeout),
 		websocket.KeepAliveInterval(in.Websocket.KeepAliveInterval),
 		websocket.IdleConnTimeout(in.Websocket.IdleConnTimeout),
