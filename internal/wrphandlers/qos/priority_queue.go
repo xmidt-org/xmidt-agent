@@ -7,54 +7,31 @@ import (
 	"github.com/xmidt-org/wrp-go/v3"
 )
 
-// Item contains a wrp Message pointer and is managed by PriorityQueue.
-type Item struct {
-	value    *wrp.Message
-	priority wrp.QOSValue
-	index    int
-}
-
 // PriorityQueue implements heap.Interface and holds Items, using wrp.QOSValue as its priority.
 // https://xmidt.io/docs/wrp/basics/#qos-description-qos
-type PriorityQueue []*Item
+type PriorityQueue []wrp.Message
 
 func (pq PriorityQueue) Len() int { return len(pq) }
 
 func (pq PriorityQueue) Less(i, j int) bool {
-	return pq[i].priority > pq[j].priority
+	return pq[i].QualityOfService > pq[j].QualityOfService
 }
 
 func (pq PriorityQueue) Swap(i, j int) {
 	pq[i], pq[j] = pq[j], pq[i]
-	pq[i].index = i
-	pq[j].index = j
 }
 
 func (pq *PriorityQueue) Push(x any) {
-	n := len(*pq)
-	i := x.(*Item)
-	i.index = n
-	i.priority = i.value.QualityOfService
-	if i.value.QualityOfService > 99 {
-		i.priority = i.value.QualityOfService
-	}
-
-	*pq = append(*pq, i)
+	*pq = append(*pq, x.(wrp.Message))
 }
 
 func (pq *PriorityQueue) Pop() any {
 	if len(*pq) == 0 {
 		return nil
 	}
-
-	old := *pq
-	n := len(old)
-	i := old[n-1]
-	// avoid memory leak
-	old[n-1] = nil
-	// for safety (no longer managed by PriorityQueue)
-	i.index = -1
-	*pq = old[0 : n-1]
+	n := len(*pq)
+	i := (*pq)[n-1]
+	*pq = (*pq)[0 : n-1]
 
 	return i
 }

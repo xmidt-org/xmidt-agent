@@ -112,32 +112,31 @@ func (h *Handler) Stop() {
 func (h *Handler) run(ctx context.Context) {
 	h.wg.Add(1)
 	defer h.wg.Done()
-	for i, ok := h.getMsg(ctx); ok; i, ok = h.getMsg(ctx) {
-		err := h.next.HandleWrp(*i.value)
+	for msg, ok := h.getMsg(ctx); ok; msg, ok = h.getMsg(ctx) {
+		err := h.next.HandleWrp(msg)
 		if err != nil {
-			h.putPrioritizedMsg(i)
+			h.putMsg(msg)
 		}
 	}
 }
 
 // HandleWrp is called to queue a message.
 func (h *Handler) HandleWrp(msg wrp.Message) error {
-	h.putMsg(&Item{value: &msg})
+	h.putMsg(msg)
 	return nil
 }
 
 // getMsg pops the next highest priority and first-in-line message (FIFO).
-func (h *Handler) getMsg(ctx context.Context) (*Item, bool) {
+func (h *Handler) getMsg(ctx context.Context) (wrp.Message, bool) {
 	ok := h.getSignal(ctx)
 	if !ok {
-		return nil, false
+		return wrp.Message{}, false
 	}
 
 	h.m.Lock()
-	// ensures we get the highest priority item/msg
-	top, ok := heap.Pop(&h.pq).(*Item)
+	msg, ok := heap.Pop(&h.pq).(wrp.Message)
 	h.m.Unlock()
-	return top, ok
+	return msg, ok
 
 }
 
@@ -162,22 +161,9 @@ func (h *Handler) getSignal(ctx context.Context) bool {
 }
 
 // putMsg pushes the message in the queue.
-func (h *Handler) putMsg(i *Item) {
+func (h *Handler) putMsg(msg wrp.Message) {
 	h.m.Lock()
-	heap.Push(&h.pq, i)
-	h.trimQueue()
-	h.m.Unlock()
-
-	h.putSignal()
-}
-
-// putPrioritizedMsg pushes the message in the queue as the first-in-line message in order
-// to maintain the previous FIFO order of the queue of when the message was originally popped.
-// This should be called when a message failed to be forwarded.
-func (h *Handler) putPrioritizedMsg(i *Item) {
-	h.m.Lock()
-	heap.Push(&h.pq, i)
-	h.pq.Swap(0, i.index)
+	heap.Push(&h.pq, msg)
 	h.trimQueue()
 	h.m.Unlock()
 
