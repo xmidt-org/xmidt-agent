@@ -65,6 +65,7 @@ func New(self wrp.DeviceID, opts ...Option) (*PubSub, error) {
 			wrp.ValidateDestination(),
 			wrp.ValidateSource(),
 			wrp.ReplaceAnySelfLocator(string(self)),
+			wrp.ClampQualityOfService(),
 		),
 	}
 
