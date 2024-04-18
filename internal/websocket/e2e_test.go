@@ -112,6 +112,10 @@ func TestEndToEnd(t *testing.T) {
 	// Allow multiple calls to start.
 	got.Start()
 
+	// Allow restart
+	got.Stop()
+	got.Start()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
