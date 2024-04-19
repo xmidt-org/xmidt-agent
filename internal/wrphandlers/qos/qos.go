@@ -36,13 +36,11 @@ type Handler struct {
 	queue PriorityQueue
 
 	m sync.Mutex
-	// ingestingQueue blocks if the SendQueuedMessages() is already running, i.e.: send
+	// ingestQueue blocks if the queue ingestion is already in progress, i.e.: send
 	// as many queued messages as possible
-	ingestingQueue chan bool
+	ingestQueue chan bool
 	// shutdown shuts down the queue ingestion
 	shutdown context.CancelFunc
-	// ctx is the queue ingestion context
-	ctx context.Context
 }
 
 // New creates a new instance of the Handler struct.  The parameter next is the
@@ -53,8 +51,8 @@ func New(next websocket.Egress, opts ...Option) (*Handler, error) {
 	}
 
 	h := &Handler{
-		next:           next,
-		ingestingQueue: make(chan bool, 1),
+		next:        next,
+		ingestQueue: make(chan bool, 1),
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -75,11 +73,18 @@ func (h *Handler) Start() {
 	}
 
 	// reset
-	h.ctx, h.shutdown = context.WithCancel(context.Background())
+	var ctx context.Context
+	ctx, h.shutdown = context.WithCancel(context.Background())
 	h.m.Unlock()
 
-	// send as many queued messages as possible
-	go h.SendQueuedMessages()
+	go h.run(ctx)
+
+	select {
+	case h.ingestQueue <- true:
+		// send as many queued messages as possible
+	default:
+		// queue ingestion is already in progress
+	}
 
 }
 
@@ -101,61 +106,48 @@ func (h *Handler) Stop() {
 func (h *Handler) HandleWrp(msg wrp.Message) error {
 	// queue newest message
 	h.queue.Enqueue(msg)
-	// send as many queued messages as possible
-	go h.SendQueuedMessages()
+	select {
+	case h.ingestQueue <- true:
+		// send as many queued messages as possible
+	default:
+		// queue ingestion is already in progress
+	}
 
 	return nil
 }
 
-// SendQueuedMessages sends as many queued messages as possible until the following occurs:
+// run sends as many queued messages as possible until the following occurs:
 // 1. the qos context was cancelled
 // 2. qos queue is empty
 // 3. there was a delivery failure
 // Note, Start() will automatically trigger a SendQueuedMessages().
-func (h *Handler) SendQueuedMessages() {
-	defer func() {
-		if len(h.ingestingQueue) == 0 {
-			// this should never happen but in case it does, this goroutine won't block forever
-			return
-		}
-
-		// the current SendQueuedMessages() is done, ingestingQueue will not block new SendQueuedMessages() calls
-		<-h.ingestingQueue
-	}()
-
-	select {
-	case h.ingestingQueue <- true:
-		// SendQueuedMessages() will start and ingestingQueue will block any new SendQueuedMessages() calls
-	default:
-		// a ingestingQueue is blocked, a SendQueuedMessages() already in progress
-		return
-	}
-
-	h.m.Lock()
-	ctx := h.ctx
-	h.m.Unlock()
-
+func (h *Handler) run(ctx context.Context) {
 	for {
-		// always get the next highest priority
-		msg, ok := h.queue.Dequeue()
-		if !ok {
-			// queue is empty
-			return
-		}
-
 		select {
+		case <-h.ingestQueue:
+		// queue ingestion will start
 		case <-ctx.Done():
-			// QOS was stopped, re-enqueue message
-			h.queue.Enqueue(msg)
+			// QOS was stopped, exit
 			return
-		default:
 		}
 
-		err := h.next.HandleWrp(msg)
-		if err != nil {
-			// delivery failed, re-enqueue message
-			h.queue.Enqueue(msg)
-			return
+		// always get the next highest priority message
+		// `ok` will stop the loop if the queue is empty
+		for msg, ok := h.queue.Dequeue(); ok; msg, ok = h.queue.Dequeue() {
+			select {
+			case <-ctx.Done():
+				// QOS was stopped, re-enqueue message and exit
+				h.queue.Enqueue(msg)
+				return
+			default:
+			}
+
+			err := h.next.HandleWrp(msg)
+			if err != nil {
+				// delivery failed, re-enqueue message
+				h.queue.Enqueue(msg)
+				break
+			}
 		}
 	}
 }
