@@ -21,6 +21,7 @@ require (
 	go.nanomsg.org/mangos/v3 v3.4.2
 	go.uber.org/fx v1.21.0
 	go.uber.org/zap v1.27.0
+	golang.org/x/sync v0.6.0
 	gopkg.in/dealancer/validate.v2 v2.1.0
 )
 

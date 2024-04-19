@@ -42,7 +42,8 @@ type Config struct {
 }
 
 type QOS struct {
-	MaxQueueSize int
+	MaxQueueSize  int
+	MaxQueueDepth int
 }
 
 type Pubsub struct {
@@ -372,6 +373,7 @@ var defaultConfig = Config{
 		ServiceName: "config",
 	},
 	QOS: QOS{
-		MaxQueueSize: 1 * 1024 * 1024, // 1MB max/queue,
+		MaxQueueSize:  1 * 1024 * 1024, // 1MB max/queue,
+		MaxQueueDepth: 1000,            // 1000 messages
 	},
 }

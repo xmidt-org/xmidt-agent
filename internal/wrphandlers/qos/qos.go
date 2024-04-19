@@ -4,11 +4,9 @@
 package qos
 
 import (
-	"container/heap"
 	"context"
 	"errors"
 	"sync"
-	"unsafe"
 
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
@@ -35,16 +33,11 @@ func (f optionFunc) apply(c *Handler) error {
 type Handler struct {
 	next wrpkit.Handler
 	// queue that'll be used to forward messages to the next wrphandler
-	pq PriorityQueue
-	// queue max size
-	maxQueueSize int
+	queue PriorityQueue
 
-	m  sync.Mutex
-	wg sync.WaitGroup
-	// items contain wrp messages sort by descending order (based on wrp message's QOS)
-	items chan []bool
-	// empty states whether or not the queue is emtpy
-	empty chan bool
+	m sync.Mutex
+	// runQueueDump triggers a queue dump, i.e.: sent as many queued messages as possible
+	runQueueDump chan bool
 	// shutdown shuts down the queue ingestion
 	shutdown context.CancelFunc
 }
@@ -57,9 +50,8 @@ func New(next websocket.Egress, opts ...Option) (*Handler, error) {
 	}
 
 	h := &Handler{
-		next:  next,
-		items: make(chan []bool, 1),
-		empty: make(chan bool, 1),
+		next:         next,
+		runQueueDump: make(chan bool, 1),
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -75,22 +67,24 @@ func New(next websocket.Egress, opts ...Option) (*Handler, error) {
 // Start starts the queue ingestion and a long running goroutine to maintain
 // the queue ingestion.
 func (h *Handler) Start() {
-	// add to message
 	h.m.Lock()
-	defer h.m.Unlock()
 
 	if h.shutdown != nil {
 		return
 	}
 
-	if len(h.empty) == 0 && len(h.items) == 0 {
-		h.empty <- true
-	}
-
 	var ctx context.Context
 	ctx, h.shutdown = context.WithCancel(context.Background())
+	h.m.Unlock()
 
 	go h.run(ctx)
+
+	// at qos start, send as many queued messages as possible
+	select {
+	case h.runQueueDump <- true:
+	default:
+		// a runQueueDump is in progress
+	}
 }
 
 // Stop stops the queue ingestion.
@@ -105,88 +99,58 @@ func (h *Handler) Stop() {
 	h.m.Unlock()
 
 	shutdown()
-	h.wg.Wait()
-}
-
-// run is the long running goroutine used for the queue ingestion.
-func (h *Handler) run(ctx context.Context) {
-	h.wg.Add(1)
-	defer h.wg.Done()
-	for msg, ok := h.getMsg(ctx); ok; msg, ok = h.getMsg(ctx) {
-		err := h.next.HandleWrp(msg)
-		if err != nil {
-			h.putMsg(msg)
-		}
-	}
 }
 
 // HandleWrp is called to queue a message.
 func (h *Handler) HandleWrp(msg wrp.Message) error {
-	h.putMsg(msg)
+	// queue newest message before running runQueueDump
+	h.queue.Enqueue(msg)
+	select {
+	case h.runQueueDump <- true:
+		// sent as many queued messages as possible
+	default:
+		// a runQueueDump is in progress
+	}
+
 	return nil
 }
 
-// getMsg pops the next highest priority and first-in-line message (FIFO).
-func (h *Handler) getMsg(ctx context.Context) (wrp.Message, bool) {
-	ok := h.getSignal(ctx)
-	if !ok {
-		return wrp.Message{}, false
+// EmptyQueue is the long running goroutine used for the queue ingestion.
+func (h *Handler) EmptyQueue(ctx context.Context) {
+	for {
+		// always get the next highest priority and first-in-line message
+		msg, ok := h.queue.Dequeue()
+		if !ok {
+			// queue is empty
+			return
+		}
+
+		select {
+		case <-ctx.Done():
+			// QOS was stopped, re-enqueue message
+			h.queue.Enqueue(msg)
+			return
+		default:
+		}
+
+		err := h.next.HandleWrp(msg)
+		if err != nil {
+			// deliever failed, re-enqueue message
+			h.queue.Enqueue(msg)
+			return
+		}
 	}
-
-	h.m.Lock()
-	msg, ok := heap.Pop(&h.pq).(wrp.Message)
-	h.m.Unlock()
-	return msg, ok
-
 }
 
-// getSignal receives the signal to pop a message from the queue
-func (h *Handler) getSignal(ctx context.Context) bool {
-	// consider a getSignal
-	var items []bool
-	select {
-	case <-ctx.Done():
-		return false
-	case items = <-h.items:
-	}
+// run is the long running goroutine used for the queue ingestion.
+func (h *Handler) run(ctx context.Context) {
+	for {
+		select {
+		case <-h.runQueueDump:
+			h.EmptyQueue(ctx)
+		case <-ctx.Done():
+			return
+		}
 
-	_ = items[0]
-	if len(items) == 1 {
-		h.empty <- true
-	} else {
-		h.items <- items[1:]
-	}
-
-	return true
-}
-
-// putMsg pushes the message in the queue.
-func (h *Handler) putMsg(msg wrp.Message) {
-	h.m.Lock()
-	heap.Push(&h.pq, msg)
-	h.trimQueue()
-	h.m.Unlock()
-
-	h.putSignal()
-}
-
-// putSignal sends the signal to pop a message from the queue
-func (h *Handler) putSignal() {
-	var items []bool
-	select {
-	case items = <-h.items:
-	case <-h.empty:
-	}
-
-	h.items <- append(items, true)
-}
-
-// trimQueue pops the message with lowest priority and last in line
-func (h *Handler) trimQueue() {
-	// when maxQueueSize is 0, len(h.pq) > 1 allows qos to send 1 message at a time
-	for len(h.pq) > 1 && (int(unsafe.Sizeof(h.pq)) > h.maxQueueSize) {
-		heap.Remove(&h.pq, len(h.pq)-1)
-		// remove 1 get signal for every trimmed message
-		<-h.items
 	}
 }
