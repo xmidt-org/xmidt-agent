@@ -55,7 +55,7 @@ type missingIn struct {
 
 	// Configuration
 	// Note, DeviceID and PartnerID is pulled from the Identity configuration
-	DeviceID wrp.DeviceID
+	Identity Identity
 
 	// wrphandlers
 	Egress websocket.Egress
@@ -63,7 +63,7 @@ type missingIn struct {
 }
 
 func provideMissingHandler(in missingIn) (*missing.Handler, error) {
-	h, err := missing.New(in.Pubsub, in.Egress, string(in.DeviceID))
+	h, err := missing.New(in.Pubsub, in.Egress, string(in.Identity.DeviceID))
 	if err != nil {
 		err = errors.Join(ErrWRPHandlerConfig, err)
 	}
@@ -76,8 +76,7 @@ type authIn struct {
 
 	// Configuration
 	// Note, DeviceID and PartnerID is pulled from the Identity configuration
-	DeviceID  wrp.DeviceID
-	PartnerID string
+	Identity Identity
 
 	// wrphandlers
 
@@ -86,7 +85,7 @@ type authIn struct {
 }
 
 func provideAuthHandler(in authIn) (*auth.Handler, error) {
-	h, err := auth.New(in.MissingHandler, in.Egress, string(in.DeviceID), in.PartnerID)
+	h, err := auth.New(in.MissingHandler, in.Egress, string(in.Identity.DeviceID), in.Identity.PartnerID)
 	if err != nil {
 		err = errors.Join(ErrWRPHandlerConfig, err)
 	}
@@ -99,7 +98,7 @@ type pubsubIn struct {
 
 	// Configuration
 	// Note, DeviceID and PartnerID is pulled from the Identity configuration
-	DeviceID  wrp.DeviceID
+	Identity  Identity
 	Pubsub    Pubsub
 	MockTr181 MockTr181
 
@@ -126,7 +125,7 @@ func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 	}
 
 	ps, err := pubsub.New(
-		in.DeviceID,
+		in.Identity.DeviceID,
 		opts...,
 	)
 	if err != nil {
@@ -138,7 +137,7 @@ func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 			mocktr181.FilePath(in.MockTr181.FilePath),
 			mocktr181.Enabled(in.MockTr181.Enabled),
 		}
-		mocktr181Handler, err := mocktr181.New(ps, string(in.DeviceID), mockDefaults...)
+		mocktr181Handler, err := mocktr181.New(ps, string(in.Identity.DeviceID), mockDefaults...)
 		if err != nil {
 			return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
 		}
