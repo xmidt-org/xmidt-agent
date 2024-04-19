@@ -41,14 +41,15 @@ type Config struct {
 	Externals        []configuration.External
 }
 
+type QOS struct {
+	Queue QOSQueue
+}
+
 type QOSQueue struct {
 	// MaxQueueSize is the allowable max size of the queue based on the sum of all queued wrp message's payloads
 	MaxQueueSize int
 	// MaxQueueDepth is the total wrp message allowed
 	MaxQueueDepth int
-}
-type QOS struct {
-	Queue QOSQueue
 }
 
 type Pubsub struct {

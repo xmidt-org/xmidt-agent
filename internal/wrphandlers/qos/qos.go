@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	ErrInvalidInput    = errors.New("invalid input")
-	ErrMisconfiguredWS = errors.New("misconfigured QOS")
+	ErrInvalidInput     = errors.New("invalid input")
+	ErrMisconfiguredQOS = errors.New("misconfigured QOS")
 )
 
 // Option is a functional option type for QOS.
@@ -36,8 +36,9 @@ type Handler struct {
 	queue PriorityQueue
 
 	m sync.Mutex
-	// runEmptyQueue triggers a queue dump, i.e.: send as many queued messages as possible
-	runEmptyQueue chan bool
+	// ingestingQueue blocks if the SendQueuedMessages() is already running, i.e.: send
+	// as many queued messages as possible
+	ingestingQueue chan bool
 	// shutdown shuts down the queue ingestion
 	shutdown context.CancelFunc
 	// ctx is the queue ingestion context
@@ -52,8 +53,8 @@ func New(next websocket.Egress, opts ...Option) (*Handler, error) {
 	}
 
 	h := &Handler{
-		next:          next,
-		runEmptyQueue: make(chan bool, 1),
+		next:           next,
+		ingestingQueue: make(chan bool, 1),
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -66,7 +67,7 @@ func New(next websocket.Egress, opts ...Option) (*Handler, error) {
 	return h, nil
 }
 
-// Start starts the queue ingestion.
+// Start starts the qos queue ingestion.
 func (h *Handler) Start() {
 	h.m.Lock()
 	if h.shutdown != nil {
@@ -75,20 +76,18 @@ func (h *Handler) Start() {
 
 	// reset
 	h.ctx, h.shutdown = context.WithCancel(context.Background())
-	h.runEmptyQueue = make(chan bool, 1)
 	h.m.Unlock()
 
-	// at qos start, send as many queued messages as possible
-	go h.EmptyQueue()
+	// send as many queued messages as possible
+	go h.SendQueuedMessages()
 
 }
 
-// Stop stops the queue ingestion.
+// Stop stops the qos queue ingestion.
 func (h *Handler) Stop() {
 	h.m.Lock()
 	shutdown := h.shutdown
 	// allows qos to restart
-	close(h.runEmptyQueue)
 	h.shutdown = nil
 	if shutdown == nil {
 		return
@@ -98,39 +97,46 @@ func (h *Handler) Stop() {
 	shutdown()
 }
 
-// HandleWrp is called to queue a message.
+// HandleWrp is called to queue a message and then attempt to send as many queued messages as possible.
 func (h *Handler) HandleWrp(msg wrp.Message) error {
-	// queue newest message before running runEmptyQueue
+	// queue newest message
 	h.queue.Enqueue(msg)
-	go h.EmptyQueue()
+	// send as many queued messages as possible
+	go h.SendQueuedMessages()
 
 	return nil
 }
 
-// EmptyQueue sends as many queued messages as possible until one of the following occurs:
+// SendQueuedMessages sends as many queued messages as possible until the following occurs:
 // 1. the qos context was cancelled
 // 2. qos queue is empty
 // 3. there was a delivery failure
-func (h *Handler) EmptyQueue() {
+// Note, Start() will automatically trigger a SendQueuedMessages().
+func (h *Handler) SendQueuedMessages() {
 	defer func() {
-		// trigged runEmptyQueue is done
-		<-h.runEmptyQueue
+		if len(h.ingestingQueue) == 0 {
+			// this should never happen but in case it does, this goroutine won't block forever
+			return
+		}
+
+		// the current SendQueuedMessages() is done, ingestingQueue will not block new SendQueuedMessages() calls
+		<-h.ingestingQueue
 	}()
 
-	h.m.Lock()
 	select {
-	// Lock() prevents a panic if Stop() called
-	case h.runEmptyQueue <- true:
-		// send as many queued messages as possible
+	case h.ingestingQueue <- true:
+		// SendQueuedMessages() will start and ingestingQueue will block any new SendQueuedMessages() calls
 	default:
+		// a ingestingQueue is blocked, a SendQueuedMessages() already in progress
 		return
-		// a runEmptyQueue is in progress
 	}
+
+	h.m.Lock()
 	ctx := h.ctx
 	h.m.Unlock()
 
 	for {
-		// always get the next highest priority
+		// always get the next highest priority message
 		msg, ok := h.queue.Dequeue()
 		if !ok {
 			// queue is empty

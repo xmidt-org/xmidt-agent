@@ -13,13 +13,14 @@ import (
 // PriorityQueue implements heap.Interface and holds wrp Message, using wrp.QOSValue as its priority.
 // https://xmidt.io/docs/wrp/basics/#qos-description-qos
 type PriorityQueue struct {
-	queue        []wrp.Message
+	queue []wrp.Message
+	// maxQueueSize is the allowable max size of the queue based on the sum of all queued wrp message's payloads
 	maxQueueSize int
 
 	m sync.Mutex
 }
 
-// Dequeue returns the next highest priority.
+// Dequeue returns the next highest priority message.
 func (pq *PriorityQueue) Dequeue() (wrp.Message, bool) {
 	defer pq.m.Unlock()
 	pq.m.Lock()
@@ -37,12 +38,12 @@ func (pq *PriorityQueue) Dequeue() (wrp.Message, bool) {
 func (pq *PriorityQueue) Enqueue(msg wrp.Message) {
 	pq.m.Lock()
 	heap.Push(pq, msg)
-	pq.trimQueue()
+	pq.trim()
 	pq.m.Unlock()
 }
 
-// trimQueue removes the newest messages with lowest priority if the queue is full.
-func (pq *PriorityQueue) trimQueue() {
+// trim removes the lowest priority message if the queue is full.
+func (pq *PriorityQueue) trim() {
 	// when pq.IsFull() is true, pq.Len() > 1 ensures at least 1 message is queued
 	for pq.Len() > 1 && pq.IsFull() {
 		heap.Remove(pq, pq.Len()-1)
