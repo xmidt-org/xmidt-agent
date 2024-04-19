@@ -26,7 +26,7 @@ var (
 type wsIn struct {
 	fx.In
 	// Note, DeviceID is pulled from the Identity configuration
-	DeviceID  wrp.DeviceID
+	Identity  Identity
 	Logger    *zap.Logger
 	CLI       *CLI
 	JWTXT     *jwtxt.Instructions
@@ -50,7 +50,7 @@ func provideWS(in wsIn) (wsOut, error) {
 
 	// Configuration options
 	opts := []websocket.Option{
-		websocket.DeviceID(in.DeviceID),
+		websocket.DeviceID(in.Identity.DeviceID),
 		websocket.FetchURLTimeout(in.Websocket.FetchURLTimeout),
 		websocket.FetchURL(
 			fetchURL(in.Websocket.URLPath, in.Websocket.BackUpURL,
