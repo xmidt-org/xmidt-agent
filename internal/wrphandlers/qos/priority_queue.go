@@ -22,8 +22,9 @@ type PriorityQueue struct {
 
 // Dequeue returns the next highest priority message.
 func (pq *PriorityQueue) Dequeue() (wrp.Message, bool) {
-	defer pq.m.Unlock()
 	pq.m.Lock()
+	defer pq.m.Unlock()
+
 	if pq.Len() == 0 {
 		return wrp.Message{}, false
 	}
@@ -36,8 +37,9 @@ func (pq *PriorityQueue) Dequeue() (wrp.Message, bool) {
 
 // Enqueue queues the given message.
 func (pq *PriorityQueue) Enqueue(msg wrp.Message) {
-	defer pq.m.Unlock()
 	pq.m.Lock()
+	defer pq.m.Unlock()
+
 	// when the queue is empty, check whether enqueuing msg would violate maxQueueSize
 	if pq.Len() == 0 {
 		if len(msg.Payload) <= pq.maxQueueSize {

@@ -68,6 +68,8 @@ func New(next websocket.Egress, opts ...Option) (*Handler, error) {
 // Start starts the qos queue ingestion.
 func (h *Handler) Start() {
 	h.m.Lock()
+	defer h.m.Unlock()
+
 	if h.shutdown != nil {
 		return
 	}
@@ -75,7 +77,6 @@ func (h *Handler) Start() {
 	// reset
 	var ctx context.Context
 	ctx, h.shutdown = context.WithCancel(context.Background())
-	h.m.Unlock()
 
 	go h.run(ctx)
 
@@ -94,10 +95,11 @@ func (h *Handler) Stop() {
 	shutdown := h.shutdown
 	// allows qos to restart
 	h.shutdown = nil
+	h.m.Unlock()
+
 	if shutdown == nil {
 		return
 	}
-	h.m.Unlock()
 
 	shutdown()
 }
@@ -131,12 +133,18 @@ func (h *Handler) run(ctx context.Context) {
 			return
 		}
 
-		// always get the next highest priority message
-		// `ok` will stop the loop if the queue is empty
-		for msg, ok := h.queue.Dequeue(); ok; msg, ok = h.queue.Dequeue() {
+		for {
+			// always get the next highest priority message
+			msg, ok := h.queue.Dequeue()
+			if !ok {
+				// queue is empty, wait for next ingestQueue trigger
+				break
+			}
+
 			select {
 			case <-ctx.Done():
 				// QOS was stopped, re-enqueue message and exit
+				// run() loop will restart on a connect event
 				h.queue.Enqueue(msg)
 				return
 			default:
@@ -144,7 +152,7 @@ func (h *Handler) run(ctx context.Context) {
 
 			err := h.next.HandleWrp(msg)
 			if err != nil {
-				// delivery failed, re-enqueue message
+				// delivery failed, re-enqueue message and wait for next ingestQueue trigger
 				h.queue.Enqueue(msg)
 				break
 			}
