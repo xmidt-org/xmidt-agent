@@ -36,18 +36,30 @@ func (pq *PriorityQueue) Dequeue() (wrp.Message, bool) {
 
 // Enqueue queues the given message.
 func (pq *PriorityQueue) Enqueue(msg wrp.Message) {
+	defer pq.m.Unlock()
 	pq.m.Lock()
-	heap.Push(pq, msg)
-	pq.trim()
-	pq.m.Unlock()
-}
+	// when the queue is empty, check whether enqueuing msg would violate maxQueueSize
+	if pq.Len() == 0 {
+		if len(msg.Payload) <= pq.maxQueueSize {
+			heap.Push(pq, msg)
+		}
 
-// trim removes the lowest priority message if the queue is full.
-func (pq *PriorityQueue) trim() {
-	// when pq.IsFull() is true, pq.Len() > 1 ensures at least 1 message is queued
-	for pq.Len() > 1 && pq.IsFull() {
-		heap.Remove(pq, pq.Len()-1)
+		return
 	}
+
+	// check whether enqueuing msg would violate the queue constraints
+	// if it does then determine whether to enqueue msg, otherwise enqueue msg
+	if pq.Size()+len(msg.Payload) > pq.maxQueueSize || len(pq.queue)+1 > cap(pq.queue) {
+		// determine whether msg is of lower priority than the least
+		// prioritized queued message `leastMsg`
+		leastMsg := heap.Remove(pq, pq.Len()-1).(wrp.Message)
+		// if it is then keep leastMsg, otherwise discard leastMsg and queue msg (the latest)
+		if leastMsg.QualityOfService > msg.QualityOfService {
+			msg = leastMsg
+		}
+	}
+
+	heap.Push(pq, msg)
 }
 
 func (pq *PriorityQueue) Size() int {
@@ -80,16 +92,15 @@ func (pq *PriorityQueue) Push(x any) {
 }
 
 func (pq *PriorityQueue) Pop() any {
-	old := pq.queue
-	n := len(old)
-	if n == 0 {
+	last := len(pq.queue) - 1
+	if last < 0 {
 		return nil
 	}
 
-	i := old[n-1]
+	item := pq.queue[last]
 	// avoid memory leak
-	old[n-1] = wrp.Message{}
-	pq.queue = old[0 : n-1]
+	pq.queue[last] = wrp.Message{}
+	pq.queue = pq.queue[0:last]
 
-	return i
+	return item
 }
