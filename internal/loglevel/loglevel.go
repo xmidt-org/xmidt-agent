@@ -15,11 +15,11 @@ type LogLevel interface {
 }
 
 type LogLevelService struct {
-	level     zap.AtomicLevel
+	level     *zap.AtomicLevel
 	origLevel []byte
 }
 
-func New(level zap.AtomicLevel) (LogLevel, error) {
+func New(level *zap.AtomicLevel) (LogLevel, error) {
 	origLevel, err := level.MarshalText()
 	if err != nil {
 		return nil, err

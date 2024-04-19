@@ -371,7 +371,7 @@ var defaultConfig = Config{
 		FilePath:    "./mock_tr181.json",
 		ServiceName: "config",
 	},
-	XmidtAgentCrud: XmidtAgentCrud {
+	XmidtAgentCrud: XmidtAgentCrud{
 		ServiceName: "xmidt_agent",
 	},
 }

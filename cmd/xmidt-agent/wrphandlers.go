@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/xmidt-agent/internal/loglevel"
 	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
@@ -26,6 +27,7 @@ func provideWRPHandlers() fx.Option {
 			providePubSubHandler,
 			provideMissingHandler,
 			provideAuthHandler,
+			provideCrudHandler,
 		),
 		fx.Invoke(provideWSEventorToHandlerAdapter),
 	)
@@ -93,6 +95,33 @@ func provideAuthHandler(in authIn) (*auth.Handler, error) {
 	return h, err
 }
 
+type crudIn struct {
+	fx.In
+
+	XmidtAgentCrud  XmidtAgentCrud
+	Identity        Identity
+	Egress          websocket.Egress
+	LogLevelService *loglevel.LogLevelService
+	PubSub          *pubsub.PubSub
+}
+
+func provideCrudHandler(in crudIn) (*xmidt_agent_crud.Handler, error) {
+	h, err := xmidt_agent_crud.New(in.Egress, string(in.Identity.DeviceID), in.LogLevelService)
+	if err != nil {
+		err = errors.Join(ErrWRPHandlerConfig, err)
+		return nil, err
+	}
+
+	// what do we do with the return value?  Does this have to be passed to pubSub somehow? Seems
+	// fishy if it does
+	_, err = in.PubSub.SubscribeService(in.XmidtAgentCrud.ServiceName, h)
+	if err != nil {
+		return nil, errors.Join(ErrWRPHandlerConfig, err)
+	}
+
+	return h, err
+}
+
 type pubsubIn struct {
 	fx.In
 
@@ -149,18 +178,6 @@ func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 
 		cancelList = append(cancelList, mocktr)
 	}
-
-	xmidtAgentCrudHandler, err := xmidt_agent_crud.New()
-	if err != nil {
-		return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
-	}
-
-	mocktr, err := ps.SubscribeService(in.MockTr181.ServiceName, mocktr181Handler)
-	if err != nil {
-		return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
-	}
-
-	cancelList = append(cancelList, mocktr)
 
 	return pubsubOut{
 		PubSub:           ps,
