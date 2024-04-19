@@ -24,7 +24,7 @@ func TestSetLevel(t *testing.T) {
 
 	level := zcfg.Level
 
-	logLevel, err := New(level)
+	logLevel, err := New(&level)
 	assert.NoError(t, err)
 	logLevelService := logLevel.(*LogLevelService)
 	assert.Equal(t, "ERROR", logLevelService.level.Level().CapitalString())
