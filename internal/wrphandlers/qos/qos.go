@@ -65,7 +65,7 @@ func New(next websocket.Egress, opts ...Option) (*Handler, error) {
 	return h, nil
 }
 
-// Start starts the qos queue ingestion.
+// Start starts the qos queue ingestion. Called during a ws connect event.
 func (h *Handler) Start() {
 	h.m.Lock()
 	defer h.m.Unlock()
@@ -89,7 +89,7 @@ func (h *Handler) Start() {
 
 }
 
-// Stop stops the qos queue ingestion.
+// Stop stops the qos queue ingestion. Called during a ws disconnect event.
 func (h *Handler) Stop() {
 	h.m.Lock()
 	shutdown := h.shutdown
