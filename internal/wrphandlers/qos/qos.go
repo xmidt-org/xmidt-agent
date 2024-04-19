@@ -36,10 +36,11 @@ type Handler struct {
 	queue PriorityQueue
 
 	m sync.Mutex
-	// runQueueDump triggers a queue dump, i.e.: sent as many queued messages as possible
-	runQueueDump chan bool
+	// runEmptyQueue triggers a queue dump, i.e.: sent as many queued messages as possible
+	runEmptyQueue chan bool
 	// shutdown shuts down the queue ingestion
 	shutdown context.CancelFunc
+	ctx      context.Context
 }
 
 // New creates a new instance of the Handler struct.  The parameter next is the
@@ -50,8 +51,8 @@ func New(next websocket.Egress, opts ...Option) (*Handler, error) {
 	}
 
 	h := &Handler{
-		next:         next,
-		runQueueDump: make(chan bool, 1),
+		next:          next,
+		runEmptyQueue: make(chan bool, 1),
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -68,23 +69,18 @@ func New(next websocket.Egress, opts ...Option) (*Handler, error) {
 // the queue ingestion.
 func (h *Handler) Start() {
 	h.m.Lock()
-
 	if h.shutdown != nil {
 		return
 	}
 
-	var ctx context.Context
-	ctx, h.shutdown = context.WithCancel(context.Background())
+	// reset
+	h.ctx, h.shutdown = context.WithCancel(context.Background())
+	h.runEmptyQueue = make(chan bool, 1)
 	h.m.Unlock()
 
-	go h.run(ctx)
-
 	// at qos start, send as many queued messages as possible
-	select {
-	case h.runQueueDump <- true:
-	default:
-		// a runQueueDump is in progress
-	}
+	go h.EmptyQueue()
+
 }
 
 // Stop stops the queue ingestion.
@@ -92,6 +88,7 @@ func (h *Handler) Stop() {
 	h.m.Lock()
 	shutdown := h.shutdown
 	// allows qos to restart
+	close(h.runEmptyQueue)
 	h.shutdown = nil
 	if shutdown == nil {
 		return
@@ -103,20 +100,32 @@ func (h *Handler) Stop() {
 
 // HandleWrp is called to queue a message.
 func (h *Handler) HandleWrp(msg wrp.Message) error {
-	// queue newest message before running runQueueDump
+	// queue newest message before running runEmptyQueue
 	h.queue.Enqueue(msg)
-	select {
-	case h.runQueueDump <- true:
-		// sent as many queued messages as possible
-	default:
-		// a runQueueDump is in progress
-	}
+	go h.EmptyQueue()
 
 	return nil
 }
 
 // EmptyQueue is the long running goroutine used for the queue ingestion.
-func (h *Handler) EmptyQueue(ctx context.Context) {
+func (h *Handler) EmptyQueue() {
+	defer func() {
+		// trigged runEmptyQueue is done
+		<-h.runEmptyQueue
+	}()
+
+	h.m.Lock()
+	select {
+	// Lock() prevents a panic if Stop() called
+	case h.runEmptyQueue <- true:
+		// sent as many queued messages as possible
+	default:
+		return
+		// a runEmptyQueue is in progress
+	}
+	ctx := h.ctx
+	h.m.Unlock()
+
 	for {
 		// always get the next highest priority
 		msg, ok := h.queue.Dequeue()
@@ -139,18 +148,5 @@ func (h *Handler) EmptyQueue(ctx context.Context) {
 			h.queue.Enqueue(msg)
 			return
 		}
-	}
-}
-
-// run is the long running goroutine used for the queue ingestion.
-func (h *Handler) run(ctx context.Context) {
-	for {
-		select {
-		case <-h.runQueueDump:
-			h.EmptyQueue(ctx)
-		case <-ctx.Done():
-			return
-		}
-
 	}
 }
