@@ -41,9 +41,14 @@ type Config struct {
 	Externals        []configuration.External
 }
 
-type QOS struct {
-	MaxQueueSize  int
+type QOSQueue struct {
+	// MaxQueueSize is the allowable max size of the queue based on the sum of all queued wrp message's payloads
+	MaxQueueSize int
+	// MaxQueueDepth is the total wrp message allowed
 	MaxQueueDepth int
+}
+type QOS struct {
+	Queue QOSQueue
 }
 
 type Pubsub struct {
@@ -373,7 +378,9 @@ var defaultConfig = Config{
 		ServiceName: "config",
 	},
 	QOS: QOS{
-		MaxQueueSize:  1 * 1024 * 1024, // 1MB max/queue,
-		MaxQueueDepth: 1000,            // 1000 messages
+		Queue: QOSQueue{
+			MaxQueueSize:  1 * 1024 * 1024, // 1MB max/queue,
+			MaxQueueDepth: 1000,            // 1000 messages
+		},
 	},
 }

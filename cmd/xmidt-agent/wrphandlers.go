@@ -63,7 +63,7 @@ type qosIn struct {
 }
 
 func provideQOSHandler(in qosIn) (*qos.Handler, error) {
-	h, err := qos.New(in.WS, qos.AddPriorityQueue(in.QOS.MaxQueueSize, in.QOS.MaxQueueDepth))
+	h, err := qos.New(in.WS, qos.AddPriorityQueue(in.QOS.Queue.MaxQueueSize, in.QOS.Queue.MaxQueueDepth))
 	in.WS.AddConnectListener(
 		event.ConnectListenerFunc(func(event.Connect) {
 			h.Start()
