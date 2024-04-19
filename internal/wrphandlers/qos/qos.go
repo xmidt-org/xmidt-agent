@@ -15,10 +15,10 @@ import (
 
 var (
 	ErrInvalidInput    = errors.New("invalid input")
-	ErrMisconfiguredWS = errors.New("misconfigured WS")
+	ErrMisconfiguredWS = errors.New("misconfigured QOS")
 )
 
-// Option is a functional option type for WS.
+// Option is a functional option type for QOS.
 type Option interface {
 	apply(*Handler) error
 }
@@ -29,18 +29,19 @@ func (f optionFunc) apply(c *Handler) error {
 	return f(c)
 }
 
-// Handler queues incoming messages and forwards them to the next wrphandler
+// Handler queues incoming messages and sends them to the next wrphandler
 type Handler struct {
 	next wrpkit.Handler
-	// queue that'll be used to forward messages to the next wrphandler
+	// queue for wrp messages
 	queue PriorityQueue
 
 	m sync.Mutex
-	// runEmptyQueue triggers a queue dump, i.e.: sent as many queued messages as possible
+	// runEmptyQueue triggers a queue dump, i.e.: send as many queued messages as possible
 	runEmptyQueue chan bool
 	// shutdown shuts down the queue ingestion
 	shutdown context.CancelFunc
-	ctx      context.Context
+	// ctx is the queue ingestion context
+	ctx context.Context
 }
 
 // New creates a new instance of the Handler struct.  The parameter next is the
@@ -65,8 +66,7 @@ func New(next websocket.Egress, opts ...Option) (*Handler, error) {
 	return h, nil
 }
 
-// Start starts the queue ingestion and a long running goroutine to maintain
-// the queue ingestion.
+// Start starts the queue ingestion.
 func (h *Handler) Start() {
 	h.m.Lock()
 	if h.shutdown != nil {
@@ -107,7 +107,10 @@ func (h *Handler) HandleWrp(msg wrp.Message) error {
 	return nil
 }
 
-// EmptyQueue is the long running goroutine used for the queue ingestion.
+// EmptyQueue sends as many queued messages as possible until one of the following occurs:
+// 1. the qos context was cancelled
+// 2. qos queue is empty
+// 3. there was a delivery failure
 func (h *Handler) EmptyQueue() {
 	defer func() {
 		// trigged runEmptyQueue is done
@@ -118,7 +121,7 @@ func (h *Handler) EmptyQueue() {
 	select {
 	// Lock() prevents a panic if Stop() called
 	case h.runEmptyQueue <- true:
-		// sent as many queued messages as possible
+		// send as many queued messages as possible
 	default:
 		return
 		// a runEmptyQueue is in progress
@@ -144,7 +147,7 @@ func (h *Handler) EmptyQueue() {
 
 		err := h.next.HandleWrp(msg)
 		if err != nil {
-			// deliever failed, re-enqueue message
+			// delivery failed, re-enqueue message
 			h.queue.Enqueue(msg)
 			return
 		}
