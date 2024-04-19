@@ -9,14 +9,14 @@ import (
 	"github.com/xmidt-org/wrp-go/v3"
 )
 
-// AddPriorityQueue sets the max size for the qos queue
+// AddPriorityQueue configures and adds a qos priority queue
 func AddPriorityQueue(maxQueueSize, maxQueueDepth int) Option {
 	return optionFunc(
 		func(h *Handler) error {
 			if maxQueueSize < 0 {
-				return fmt.Errorf("%w: negative MaxQueueSize", ErrMisconfiguredWS)
+				return fmt.Errorf("%w: negative MaxQueueSize", ErrMisconfiguredQOS)
 			} else if maxQueueDepth < 0 {
-				return fmt.Errorf("%w: negative maxQueueDepth", ErrMisconfiguredWS)
+				return fmt.Errorf("%w: negative maxQueueDepth", ErrMisconfiguredQOS)
 			}
 
 			h.queue = PriorityQueue{
