@@ -19,7 +19,7 @@ type PriorityQueue struct {
 	m sync.Mutex
 }
 
-// Dequeue returns the next highest priority and first-in-line message (FIFO).
+// Dequeue returns the next highest priority.
 func (pq *PriorityQueue) Dequeue() (wrp.Message, bool) {
 	defer pq.m.Unlock()
 	pq.m.Lock()

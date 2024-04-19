@@ -118,7 +118,7 @@ func (h *Handler) HandleWrp(msg wrp.Message) error {
 // EmptyQueue is the long running goroutine used for the queue ingestion.
 func (h *Handler) EmptyQueue(ctx context.Context) {
 	for {
-		// always get the next highest priority and first-in-line message
+		// always get the next highest priority
 		msg, ok := h.queue.Dequeue()
 		if !ok {
 			// queue is empty
