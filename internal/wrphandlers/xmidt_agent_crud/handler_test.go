@@ -46,7 +46,7 @@ func TestHandler_HandleWrp(t *testing.T) {
 				Source:      "dns:tr1d1um.example.com/service/ignored",
 				Destination: "xmidt-agent",
 				Path:        "loglevel",
-				Payload:     []byte("{\"loglevel\":\"debug\",\"duration\":1}"),
+				Payload:     []byte("{\"loglevel\":\"debug\",\"duration\":\"1m\"}"),
 			},
 			logLevelMock: newMockLogLevel(),
 			mockCalls: func(logLevelMock *mockLogLevel) {
@@ -80,6 +80,27 @@ func TestHandler_HandleWrp(t *testing.T) {
 			},
 		},
 		{
+			description:     "set log level with a bad duration",
+			egressCallCount: 1,
+			expectedErr:     nil,
+			msg: wrp.Message{
+				Type:        wrp.UpdateMessageType,
+				Source:      "dns:tr1d1um.example.com/service/ignored",
+				Destination: "xmidt-agent",
+				Path:        "loglevel",
+				Payload:     []byte("{\"loglevel\":\"debug\",\"duration\":\"1zzzzzz\"}"),
+			},
+			logLevelMock: newMockLogLevel(),
+			mockCalls: func(logLevelMock *mockLogLevel) {
+				logLevelMock.On("SetLevel", "debug", 30*time.Minute).Return(nil)
+			},
+			validate: func(a *assert.Assertions, msg wrp.Message, logLevelMock *mockLogLevel) error {
+				a.Equal(int64(http.StatusOK), *msg.Status)
+				logLevelMock.AssertCalled(t, "SetLevel", "debug", 30*time.Minute)
+				return nil
+			},
+		},
+		{
 			description:     "send some nonexistent action",
 			egressCallCount: 1,
 			expectedErr:     nil,
@@ -95,7 +116,7 @@ func TestHandler_HandleWrp(t *testing.T) {
 
 			},
 			validate: func(a *assert.Assertions, msg wrp.Message, logLevelMock *mockLogLevel) error {
-				a.Equal(int64(http.StatusOK), *msg.Status)
+				a.Equal(int64(http.StatusBadRequest), *msg.Status)
 				logLevelMock.AssertNotCalled(t, "SetLevel")
 				return nil
 			},

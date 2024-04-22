@@ -13,14 +13,7 @@ import (
 	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 )
 
-const DefaultLogLevelChangeMinutes = 30
-
-const (
-	Create   = 5
-	Retrieve = 6
-	Update   = 7
-	Delete   = 8
-)
+const DefaultLogLevelChangeDuration = 30 * time.Minute
 
 type Handler struct {
 	egress   wrpkit.Handler
@@ -43,7 +36,7 @@ func New(egress wrpkit.Handler, source string, logLevel loglevel.LogLevel) (*Han
 }
 
 func (h *Handler) HandleWrp(msg wrp.Message) error {
-	payload := make(map[string]interface{})
+	payload := make(map[string]string)
 
 	err := json.Unmarshal(msg.Payload, &payload)
 	if err != nil { // do we still want to return a response here?
@@ -51,12 +44,14 @@ func (h *Handler) HandleWrp(msg wrp.Message) error {
 	}
 
 	var payloadResponse []byte
-	statusCode := int64(http.StatusOK)
+	statusCode := int64(http.StatusBadRequest)
 
 	switch msg.Type {
-	case Update:
-		statusCode, _ = h.update(msg.Path, payload)
-		// the above error needs to be logged
+	case wrp.UpdateMessageType:
+		statusCode, err = h.update(msg.Path, payload)
+		if err != nil {
+			payloadResponse = []byte(err.Error())
+		}
 
 	default:
 
@@ -75,29 +70,29 @@ func (h *Handler) HandleWrp(msg wrp.Message) error {
 	return err
 }
 
-// why is status code int64?
-func (h *Handler) update(path string, payload map[string]interface{}) (int64, error) {
+func (h *Handler) update(path string, payload map[string]string) (int64, error) {
+	badRequestStatus := int64(http.StatusBadRequest)
+	okStatus := int64(http.StatusOK)
+
 	switch path {
 	case "loglevel":
 		err := h.changeLogLevel(payload)
 		if err != nil {
-			return int64(http.StatusBadRequest), err
+			return badRequestStatus, err
 		}
+		return okStatus, nil
 
 	default:
-		return int64(http.StatusOK), nil
+		return badRequestStatus, nil
 	}
 
-	return int64(http.StatusOK), nil
 }
 
-func (h *Handler) changeLogLevel(payload map[string]interface{}) error {
-	minutes := float64(DefaultLogLevelChangeMinutes)
-	inputMinutes := payload["duration"]
-	if inputMinutes != nil {
-		minutes = inputMinutes.(float64)
+func (h *Handler) changeLogLevel(payload map[string]string) error {
+	duration, err := time.ParseDuration(payload["duration"])
+	if err != nil {
+		duration = DefaultLogLevelChangeDuration
 	}
 
-	duration := time.Duration(minutes) * time.Minute
-	return h.logLevel.SetLevel(payload["loglevel"].(string), duration)
+	return h.logLevel.SetLevel(payload["loglevel"], duration)
 }
