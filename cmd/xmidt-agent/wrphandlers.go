@@ -6,12 +6,14 @@ import (
 	"errors"
 
 	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/xmidt-agent/internal/loglevel"
 	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/auth"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/missing"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/mocktr181"
+	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/xmidt_agent_crud"
 	"go.uber.org/fx"
 )
 
@@ -25,6 +27,7 @@ func provideWRPHandlers() fx.Option {
 			providePubSubHandler,
 			provideMissingHandler,
 			provideAuthHandler,
+			provideCrudHandler,
 		),
 		fx.Invoke(provideWSEventorToHandlerAdapter),
 	)
@@ -87,6 +90,33 @@ func provideAuthHandler(in authIn) (*auth.Handler, error) {
 	h, err := auth.New(in.MissingHandler, in.Egress, string(in.Identity.DeviceID), in.Identity.PartnerID)
 	if err != nil {
 		err = errors.Join(ErrWRPHandlerConfig, err)
+	}
+
+	return h, err
+}
+
+type crudIn struct {
+	fx.In
+
+	XmidtAgentCrud  XmidtAgentCrud
+	Identity        Identity
+	Egress          websocket.Egress
+	LogLevelService *loglevel.LogLevelService
+	PubSub          *pubsub.PubSub
+}
+
+func provideCrudHandler(in crudIn) (*xmidt_agent_crud.Handler, error) {
+	h, err := xmidt_agent_crud.New(in.Egress, string(in.Identity.DeviceID), in.LogLevelService)
+	if err != nil {
+		err = errors.Join(ErrWRPHandlerConfig, err)
+		return nil, err
+	}
+
+	// what do we do with the return value?  Does this have to be passed to pubSub somehow? Seems
+	// fishy if it does
+	_, err = in.PubSub.SubscribeService(in.XmidtAgentCrud.ServiceName, h)
+	if err != nil {
+		return nil, errors.Join(ErrWRPHandlerConfig, err)
 	}
 
 	return h, err
