@@ -19,6 +19,7 @@ FROM alpine:latest
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt  /etc/ssl/certs/
 COPY xmidt-agent /
 COPY ./.release/docker/entrypoint.sh  /
+RUN chmod +x /entrypoint.sh
 
 # Include compliance details about the container and what it contains.
 COPY Dockerfile /
@@ -27,12 +28,16 @@ COPY LICENSE    /
 
 # Make the location for the configuration file that will be used.
 RUN     mkdir /etc/xmidt-agent/
-COPY ./.release/docker/config/  /etc/xmidt-agent/
+COPY ./.release/docker/config/xmidt_agent.yaml  /etc/xmidt-agent/xmidt_agent.yaml
+COPY ./.release/docker/certs/  /certs
+COPY ./internal/wrphandlers/mocktr181/mock_tr181.json /
 
-USER nobody
+USER root
 
-ENTRYPOINT ["/entrypoint.sh"]
+#ENTRYPOINT ["tail", "-f", "/dev/null"]
+#ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/xmidt-agent"]
 
 EXPOSE 6666
 
-CMD ["/xmidt-agent"]
+CMD ["-f", "/etc/xmidt-agent/xmidt_agent.yaml", "--dev"]

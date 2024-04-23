@@ -18,3 +18,13 @@ By participating, you agree to this Code.
 
 Refer to [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## Run xmidt-agent simulator as a docker container
+1. cp .release/docker/config/config_template.yaml to .release/docker/config/xmidt_agent.yaml
+2. replace field values (in caps) with desired values (TODO need more of an explanation of the jwt pem stuff)
+3. cd cmd/xmidt-agent (TODO build from root directory)
+4. build for alpine
+    ```env GOOS=linux GOARCH=arm64 go build .```
+5. mv xmidt-agent ../..  (TODO)
+6. cd back to root of repository
+7. docker build -t xmidt-agent .
+8. docker run xmidt-agent

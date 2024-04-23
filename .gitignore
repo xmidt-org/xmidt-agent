@@ -27,6 +27,7 @@ __debug_bin*
 go.work
 
 cmd/xmidt-agent/xmidt-agent
+.release/docker/config/xmidt_agent.*
 
 internal/jwtxt/cmd/example/*
 internal/credentials/cmd/example/*
@@ -35,6 +36,7 @@ internal/adapters/libparodus/cmd/example/example
 *.dot
 *.pem
 *.yml
+*.yaml
 
 .storage
 

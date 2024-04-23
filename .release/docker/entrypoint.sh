@@ -28,7 +28,7 @@ _main() {
         echo "Entrypoint script for xmidt-agent Client ${VERSION} started."
     fi
 
-    exec "$@"
+    #exec "$@"
 }
 
 _main "$@"
