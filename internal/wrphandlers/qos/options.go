@@ -5,24 +5,17 @@ package qos
 
 import (
 	"fmt"
-
-	"github.com/xmidt-org/wrp-go/v3"
 )
 
-// AddPriorityQueue configures and adds a qos priority queue
-func AddPriorityQueue(maxQueueSize, maxQueueDepth int) Option {
+// MaxHeapSize is the allowable max size of the qos' priority queue, based on the sum of all queued wrp message's payload
+func MaxHeapSize(s int) Option {
 	return optionFunc(
 		func(h *Handler) error {
-			if maxQueueSize < 0 {
-				return fmt.Errorf("%w: negative MaxQueueSize", ErrMisconfiguredQOS)
-			} else if maxQueueDepth < 0 {
-				return fmt.Errorf("%w: negative maxQueueDepth", ErrMisconfiguredQOS)
+			if s < 0 {
+				return fmt.Errorf("%w: negative MaxHeapSize", ErrMisconfiguredQOS)
 			}
 
-			h.queue = PriorityQueue{
-				queue:        make([]wrp.Message, 0, maxQueueDepth),
-				maxQueueSize: maxQueueSize,
-			}
+			h.maxHeapSize = s
 
 			return nil
 		})

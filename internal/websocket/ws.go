@@ -184,18 +184,6 @@ func (ws *Websocket) AddMessageListener(listener event.MsgListener, cancel ...*e
 	return event.CancelFunc(ws.msgListeners.Add(listener))
 }
 
-// AddDisconnectListener adds a disconnect listener to the WS connection.
-// The listener will be called for every ws disconnect.
-func (ws *Websocket) AddDisconnectListener(listener event.DisconnectListener, cancel ...*event.CancelFunc) event.CancelFunc {
-	return event.CancelFunc(ws.disconnectListeners.Add(listener))
-}
-
-// AddConnectListener adds a connect listener to the WS connection.
-// The listener will be called for every ws connection.
-func (ws *Websocket) AddConnectListener(listener event.ConnectListener, cancel ...*event.CancelFunc) event.CancelFunc {
-	return event.CancelFunc(ws.connectListeners.Add(listener))
-}
-
 // Send sends the provided WRP message through the existing websocket.  This
 // call synchronously blocks until the write is complete.
 func (ws *Websocket) Send(ctx context.Context, msg wrp.Message) error {

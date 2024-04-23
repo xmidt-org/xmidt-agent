@@ -39,7 +39,7 @@ type wsAdapterIn struct {
 
 	// wrphandlers
 	AuthHandler             *auth.Handler
-	WRPHandlerAdapterCancel event.CancelFunc `name:"wrphandlerAdapter"`
+	WRPHandlerAdapterCancel event.CancelFunc
 }
 
 func provideWSEventorToHandlerAdapter(in wsAdapterIn) {
@@ -56,28 +56,25 @@ type qosIn struct {
 
 	QOS QOS
 	WS  *websocket.Websocket
-
-	// wrphandlers
-	QOSStartAdapter event.CancelFunc `name:"qosStartAdapter"`
-	QOSEndAdapter   event.CancelFunc `name:"qosEndAdapter"`
 }
 
-func provideQOSHandler(in qosIn) (*qos.Handler, error) {
-	h, err := qos.New(in.WS, qos.AddPriorityQueue(in.QOS.Queue.MaxQueueSize, in.QOS.Queue.MaxQueueDepth))
-	in.WS.AddConnectListener(
-		event.ConnectListenerFunc(func(event.Connect) {
-			h.Start()
-		}),
-		&in.QOSStartAdapter,
-	)
-	in.WS.AddDisconnectListener(
-		event.DisconnectListenerFunc(func(event.Disconnect) {
-			h.Stop()
-		}),
-		&in.QOSEndAdapter,
+type qosOut struct {
+	fx.Out
+
+	QOS    *qos.Handler
+	Cancel func() `group:"cancels"`
+}
+
+func provideQOSHandler(in qosIn) (qosOut, error) {
+	h, shutdown, err := qos.New(
+		in.WS,
+		qos.MaxHeapSize(in.QOS.MaxHeapSize),
 	)
 
-	return h, err
+	return qosOut{
+		QOS:    h,
+		Cancel: shutdown,
+	}, err
 }
 
 type missingIn struct {

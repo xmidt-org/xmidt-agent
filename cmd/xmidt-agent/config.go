@@ -42,14 +42,8 @@ type Config struct {
 }
 
 type QOS struct {
-	Queue QOSQueue
-}
-
-type QOSQueue struct {
-	// MaxQueueSize is the allowable max size of the queue based on the sum of all queued wrp message's payloads
-	MaxQueueSize int
-	// MaxQueueDepth is the total wrp message allowed
-	MaxQueueDepth int
+	// MaxHeapSize is the allowable max size of the qos' priority queue, based on the sum of all queued wrp message's payload
+	MaxHeapSize int
 }
 
 type Pubsub struct {
@@ -379,9 +373,6 @@ var defaultConfig = Config{
 		ServiceName: "config",
 	},
 	QOS: QOS{
-		Queue: QOSQueue{
-			MaxQueueSize:  1 * 1024 * 1024, // 1MB max/queue,
-			MaxQueueDepth: 1000,            // 1000 messages
-		},
+		MaxHeapSize: 1 * 1024 * 1024, // 1MB max/queue,
 	},
 }

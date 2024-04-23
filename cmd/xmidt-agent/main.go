@@ -52,6 +52,7 @@ type LifeCycleIn struct {
 	Cred             *credentials.Credentials
 	EventCancelList  []event.CancelFunc
 	PubSubCancelList []pubsub.CancelFunc
+	Cancels          []func() `group:"cancels"`
 }
 
 // xmidtAgent is the main entry point for the program.  It is responsible for
@@ -83,6 +84,7 @@ func xmidtAgent(args []string) (*fx.App, error) {
 			provideConfig,
 			provideCredentials,
 			provideInstructions,
+			provideWS,
 
 			goschtalt.UnmarshalFunc[sallust.Config]("logger", goschtalt.Optional()),
 			goschtalt.UnmarshalFunc[Identity]("identity"),
@@ -100,7 +102,6 @@ func xmidtAgent(args []string) (*fx.App, error) {
 
 		fsProvide(),
 		provideWRPHandlers(),
-		provideWSWithAdapters(),
 
 		fx.Invoke(
 			lifeCycle,
@@ -225,7 +226,7 @@ func onStart(cred *credentials.Credentials, ws *websocket.Websocket, logger *zap
 	}
 }
 
-func onStop(ws *websocket.Websocket, shutdowner fx.Shutdowner, eventCancelList []event.CancelFunc, pubsubCancelList []pubsub.CancelFunc, logger *zap.Logger) func(context.Context) error {
+func onStop(ws *websocket.Websocket, shutdowner fx.Shutdowner, eventCancelList []event.CancelFunc, pubsubCancelList []pubsub.CancelFunc, cancels []func(), logger *zap.Logger) func(context.Context) error {
 	logger = logger.Named("on_stop")
 
 	return func(_ context.Context) error {
@@ -253,6 +254,10 @@ func onStop(ws *websocket.Websocket, shutdowner fx.Shutdowner, eventCancelList [
 			c()
 		}
 
+		for _, c := range cancels {
+			c()
+		}
+
 		return nil
 	}
 }
@@ -262,7 +267,7 @@ func lifeCycle(in LifeCycleIn) {
 	in.LC.Append(
 		fx.Hook{
 			OnStart: onStart(in.Cred, in.WS, logger),
-			OnStop:  onStop(in.WS, in.Shutdowner, in.EventCancelList, in.PubSubCancelList, logger),
+			OnStop:  onStop(in.WS, in.Shutdowner, in.EventCancelList, in.PubSubCancelList, in.Cancels, logger),
 		},
 	)
 }
