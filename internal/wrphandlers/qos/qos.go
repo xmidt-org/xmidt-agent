@@ -15,6 +15,7 @@ import (
 var (
 	ErrInvalidInput     = errors.New("invalid input")
 	ErrMisconfiguredQOS = errors.New("misconfigured QOS")
+	ErrQOSHasShutdown   = errors.New("QOS has been shutdown")
 )
 
 // Option is a functional option type for QOS.
@@ -34,19 +35,23 @@ type serviceQOSHandler func(wrp.Message) (<-chan wrp.Message, <-chan struct{})
 type Handler struct {
 	// queue for wrp messages, ingested by serviceQOS
 	queue chan wrp.Message
-	// maxHeapSize is the allowable max size of the qos' priority queue, based on the sum of all queued wrp message's payload
-	maxHeapSize int
+	// maxQueueSize is the allowable max size of the qos' priority queue, based on the sum of all queued wrp message's payload
+	maxQueueSize int
+	// done indicates whether or not qos has been shutdown
+	done <-chan struct{}
 }
 
 // New creates a new instance of the Handler struct.  The parameter next is the
 // handler that will be called and monitored for errors.
-func New(next websocket.Egress, opts ...Option) (*Handler, func(), error) {
+// Note, once shutdown is called, any calls to Handler.HandleWrp will result in
+// an ErrQOSHasShutdown error
+func New(next websocket.Egress, opts ...Option) (h *Handler, shutdown func(), err error) {
 	if next == nil {
 		return nil, nil, ErrInvalidInput
 	}
 
 	q := make(chan wrp.Message)
-	h := &Handler{
+	h = &Handler{
 		queue: q,
 	}
 
@@ -60,7 +65,8 @@ func New(next websocket.Egress, opts ...Option) (*Handler, func(), error) {
 
 	// shutdown() is used to stop serviceQOS by closing its `done` chan.
 	ctx, shutdown := context.WithCancel(context.Background())
-	go serviceQOS(ctx.Done(), h.queue, h.maxHeapSize, handleWRPWrapper(next))
+	h.done = ctx.Done()
+	go serviceQOS(ctx.Done(), h.queue, h.maxQueueSize, handleWRPWrapper(next))
 
 	return h, shutdown, nil
 }
@@ -68,8 +74,14 @@ func New(next websocket.Egress, opts ...Option) (*Handler, func(), error) {
 // HandleWRP queues incoming messages while the background serviceQOS goroutine attempts
 // to send as many queued messages as possible, where the highest QOS messages are prioritized
 func (h *Handler) HandleWrp(msg wrp.Message) error {
-	// never blocked as long as the serviceQOS goroutine is running
-	h.queue <- msg
+	select {
+	// h.done is the same `done <-chan struct{}` that serviceQOS is using
+	case <-h.done:
+		return ErrQOSHasShutdown
+	default:
+		// h.queue will never block as long as the serviceQOS goroutine is running.
+		h.queue <- msg
+	}
 
 	return nil
 }
@@ -82,11 +94,11 @@ func handleWRPWrapper(next wrpkit.Handler) serviceQOSHandler {
 			defer close(ready)
 			defer close(failedMsg)
 
-			// note, Websocket.HandleWrp already locks between writes
+			// Note, Websocket.HandleWrp already locks between writes.
 			if err := next.HandleWrp(msg); err != nil {
-				// delivery failed, re-enqueue message and try again later
+				// Delivery failed, re-enqueue message and try again later.
 				failedMsg <- msg
-				// the err itself is ignored
+				// The err itself is ignored.
 			}
 		}()
 
@@ -98,13 +110,13 @@ func handleWRPWrapper(next wrpkit.Handler) serviceQOSHandler {
 // where the highest QOS messages are prioritized.
 // serviceQOS is stopped when Handler.Cancel() is called, closing the `done` chan.
 // Note, New will automatically start the serviceQOS goroutine.
-func serviceQOS(done <-chan struct{}, queue <-chan wrp.Message, maxHeapSize int, handleWRP serviceQOSHandler) {
+func serviceQOS(done <-chan struct{}, queue <-chan wrp.Message, maxQueueSize int, handleWRP serviceQOSHandler) {
 	// create and manage the priority queue
-	pq := PriorityQueue{maxHeapSize: maxHeapSize}
+	pq := priorityQueue{maxQueueSize: maxQueueSize}
 	var (
-		// signaling channel from the handleWRP
+		// Signaling channel from the handleWRP.
 		ready <-chan struct{}
-		// channel for failed deliveries, re-enqueue message
+		// Channel for failed deliveries, re-enqueue message.
 		failedMsg <-chan wrp.Message
 	)
 
@@ -112,18 +124,20 @@ func serviceQOS(done <-chan struct{}, queue <-chan wrp.Message, maxHeapSize int,
 		select {
 		case <-done:
 			return
-		// `m` is either a new message or a message handleWRP failed to be deliver
 		case msg := <-queue:
 			pq.Enqueue(msg)
 			if ready != nil {
-				// previous handleWRP call has not finished, do nothing
+				// Previous handleWRP call has not finished, do nothing.
 			} else if top, ok := pq.Dequeue(); ok {
 				failedMsg, ready = handleWRP(top)
 			}
 		case <-ready:
-			// failedMsg either contains 1 failed message or it's closed
+			// Previous handleWRP call has finished, check whether handleWRP
+			// had successfully delivered its message or not.
+			// If it failed, then failedMsg will contain the failed message.
+			// Otherwise failedMsg is closed.
 			if msg, ok := <-failedMsg; ok {
-				// delivery failed, re-enqueue message and try again later
+				// Delivery failed, re-enqueue message and try again later.
 				pq.Enqueue(msg)
 			}
 

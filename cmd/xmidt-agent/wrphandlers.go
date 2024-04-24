@@ -71,7 +71,7 @@ type qosOut struct {
 func provideQOSHandler(in qosIn) (qosOut, error) {
 	h, shutdown, err := qos.New(
 		in.WS,
-		qos.MaxHeapSize(in.QOS.MaxHeapSize),
+		qos.MaxQueueSize(in.QOS.MaxQueueSize),
 	)
 
 	return qosOut{
