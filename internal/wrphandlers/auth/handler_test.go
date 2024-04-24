@@ -14,8 +14,6 @@ import (
 )
 
 func TestHandler_HandleWrp(t *testing.T) {
-	//randomErr := errors.New("random error")
-
 	tests := []struct {
 		description     string
 		nextResult      error
