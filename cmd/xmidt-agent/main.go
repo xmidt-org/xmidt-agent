@@ -14,6 +14,7 @@ import (
 	"github.com/goschtalt/goschtalt"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials"
+	"github.com/xmidt-org/xmidt-agent/internal/loglevel"
 	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
@@ -98,6 +99,7 @@ func xmidtAgent(args []string) (*fx.App, error) {
 			goschtalt.UnmarshalFunc[QOS]("qos"),
 
 			provideNetworkService,
+			loglevel.New,
 		),
 
 		fsProvide(),
@@ -187,7 +189,7 @@ type LoggerIn struct {
 
 // Create the logger and configure it based on if the program is in
 // debug mode or normal mode.
-func provideLogger(in LoggerIn) (*zap.Logger, error) {
+func provideLogger(in LoggerIn) (*zap.AtomicLevel, *zap.Logger, error) {
 	if in.CLI.Dev {
 		in.Cfg.EncoderConfig.EncodeLevel = "capitalColor"
 		in.Cfg.EncoderConfig.EncodeTime = "RFC3339"
@@ -198,7 +200,14 @@ func provideLogger(in LoggerIn) (*zap.Logger, error) {
 		in.Cfg.ErrorOutputPaths = append(in.Cfg.ErrorOutputPaths, "stderr")
 	}
 
-	return in.Cfg.Build()
+	zcfg, err := in.Cfg.NewZapConfig()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	logger, err := in.Cfg.Build()
+
+	return &zcfg.Level, logger, err
 }
 
 func onStart(cred *credentials.Credentials, ws *websocket.Websocket, logger *zap.Logger) func(context.Context) error {

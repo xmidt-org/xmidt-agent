@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/xmidt-agent/internal/loglevel"
 	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
@@ -13,6 +14,7 @@ import (
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/missing"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/mocktr181"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/qos"
+	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/xmidt_agent_crud"
 	"go.uber.org/fx"
 )
 
@@ -26,6 +28,7 @@ func provideWRPHandlers() fx.Option {
 			providePubSubHandler,
 			provideMissingHandler,
 			provideAuthHandler,
+			provideCrudHandler,
 			provideQOSHandler,
 		),
 		fx.Invoke(provideWSEventorToHandlerAdapter),
@@ -82,7 +85,7 @@ type missingIn struct {
 
 	// Configuration
 	// Note, DeviceID and PartnerID is pulled from the Identity configuration
-	DeviceID wrp.DeviceID
+	Identity Identity
 
 	// wrphandlers
 	Egress *qos.Handler
@@ -90,7 +93,7 @@ type missingIn struct {
 }
 
 func provideMissingHandler(in missingIn) (*missing.Handler, error) {
-	h, err := missing.New(in.Pubsub, in.Egress, string(in.DeviceID))
+	h, err := missing.New(in.Pubsub, in.Egress, string(in.Identity.DeviceID))
 	if err != nil {
 		err = errors.Join(ErrWRPHandlerConfig, err)
 	}
@@ -103,8 +106,7 @@ type authIn struct {
 
 	// Configuration
 	// Note, DeviceID and PartnerID is pulled from the Identity configuration
-	DeviceID  wrp.DeviceID
-	PartnerID string
+	Identity Identity
 
 	// wrphandlers
 
@@ -113,9 +115,36 @@ type authIn struct {
 }
 
 func provideAuthHandler(in authIn) (*auth.Handler, error) {
-	h, err := auth.New(in.MissingHandler, in.Egress, string(in.DeviceID), in.PartnerID)
+	h, err := auth.New(in.MissingHandler, in.Egress, string(in.Identity.DeviceID), in.Identity.PartnerID)
 	if err != nil {
 		err = errors.Join(ErrWRPHandlerConfig, err)
+	}
+
+	return h, err
+}
+
+type crudIn struct {
+	fx.In
+
+	XmidtAgentCrud  XmidtAgentCrud
+	Identity        Identity
+	Egress          websocket.Egress
+	LogLevelService *loglevel.LogLevelService
+	PubSub          *pubsub.PubSub
+}
+
+func provideCrudHandler(in crudIn) (*xmidt_agent_crud.Handler, error) {
+	h, err := xmidt_agent_crud.New(in.Egress, string(in.Identity.DeviceID), in.LogLevelService)
+	if err != nil {
+		err = errors.Join(ErrWRPHandlerConfig, err)
+		return nil, err
+	}
+
+	// what do we do with the return value?  Does this have to be passed to pubSub somehow? Seems
+	// fishy if it does
+	_, err = in.PubSub.SubscribeService(in.XmidtAgentCrud.ServiceName, h)
+	if err != nil {
+		return nil, errors.Join(ErrWRPHandlerConfig, err)
 	}
 
 	return h, err
@@ -126,7 +155,7 @@ type pubsubIn struct {
 
 	// Configuration
 	// Note, DeviceID and PartnerID is pulled from the Identity configuration
-	DeviceID  wrp.DeviceID
+	Identity  Identity
 	Pubsub    Pubsub
 	MockTr181 MockTr181
 
@@ -153,7 +182,7 @@ func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 	}
 
 	ps, err := pubsub.New(
-		in.DeviceID,
+		in.Identity.DeviceID,
 		opts...,
 	)
 	if err != nil {
@@ -165,7 +194,7 @@ func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 			mocktr181.FilePath(in.MockTr181.FilePath),
 			mocktr181.Enabled(in.MockTr181.Enabled),
 		}
-		mocktr181Handler, err := mocktr181.New(ps, string(in.DeviceID), mockDefaults...)
+		mocktr181Handler, err := mocktr181.New(ps, string(in.Identity.DeviceID), mockDefaults...)
 		if err != nil {
 			return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
 		}

@@ -158,10 +158,11 @@ func Test_provideLogger(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			assert := assert.New(t)
 
-			got, err := provideLogger(LoggerIn{CLI: tc.cli, Cfg: tc.cfg})
+			level, got, err := provideLogger(LoggerIn{CLI: tc.cli, Cfg: tc.cfg})
 
 			if tc.expectedErr == nil {
 				assert.NotNil(got)
+				assert.NotNil(level)
 				assert.NoError(err)
 				return
 			}
