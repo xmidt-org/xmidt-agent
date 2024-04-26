@@ -6,6 +6,7 @@ package qos
 import (
 	"context"
 	"errors"
+	"sync"
 
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
@@ -33,55 +34,89 @@ type serviceQOSHandler func(wrp.Message) (<-chan wrp.Message, <-chan struct{})
 
 // Handler queues incoming messages and sends them to the next wrphandler
 type Handler struct {
+	next serviceQOSHandler
 	// queue for wrp messages, ingested by serviceQOS
 	queue chan wrp.Message
 	// maxQueueSize is the allowable max size of the qos' priority queue, based on the sum of all queued wrp message's payload
 	maxQueueSize int
-	// done indicates whether or not qos has been shutdown
-	done <-chan struct{}
+
+	lock   sync.Mutex
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 // New creates a new instance of the Handler struct.  The parameter next is the
 // handler that will be called and monitored for errors.
-// Note, once shutdown is called, any calls to Handler.HandleWrp will result in
+// Note, once cancel is called, any calls to Handler.HandleWrp will result in
 // an ErrQOSHasShutdown error
-func New(next websocket.Egress, opts ...Option) (h *Handler, shutdown func(), err error) {
+func New(next websocket.Egress, opts ...Option) (h *Handler, err error) {
 	if next == nil {
-		return nil, nil, ErrInvalidInput
+		return nil, ErrInvalidInput
 	}
 
-	q := make(chan wrp.Message)
 	h = &Handler{
-		queue: q,
+		next: handleWRPWrapper(next),
 	}
 
+	var errs error
 	for _, opt := range opts {
 		if opt != nil {
 			if err := opt.apply(h); err != nil {
-				return nil, nil, err
+				errs = errors.Join(errs, err)
+				h = nil
 			}
 		}
 	}
 
-	// shutdown() is used to stop serviceQOS by closing its `done` chan.
-	ctx, shutdown := context.WithCancel(context.Background())
-	h.done = ctx.Done()
-	go serviceQOS(ctx.Done(), h.queue, h.maxQueueSize, handleWRPWrapper(next))
+	return h, errs
+}
 
-	return h, shutdown, nil
+func (h *Handler) Start() error {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
+	if h.ctx != nil {
+		return nil
+	}
+
+	// h.queue will never block as long as the serviceQOS goroutine is running.
+	h.queue = make(chan wrp.Message, 1)
+	// h.cancel() stops serviceQOS by closing its `done` chan.
+	h.ctx, h.cancel = context.WithCancel(context.Background())
+	go serviceQOS(h.ctx.Done(), h.queue, h.maxQueueSize, h.next)
+
+	return nil
+}
+
+func (h *Handler) Stop() {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
+	if h.ctx == nil {
+		return
+	}
+
+	h.cancel()
+	h.ctx = nil
+	h.cancel = nil
+	// defensive: cancelling the context should be enough, but this makes things bulletproof
+	close(h.queue)
+	h.queue = nil
 }
 
 // HandleWRP queues incoming messages while the background serviceQOS goroutine attempts
 // to send as many queued messages as possible, where the highest QOS messages are prioritized
 func (h *Handler) HandleWrp(msg wrp.Message) error {
-	select {
-	// h.done is the same `done <-chan struct{}` that serviceQOS is using
-	case <-h.done:
+	h.lock.Lock()
+	queue := h.queue
+	h.lock.Unlock()
+
+	if queue == nil {
 		return ErrQOSHasShutdown
-	default:
-		// h.queue will never block as long as the serviceQOS goroutine is running.
-		h.queue <- msg
 	}
+
+	// queue will never block as long as the serviceQOS goroutine is running.
+	queue <- msg
 
 	return nil
 }
@@ -108,8 +143,8 @@ func handleWRPWrapper(next wrpkit.Handler) serviceQOSHandler {
 
 // serviceQOS is a long running goroutine that sends as many queued messages as possible,
 // where the highest QOS messages are prioritized.
-// serviceQOS is stopped when Handler.Cancel() is called, closing the `done` chan.
-// Note, New will automatically start the serviceQOS goroutine.
+// serviceQOS starts when Handler.Start() is called.
+// serviceQOS stops when Handler.Stop() is called, closing its `done` chan.
 func serviceQOS(done <-chan struct{}, queue <-chan wrp.Message, maxQueueSize int, handleWRP serviceQOSHandler) {
 	// create and manage the priority queue
 	pq := priorityQueue{maxQueueSize: maxQueueSize}
@@ -124,7 +159,13 @@ func serviceQOS(done <-chan struct{}, queue <-chan wrp.Message, maxQueueSize int
 		select {
 		case <-done:
 			return
-		case msg := <-queue:
+		case msg, ok := <-queue:
+			if !ok {
+				// Don't enqueue an empty wrp.Message{}
+				// Handler.Stop() has been called, both `queue` and `done` are closed.
+				return
+			}
+
 			pq.Enqueue(msg)
 			if ready != nil {
 				// Previous handleWRP call has not finished, do nothing.

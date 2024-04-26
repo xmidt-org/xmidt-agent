@@ -61,23 +61,11 @@ type qosIn struct {
 	WS  *websocket.Websocket
 }
 
-type qosOut struct {
-	fx.Out
-
-	QOS    *qos.Handler
-	Cancel func() `group:"cancels"`
-}
-
-func provideQOSHandler(in qosIn) (qosOut, error) {
-	h, shutdown, err := qos.New(
+func provideQOSHandler(in qosIn) (*qos.Handler, error) {
+	return qos.New(
 		in.WS,
 		qos.MaxQueueSize(in.QOS.MaxQueueSize),
 	)
-
-	return qosOut{
-		QOS:    h,
-		Cancel: shutdown,
-	}, err
 }
 
 type missingIn struct {

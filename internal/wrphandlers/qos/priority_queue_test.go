@@ -122,6 +122,13 @@ func testEnqueueDequeue(t *testing.T) {
 			expectedQueueSize: 1,
 		},
 		{
+			description:             "drop incoming low priority messages since queue is filled with higher priority message",
+			messages:                []wrp.Message{largeCriticalQOSMsg, largeCriticalQOSMsg, smallLowQOSMsg, mediumMediumQosMsg},
+			maxQueueSize:            len(largeCriticalQOSMsg.Payload) * 2,
+			expectedQueueSize:       2,
+			expectedDequeueSequence: []wrp.Message{largeCriticalQOSMsg, largeCriticalQOSMsg},
+		},
+		{
 			description:             "dequeue all messages from highest to lowest priority",
 			messages:                enqueueSequenceTest,
 			maxQueueSize:            queueSizeSequenceTest,

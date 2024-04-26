@@ -79,6 +79,16 @@ func TestHandler_HandleWrp(t *testing.T) {
 			}),
 			shouldHalt: true,
 		},
+		{
+			description:   "zero MaxQueueSize option value",
+			maxQueueSize:  0,
+			nextCallCount: 1,
+			next: wrpkit.HandlerFunc(func(wrp.Message) error {
+				nextCallCount.Add(1)
+
+				return nil
+			}),
+		},
 		// failure cases
 		{
 			description:    "invalid inputs for qos.New",
@@ -90,10 +100,6 @@ func TestHandler_HandleWrp(t *testing.T) {
 			maxQueueSize: -1,
 			next: wrpkit.HandlerFunc(func(wrp.Message) error {
 				nextCallCount.Add(1)
-				if nextCallCount.Load() < 2 {
-					// message should be re-enqueue and re-delivered
-					return errors.New("random error")
-				}
 
 				return nil
 			}),
@@ -117,25 +123,30 @@ func TestHandler_HandleWrp(t *testing.T) {
 			assert := assert.New(t)
 			require := require.New(t)
 
-			h, shutdown, err := qos.New(tc.next, qos.MaxQueueSize(tc.maxQueueSize))
+			h, err := qos.New(tc.next, qos.MaxQueueSize(tc.maxQueueSize))
 			if tc.expectedNewErr != nil {
 				assert.ErrorIs(err, tc.expectedNewErr)
 				assert.Nil(h)
-				assert.Nil(shutdown)
 
 				return
 			} else {
 				require.NoError(err)
 				require.NotNil(h)
-				require.NotNil(shutdown)
 			}
 
+			h.Start()
+			// Allow multiple calls to Start.
+			h.Start()
+
 			if tc.shutdown {
-				shutdown()
+				h.Stop()
+				// Allow multiple calls to Stop.
+				h.Stop()
+
 				// allow qos ingestion to stop beforing sending a message
 				time.Sleep(10 * time.Millisecond)
 			} else {
-				defer shutdown()
+				defer h.Stop()
 			}
 
 			err = h.HandleWrp(msg)

@@ -18,6 +18,7 @@ import (
 	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
+	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/qos"
 
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -50,10 +51,10 @@ type LifeCycleIn struct {
 	LC               fx.Lifecycle
 	Shutdowner       fx.Shutdowner
 	WS               *websocket.Websocket
+	QOS              *qos.Handler
 	Cred             *credentials.Credentials
 	EventCancelList  []event.CancelFunc
 	PubSubCancelList []pubsub.CancelFunc
-	Cancels          []func() `group:"cancels"`
 }
 
 // xmidtAgent is the main entry point for the program.  It is responsible for
@@ -210,7 +211,7 @@ func provideLogger(in LoggerIn) (*zap.AtomicLevel, *zap.Logger, error) {
 	return &zcfg.Level, logger, err
 }
 
-func onStart(cred *credentials.Credentials, ws *websocket.Websocket, logger *zap.Logger) func(context.Context) error {
+func onStart(cred *credentials.Credentials, ws *websocket.Websocket, qos *qos.Handler, logger *zap.Logger) func(context.Context) error {
 	logger = logger.Named("on_start")
 
 	return func(ctx context.Context) error {
@@ -230,12 +231,13 @@ func onStart(cred *credentials.Credentials, ws *websocket.Websocket, logger *zap
 		// blocks until an attempt to fetch the credentials has been made or the context is canceled
 		cred.WaitUntilFetched(ctx)
 		ws.Start()
+		qos.Start()
 
 		return nil
 	}
 }
 
-func onStop(ws *websocket.Websocket, shutdowner fx.Shutdowner, eventCancelList []event.CancelFunc, pubsubCancelList []pubsub.CancelFunc, cancels []func(), logger *zap.Logger) func(context.Context) error {
+func onStop(ws *websocket.Websocket, qos *qos.Handler, shutdowner fx.Shutdowner, eventCancelList []event.CancelFunc, pubsubCancelList []pubsub.CancelFunc, logger *zap.Logger) func(context.Context) error {
 	logger = logger.Named("on_stop")
 
 	return func(_ context.Context) error {
@@ -255,15 +257,12 @@ func onStop(ws *websocket.Websocket, shutdowner fx.Shutdowner, eventCancelList [
 		}
 
 		ws.Stop()
+		qos.Stop()
 		for _, c := range eventCancelList {
 			c()
 		}
 
 		for _, c := range pubsubCancelList {
-			c()
-		}
-
-		for _, c := range cancels {
 			c()
 		}
 
@@ -275,8 +274,8 @@ func lifeCycle(in LifeCycleIn) {
 	logger := in.Logger.Named("fx_lifecycle")
 	in.LC.Append(
 		fx.Hook{
-			OnStart: onStart(in.Cred, in.WS, logger),
-			OnStop:  onStop(in.WS, in.Shutdowner, in.EventCancelList, in.PubSubCancelList, in.Cancels, logger),
+			OnStart: onStart(in.Cred, in.WS, in.QOS, logger),
+			OnStop:  onStop(in.WS, in.QOS, in.Shutdowner, in.EventCancelList, in.PubSubCancelList, logger),
 		},
 	)
 }
