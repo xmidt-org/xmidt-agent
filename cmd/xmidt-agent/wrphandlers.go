@@ -39,17 +39,29 @@ type wsAdapterIn struct {
 	WS *websocket.Websocket
 
 	// wrphandlers
-	AuthHandler             *auth.Handler
-	WRPHandlerAdapterCancel event.CancelFunc
+	AuthHandler *auth.Handler
+
+	// cancels
+	WRPHandlerAdapter func() `name:"wrp_handler_adapter_cancel"`
 }
 
-func provideWSEventorToHandlerAdapter(in wsAdapterIn) {
+type wsAdapterOut struct {
+	fx.Out
+
+	WRPHandlerAdapter func() `name:"wrp_handler_adapter_cancel"`
+}
+
+func provideWSEventorToHandlerAdapter(in wsAdapterIn) wsAdapterOut {
 	in.WS.AddMessageListener(
 		event.MsgListenerFunc(func(m wrp.Message) {
 			_ = in.AuthHandler.HandleWrp(m)
 		}),
-		&in.WRPHandlerAdapterCancel,
+		&in.WRPHandlerAdapter,
 	)
+
+	return wsAdapterOut{
+		WRPHandlerAdapter: in.WRPHandlerAdapter,
+	}
 }
 
 type missingIn struct {
@@ -138,14 +150,14 @@ type pubsubIn struct {
 type pubsubOut struct {
 	fx.Out
 
-	PubSub           *pubsub.PubSub
-	PubSubCancelList []pubsub.CancelFunc
+	PubSub *pubsub.PubSub
+	Egress func() `group:"cancels"`
+	Mocktr func() `group:"cancels"`
 }
 
 func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 	var (
-		egress     pubsub.CancelFunc
-		cancelList = []pubsub.CancelFunc{egress}
+		egress, mocktr func()
 	)
 
 	opts := []pubsub.Option{
@@ -171,16 +183,16 @@ func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 			return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
 		}
 
-		mocktr, err := ps.SubscribeService(in.MockTr181.ServiceName, mocktr181Handler)
+		mocktr, err = ps.SubscribeService(in.MockTr181.ServiceName, mocktr181Handler)
 		if err != nil {
 			return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
 		}
 
-		cancelList = append(cancelList, mocktr)
 	}
 
 	return pubsubOut{
-		PubSub:           ps,
-		PubSubCancelList: cancelList,
+		PubSub: ps,
+		Egress: egress,
+		Mocktr: mocktr,
 	}, err
 }

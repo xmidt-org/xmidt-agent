@@ -36,11 +36,13 @@ type wsIn struct {
 
 type wsOut struct {
 	fx.Out
-	WSHandler               wrpkit.Handler
-	WS                      *websocket.Websocket
-	Egress                  websocket.Egress
-	WRPHandlerAdapterCancel event.CancelFunc
-	EventCancelList         []event.CancelFunc
+	WSHandler wrpkit.Handler
+	WS        *websocket.Websocket
+	Egress    websocket.Egress
+
+	// cancels
+	Msg, Con, Discon, Heartbeat func() `group:"cancels"`
+	WRPHandlerAdapter           func() `name:"wrp_handler_adapter_cancel"`
 }
 
 func provideWS(in wsIn) (wsOut, error) {
@@ -74,8 +76,7 @@ func provideWS(in wsIn) (wsOut, error) {
 
 	// Listener options
 	var (
-		msg, con, discon, heartbeat, wrphandlerAdapter event.CancelFunc
-		cancelList                                     = []event.CancelFunc{wrphandlerAdapter}
+		msg, con, discon, heartbeat, wrphandlerAdapter func()
 	)
 	if in.CLI.Dev {
 		logger := in.Logger.Named("websocket")
@@ -100,7 +101,6 @@ func provideWS(in wsIn) (wsOut, error) {
 					logger.Info("heartbeat listener", zap.Any("event", e))
 				}), &heartbeat),
 		)
-		cancelList = append(cancelList, msg, con, discon, heartbeat)
 	}
 
 	ws, err := websocket.New(opts...)
@@ -109,10 +109,13 @@ func provideWS(in wsIn) (wsOut, error) {
 	}
 
 	return wsOut{
-		WS:                      ws,
-		EventCancelList:         cancelList,
-		WRPHandlerAdapterCancel: wrphandlerAdapter,
-		Egress:                  ws,
+		WS:                ws,
+		Egress:            ws,
+		Msg:               msg,
+		Con:               con,
+		Discon:            discon,
+		Heartbeat:         heartbeat,
+		WRPHandlerAdapter: wrphandlerAdapter,
 	}, err
 }
 

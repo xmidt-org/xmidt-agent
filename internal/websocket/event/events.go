@@ -26,9 +26,6 @@ const (
 	IPv6 IPMode = "IPv6"
 )
 
-// CancelFunc is the interface that provides a method to cancel a listener.
-type CancelFunc func()
-
 type Connect struct {
 	// Started holds the time when the connection attempt was started.
 	Started time.Time

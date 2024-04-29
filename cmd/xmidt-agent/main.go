@@ -15,9 +15,7 @@ import (
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials"
 	"github.com/xmidt-org/xmidt-agent/internal/loglevel"
-	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
-	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
 
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -46,13 +44,12 @@ type CLI struct {
 
 type LifeCycleIn struct {
 	fx.In
-	Logger           *zap.Logger
-	LC               fx.Lifecycle
-	Shutdowner       fx.Shutdowner
-	WS               *websocket.Websocket
-	Cred             *credentials.Credentials
-	EventCancelList  []event.CancelFunc
-	PubSubCancelList []pubsub.CancelFunc
+	Logger     *zap.Logger
+	LC         fx.Lifecycle
+	Shutdowner fx.Shutdowner
+	WS         *websocket.Websocket
+	Cred       *credentials.Credentials
+	Cancels    []func() `group:"cancels"`
 }
 
 // xmidtAgent is the main entry point for the program.  It is responsible for
@@ -233,7 +230,7 @@ func onStart(cred *credentials.Credentials, ws *websocket.Websocket, logger *zap
 	}
 }
 
-func onStop(ws *websocket.Websocket, shutdowner fx.Shutdowner, eventCancelList []event.CancelFunc, pubsubCancelList []pubsub.CancelFunc, logger *zap.Logger) func(context.Context) error {
+func onStop(ws *websocket.Websocket, shutdowner fx.Shutdowner, cancels []func(), logger *zap.Logger) func(context.Context) error {
 	logger = logger.Named("on_stop")
 
 	return func(_ context.Context) error {
@@ -253,11 +250,7 @@ func onStop(ws *websocket.Websocket, shutdowner fx.Shutdowner, eventCancelList [
 		}
 
 		ws.Stop()
-		for _, c := range eventCancelList {
-			c()
-		}
-
-		for _, c := range pubsubCancelList {
+		for _, c := range cancels {
 			c()
 		}
 
@@ -270,7 +263,7 @@ func lifeCycle(in LifeCycleIn) {
 	in.LC.Append(
 		fx.Hook{
 			OnStart: onStart(in.Cred, in.WS, logger),
-			OnStop:  onStop(in.WS, in.Shutdowner, in.EventCancelList, in.PubSubCancelList, logger),
+			OnStop:  onStop(in.WS, in.Shutdowner, in.Cancels, logger),
 		},
 	)
 }

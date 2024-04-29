@@ -273,45 +273,45 @@ func MaxMessageBytes(bytes int64) Option {
 
 // AddMessageListener adds a message listener to the WS connection.
 // The listener will be called for every message received from the WS.
-func AddMessageListener(listener event.MsgListener, cancel ...*event.CancelFunc) Option {
+func AddMessageListener(listener event.MsgListener, cancel ...*func()) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
-			var ignored event.CancelFunc
+			var ignored func()
 			cancel = append(cancel, &ignored)
-			*cancel[0] = event.CancelFunc(ws.msgListeners.Add(listener))
+			*cancel[0] = ws.msgListeners.Add(listener)
 			return nil
 		})
 }
 
 // AddConnectListener adds a connect listener to the WS connection.
-func AddConnectListener(listener event.ConnectListener, cancel ...*event.CancelFunc) Option {
+func AddConnectListener(listener event.ConnectListener, cancel ...*func()) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
-			var ignored event.CancelFunc
+			var ignored func()
 			cancel = append(cancel, &ignored)
-			*cancel[0] = event.CancelFunc(ws.connectListeners.Add(listener))
+			*cancel[0] = ws.connectListeners.Add(listener)
 			return nil
 		})
 }
 
 // AddDisconnectListener adds a disconnect listener to the WS connection.
-func AddDisconnectListener(listener event.DisconnectListener, cancel ...*event.CancelFunc) Option {
+func AddDisconnectListener(listener event.DisconnectListener, cancel ...*func()) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
-			var ignored event.CancelFunc
+			var ignored func()
 			cancel = append(cancel, &ignored)
-			*cancel[0] = event.CancelFunc(ws.disconnectListeners.Add(listener))
+			*cancel[0] = ws.disconnectListeners.Add(listener)
 			return nil
 		})
 }
 
 // AddHeartbeatListener adds a heartbeat listener to the WS connection.
-func AddHeartbeatListener(listener event.HeartbeatListener, cancel ...*event.CancelFunc) Option {
+func AddHeartbeatListener(listener event.HeartbeatListener, cancel ...*func()) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
-			var ignored event.CancelFunc
+			var ignored func()
 			cancel = append(cancel, &ignored)
-			*cancel[0] = event.CancelFunc(ws.heartbeatListeners.Add(listener))
+			*cancel[0] = ws.heartbeatListeners.Add(listener)
 			return nil
 		})
 }
