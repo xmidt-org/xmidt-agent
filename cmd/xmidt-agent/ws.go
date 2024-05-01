@@ -48,13 +48,20 @@ func provideWS(in wsIn) (wsOut, error) {
 		return wsOut{}, nil
 	}
 
+	var fetchURLFunc func(context.Context) (string, error)
+	// JWTXT is not required
+	// fetchURL() will use in.Websocket.BackUpURL if in.JWTXT is nil
+	if in.JWTXT != nil {
+		fetchURLFunc = in.JWTXT.Endpoint
+	}
+
 	// Configuration options
 	opts := []websocket.Option{
 		websocket.DeviceID(in.Identity.DeviceID),
 		websocket.FetchURLTimeout(in.Websocket.FetchURLTimeout),
 		websocket.FetchURL(
 			fetchURL(in.Websocket.URLPath, in.Websocket.BackUpURL,
-				in.JWTXT.Endpoint)),
+				fetchURLFunc)),
 		websocket.PingInterval(in.Websocket.PingInterval),
 		websocket.PingTimeout(in.Websocket.PingTimeout),
 		websocket.ConnectTimeout(in.Websocket.ConnectTimeout),
@@ -118,6 +125,10 @@ func provideWS(in wsIn) (wsOut, error) {
 
 func fetchURL(path, backUpURL string, f func(context.Context) (string, error)) func(context.Context) (string, error) {
 	return func(ctx context.Context) (string, error) {
+		if f == nil {
+			return url.JoinPath(backUpURL, path)
+		}
+
 		baseURL, err := f(ctx)
 		if err != nil {
 			if backUpURL != "" {
