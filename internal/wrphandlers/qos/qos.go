@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/xmidt-org/wrp-go/v3"
-	"github.com/xmidt-org/xmidt-agent/internal/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 )
 
@@ -49,7 +48,7 @@ type Handler struct {
 // handler that will be called and monitored for errors.
 // Note, once cancel is called, any calls to Handler.HandleWrp will result in
 // an ErrQOSHasShutdown error
-func New(next websocket.Egress, opts ...Option) (h *Handler, err error) {
+func New(next wrpkit.Handler, opts ...Option) (h *Handler, err error) {
 	if next == nil {
 		return nil, ErrInvalidInput
 	}
@@ -79,8 +78,7 @@ func (h *Handler) Start() error {
 		return nil
 	}
 
-	// h.queue will never block as long as the serviceQOS goroutine is running.
-	h.queue = make(chan wrp.Message, 1)
+	h.queue = make(chan wrp.Message)
 	// h.cancel() stops serviceQOS by closing its `done` chan.
 	h.ctx, h.cancel = context.WithCancel(context.Background())
 	go serviceQOS(h.ctx.Done(), h.queue, h.maxQueueSize, h.next)
@@ -114,7 +112,6 @@ func (h *Handler) HandleWrp(msg wrp.Message) error {
 		return ErrQOSHasShutdown
 	}
 
-	// queue will never block as long as the serviceQOS goroutine is running.
 	h.queue <- msg
 
 	return nil
