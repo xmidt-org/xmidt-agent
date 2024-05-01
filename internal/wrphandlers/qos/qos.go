@@ -108,15 +108,14 @@ func (h *Handler) Stop() {
 // to send as many queued messages as possible, where the highest QOS messages are prioritized
 func (h *Handler) HandleWrp(msg wrp.Message) error {
 	h.lock.Lock()
-	queue := h.queue
-	h.lock.Unlock()
+	defer h.lock.Unlock()
 
-	if queue == nil {
+	if h.queue == nil {
 		return ErrQOSHasShutdown
 	}
 
 	// queue will never block as long as the serviceQOS goroutine is running.
-	queue <- msg
+	h.queue <- msg
 
 	return nil
 }
