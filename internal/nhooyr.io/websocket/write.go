@@ -236,6 +236,13 @@ func (mw *msgWriter) close() {
 
 func (c *Conn) writeControl(ctx context.Context, opcode opcode, p []byte) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+	switch opcode {
+	case opPong:
+		if c.pingTimeout > 0 {
+			ctx, cancel = context.WithTimeout(ctx, c.pingTimeout)
+		}
+	}
+
 	defer cancel()
 
 	_, err := c.writeFrame(ctx, true, false, opcode, p)
