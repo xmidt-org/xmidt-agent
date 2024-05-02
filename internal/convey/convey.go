@@ -3,6 +3,11 @@
 
 package convey
 
+import (
+	"fmt"
+	"github.com/xmidt-org/xmidt-agent/internal/net"
+)
+
 type Option interface {
 	apply(*ConveyHeaderProvider) error
 }
@@ -17,29 +22,29 @@ const (
 	HeaderName = "X-Webpa-Convey"
 )
 
-type ConveyHeader struct {
-	Firmware string `json:"fw-name"`
-	Hardware string  `json:"hw-model"`
-	Manufacturer string `json:"hw-manufacturer"`
-	SerialNumber string `json:"hw-serial-number"`
-	LastRebootReason string `json:"hw-last-reboot-reason"`
-	LastReconnectReason string `json:"webpa-last-reconnect-reason"`
-	Protocol string `json:"webpa-protocol"`
-	BootTime string `json:"boot-time"`
-	BootTimeRetryDelay string `json:"boot-time-retry-wait"`
-	InterfaceUsed string `json:"webpa-interface-used"`
-	InterfacesAvailable []string `json:"interfaces-avail"`
-}
+const (
+	Firmware                   = "fw-name"
+	Hardware                   = "hw-model"
+	Manufacturer               = "hw-manufacturer"
+	SerialNumber               = "hw-serial-number"
+	LastRebootReason           = "hw-last-reboot-reason"
+	Protocol                   = "webpa-protocol"
+	BootTime                   = "boot-time"
+	BootTimeRetryDelay         = "boot-time-retry-wait"
+	InterfaceUsed       string = "webpa-interface-used"
+	InterfacesAvailable        = "interfaces-available"
+)
 
 type ConveyHeaderProvider struct {
-	firmware string
-	hardware string
-	manufacturer string
-	serialNumber string
-	lastRebootReason string
-	lastReconnectReason string
-	protocol string
-	bootTime string
+	networkService     *net.NetworkService
+	fields             []string
+	firmware           string
+	hardware           string
+	manufacturer       string
+	serialNumber       string
+	lastRebootReason   string
+	protocol           string
+	bootTime           string
 	bootTimeRetryDelay string
 }
 
@@ -57,16 +62,38 @@ func New(opts ...Option) (*ConveyHeaderProvider, error) {
 	return conveyHeaderProvider, nil
 }
 
-func (c *ConveyHeaderProvider) GetConveyHeader() ConveyHeader {
-	return ConveyHeader {
-		Firmware: c.firmware,
-		Hardware: c.hardware, 
-		Manufacturer: c.manufacturer,
-		SerialNumber: c.serialNumber,
-		LastRebootReason: c.lastRebootReason,
-		LastReconnectReason: c.lastReconnectReason,
-		Protocol: c.protocol,
-		BootTime: c.bootTime,
-		BootTimeRetryDelay: c.bootTimeRetryDelay,
+func (c *ConveyHeaderProvider) GetConveyHeader() map[string]interface{} {
+	header := make(map[string]interface{})
+
+	for _, field := range c.fields {
+		switch field {
+		case Firmware:
+			header[field] = c.firmware
+		case Hardware:
+			header[field] = c.hardware
+		case Manufacturer:
+			header[field] = c.manufacturer
+		case SerialNumber:
+			header[field] = c.serialNumber
+		case LastRebootReason:
+			header[field] = c.lastRebootReason
+		case Protocol:
+			header[field] = c.protocol
+		case BootTime:
+			header[field] = c.bootTime
+		case BootTimeRetryDelay:
+			header[field] = c.bootTimeRetryDelay
+		case InterfacesAvailable: // what if we can't get interfaces available?
+			names, err := c.networkService.GetInterfaceNames()
+			if err != nil {
+				fmt.Printf("unable to get network interfaces %s", err.Error())
+				continue
+			}
+			header[field] = names
+		default:
+
+		}
 	}
+
+	return header
 }

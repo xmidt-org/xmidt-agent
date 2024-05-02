@@ -5,13 +5,50 @@ package convey
 
 import (
 	"errors"
+	"fmt"
+	"time"
+
+	"github.com/xmidt-org/xmidt-agent/internal/net"
 )
 
 var (
 	ErrInvalidInput = errors.New("invalid input")
+	validFields     = []string{Firmware, Hardware, SerialNumber, Manufacturer, LastRebootReason, Protocol, BootTime, BootTimeRetryDelay, InterfacesAvailable}
 )
 
-func serialNumber(serialNumber string) Option {
+func NetworkServiceOpt(networkService *net.NetworkService) Option {
+	return optionFunc(
+		func(c *ConveyHeaderProvider) error {
+			if networkService == nil {
+				fmt.Printf("nil networkService")
+				return ErrInvalidInput
+			}
+			c.networkService = networkService
+			return nil
+		})
+}
+
+func FieldsOpt(fields []string) Option {
+	return optionFunc(
+		func(c *ConveyHeaderProvider) error {
+			for _, field := range fields {
+				valid := false
+				for _, validField := range validFields {
+					if field == validField {
+						valid = true
+					}
+				}
+				if !valid {
+					fmt.Printf("invalid metadata field %s", field)
+					return ErrInvalidInput
+				}
+			}
+			c.fields = fields
+			return nil
+		})
+}
+
+func SerialNumberOpt(serialNumber string) Option {
 	return optionFunc(
 		func(c *ConveyHeaderProvider) error {
 			c.serialNumber = serialNumber
@@ -19,7 +56,7 @@ func serialNumber(serialNumber string) Option {
 		})
 }
 
-func hardwareModel(hardwareModel string) Option {
+func HardwareModelOpt(hardwareModel string) Option {
 	return optionFunc(
 		func(c *ConveyHeaderProvider) error {
 			c.hardware = hardwareModel
@@ -27,7 +64,15 @@ func hardwareModel(hardwareModel string) Option {
 		})
 }
 
-func manufacturer(manufacturer string) Option {
+func FirmwareOpt(firmware string) Option {
+	return optionFunc(
+		func(c *ConveyHeaderProvider) error {
+			c.firmware = firmware
+			return nil
+		})
+}
+
+func ManufacturerOpt(manufacturer string) Option {
 	return optionFunc(
 		func(c *ConveyHeaderProvider) error {
 			c.manufacturer = manufacturer
@@ -35,7 +80,7 @@ func manufacturer(manufacturer string) Option {
 		})
 }
 
-func lastRebootReason(lastRebootReason string) Option {
+func LastRebootReasonOpt(lastRebootReason string) Option {
 	return optionFunc(
 		func(c *ConveyHeaderProvider) error {
 			c.lastRebootReason = lastRebootReason
@@ -43,15 +88,7 @@ func lastRebootReason(lastRebootReason string) Option {
 		})
 }
 
-func lastReconnectReason(lastReconnectReason string) Option {
-	return optionFunc(
-		func(c *ConveyHeaderProvider) error {
-			c.lastReconnectReason = lastReconnectReason
-			return nil
-		})
-}
-
-func protocol(protocol string) Option {
+func XmidtProtocolOpt(protocol string) Option {
 	return optionFunc(
 		func(c *ConveyHeaderProvider) error {
 			c.protocol = protocol
@@ -59,7 +96,7 @@ func protocol(protocol string) Option {
 		})
 }
 
-func bootTime(bootTime string) Option {
+func BootTimeOpt(bootTime string) Option {
 	return optionFunc(
 		func(c *ConveyHeaderProvider) error {
 			c.bootTime = bootTime
@@ -67,10 +104,10 @@ func bootTime(bootTime string) Option {
 		})
 }
 
-func bootTimeRetryDelay(bootTimeRetryDelay string) Option {
+func BootRetryWaitOpt(bootTimeRetryDelay time.Duration) Option {
 	return optionFunc(
 		func(c *ConveyHeaderProvider) error {
-			c.bootTimeRetryDelay = bootTimeRetryDelay
+			c.bootTimeRetryDelay = fmt.Sprint(bootTimeRetryDelay.Milliseconds())
 			return nil
 		})
 }

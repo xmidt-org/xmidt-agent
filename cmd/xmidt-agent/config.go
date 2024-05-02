@@ -39,6 +39,7 @@ type Config struct {
 	MockTr181        MockTr181
 	Externals        []configuration.External
 	XmidtAgentCrud   XmidtAgentCrud
+	Convey           Convey
 }
 
 type Pubsub struct {
@@ -200,6 +201,10 @@ type MockTr181 struct {
 	FilePath    string
 	Enabled     bool
 	ServiceName string
+}
+
+type Convey struct {
+	Fields []string
 }
 
 // Collect and process the configuration files and env vars and
@@ -373,5 +378,8 @@ var defaultConfig = Config{
 	},
 	XmidtAgentCrud: XmidtAgentCrud{
 		ServiceName: "xmidt_agent",
+	},
+	Convey: Convey{
+		Fields: []string{"fw-name", "hw-model", "hw-manufacturer", "hw-serial-number", "hw-last-reboot-reason", "webpa-protocol", "boot-time", "boot-time-retry-wait", "webpa-interface-used", "interfaces-available"},
 	},
 }
