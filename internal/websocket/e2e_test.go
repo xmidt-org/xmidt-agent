@@ -432,7 +432,7 @@ func TestEndToEndPingTimeout(t *testing.T) {
 	// All disconnectErrs errors should be caused by context.DeadlineExceeded
 	for _, err := range disconnectErrs {
 		if errors.Is(err, net.ErrClosed) {
-			// net.ErrClosed may occur during testing, don't count them
+			// net.ErrClosed may occur during tests, don't count them
 			continue
 		}
 
