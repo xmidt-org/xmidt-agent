@@ -13,10 +13,10 @@ import (
 
 var (
 	ErrInvalidInput = errors.New("invalid input")
-	validFields     = []string{Firmware, Hardware, SerialNumber, Manufacturer, LastRebootReason, Protocol, BootTime, BootTimeRetryDelay, InterfacesAvailable}
+	validFields     = []string{Firmware, Hardware, SerialNumber, Manufacturer, LastRebootReason, Protocol, BootTime, BootTimeRetryDelay, InterfaceUsed, InterfacesAvailable}
 )
 
-func NetworkServiceOpt(networkService *net.NetworkService) Option {
+func NetworkServiceOpt(networkService net.NetworkServicer) Option {
 	return optionFunc(
 		func(c *ConveyHeaderProvider) error {
 			if networkService == nil {
@@ -107,7 +107,7 @@ func BootTimeOpt(bootTime string) Option {
 func BootRetryWaitOpt(bootTimeRetryDelay time.Duration) Option {
 	return optionFunc(
 		func(c *ConveyHeaderProvider) error {
-			c.bootTimeRetryDelay = fmt.Sprint(bootTimeRetryDelay.Milliseconds())
+			c.bootTimeRetryDelay = fmt.Sprint(bootTimeRetryDelay.Seconds())
 			return nil
 		})
 }

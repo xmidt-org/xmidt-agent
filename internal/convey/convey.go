@@ -36,7 +36,7 @@ const (
 )
 
 type ConveyHeaderProvider struct {
-	networkService     *net.NetworkService
+	networkService     net.NetworkServicer
 	fields             []string
 	firmware           string
 	hardware           string
@@ -96,4 +96,8 @@ func (c *ConveyHeaderProvider) GetConveyHeader() map[string]interface{} {
 	}
 
 	return header
+}
+
+func (c *ConveyHeaderProvider) Decorator() {
+
 }

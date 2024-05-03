@@ -7,16 +7,16 @@ import (
 	"net"
 )
 
-type NetworkWrapper struct{}
+type NetworkWrap struct{}
 
-type NetworkInterface interface {
+type NetworkWrapper interface {
 	Interfaces() ([]net.Interface, error)
 }
 
-func NewNetworkWrapper() NetworkInterface {
-	return new(NetworkService)
+func NewNetworkWrapper() NetworkWrapper {
+	return new(NetworkWrap)
 }
 
-func (n *NetworkService) Interfaces() ([]net.Interface, error) {
+func (n *NetworkWrap) Interfaces() ([]net.Interface, error) {
 	return net.Interfaces()
 }
