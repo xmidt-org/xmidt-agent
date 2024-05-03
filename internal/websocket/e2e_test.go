@@ -414,7 +414,7 @@ func TestEndToEndPingTimeout(t *testing.T) {
 		ws.CredentialsDecorator(func(h http.Header) error {
 			return nil
 		}),
-		// Trigger a ping timeout
+		// Triggers ping timeouts
 		ws.PingTimeout(time.Nanosecond),
 	)
 	require.NoError(err)
