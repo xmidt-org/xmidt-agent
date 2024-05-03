@@ -57,6 +57,16 @@ func validateCredentialsDecorator() Option {
 		})
 }
 
+func validateConveyDecorator() Option {
+	return optionFunc(
+		func(ws *Websocket) error {
+			if ws.conveyDecorator == nil {
+				return fmt.Errorf("%w: nil ConveyDecorator", ErrMisconfiguredWS)
+			}
+			return nil
+		})
+}
+
 func validateNowFunc() Option {
 	return optionFunc(
 		func(ws *Websocket) error {

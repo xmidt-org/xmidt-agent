@@ -4,7 +4,10 @@
 package convey
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
+
 	"github.com/xmidt-org/xmidt-agent/internal/net"
 )
 
@@ -98,6 +101,15 @@ func (c *ConveyHeaderProvider) GetConveyHeader() map[string]interface{} {
 	return header
 }
 
-func (c *ConveyHeaderProvider) Decorator() {
+func (c *ConveyHeaderProvider) Decorate(headers http.Header) error {
+	header := c.GetConveyHeader()
+	headerBytes, err := json.Marshal(header)
+	if err != nil {
+		// use eventor to log
+		fmt.Printf("error marshaling convey header %s", err)
+	}
 
+	headers.Set(HeaderName, string(headerBytes))
+
+	return nil
 }

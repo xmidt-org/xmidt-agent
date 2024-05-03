@@ -4,6 +4,7 @@
 package convey
 
 import (
+	"net/http"
 	"testing"
 	"time"
 
@@ -86,4 +87,17 @@ func (suite *ConveySuite) TestGetConveyHeaderSubsetFields() {
 	suite.Nil(header["boot-time"])
 	suite.Nil(header["boot-time-retry-wait"])
 	suite.Nil(header["interfaces-available"])
+}
+
+func (suite *ConveySuite) TestDecorate() {
+	suite.mockNetworkService.On("GetInterfaceNames").Return([]string{"docsis"}, nil)
+
+	req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
+	suite.NoError(err)
+	suite.NotNil(req)
+
+	err = suite.conveyHeaderProvider.Decorate(req.Header)
+	suite.NoError(err)
+
+	suite.NotNil(req.Header.Get(HeaderName))
 }

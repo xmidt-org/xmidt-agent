@@ -54,6 +54,10 @@ func TestNew(t *testing.T) {
 					h.Add("Credentials-Decorator", "some value")
 					return nil
 				}),
+				ConveyDecorator(func(h http.Header) error {
+					h.Add("Convey-Decorator", "some value")
+					return nil
+				}),
 				NowFunc(time.Now),
 				RetryPolicy(retry.Config{}),
 			),
@@ -68,9 +72,11 @@ func TestNew(t *testing.T) {
 				// Headers
 				assert.NotNil(c.additionalHeaders)
 				assert.NoError(c.credDecorator(c.additionalHeaders))
+				assert.NoError(c.conveyDecorator(c.additionalHeaders))
 				assert.Equal("mac:112233445566", c.additionalHeaders.Get("X-Webpa-Device-Name"))
 				assert.Equal("vAlUE", c.additionalHeaders.Get("Some-Other-Header"))
 				assert.Equal("some value", c.additionalHeaders.Get("Credentials-Decorator"))
+				assert.Equal("some value", c.additionalHeaders.Get("Convey-Decorator"))
 			},
 		},
 
