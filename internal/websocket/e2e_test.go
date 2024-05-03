@@ -429,7 +429,7 @@ func TestEndToEndPingTimeout(t *testing.T) {
 	assert.Greater(disconnectCnt.Load(), int64(0))
 	// disconnectErrs should only contain
 	assert.NotEmpty(disconnectErrs)
-	// All disconnectErrs errors should be caused by context.DeadlineExceeded
+	// disconnectErrs should only contain context.DeadlineExceeded errors
 	for _, err := range disconnectErrs {
 		if errors.Is(err, net.ErrClosed) {
 			// net.ErrClosed may occur during tests, don't count them
