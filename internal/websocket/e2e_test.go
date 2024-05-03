@@ -427,7 +427,6 @@ func TestEndToEndPingTimeout(t *testing.T) {
 	assert.Equal(int64(0), heartbeatCnt.Load())
 	assert.Greater(connectCnt.Load(), int64(0))
 	assert.Greater(disconnectCnt.Load(), int64(0))
-	// disconnectErrs should only contain
 	assert.NotEmpty(disconnectErrs)
 	// disconnectErrs should only contain context.DeadlineExceeded errors
 	for _, err := range disconnectErrs {
