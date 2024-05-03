@@ -423,7 +423,7 @@ func TestEndToEndPingTimeout(t *testing.T) {
 	got.Start()
 	time.Sleep(500 * time.Millisecond)
 	got.Stop()
-	// heartbeatCnt should be zero due to a ping timeout
+	// heartbeatCnt should be zero due ping timeouts
 	assert.Equal(int64(0), heartbeatCnt.Load())
 	assert.Greater(connectCnt.Load(), int64(0))
 	assert.Greater(disconnectCnt.Load(), int64(0))
