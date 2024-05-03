@@ -7,7 +7,7 @@ import (
 	"github.com/xmidt-org/xmidt-agent/internal/net"
 )
 
-func provideNetworkService() *net.NetworkService {
+func provideNetworkService() net.NetworkServicer {
 	return &net.NetworkService{
 		N: net.NewNetworkWrapper(),
 	}

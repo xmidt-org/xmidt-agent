@@ -13,7 +13,7 @@ import (
 
 type conveyIn struct {
 	fx.In
-	NetworkService *net.NetworkService
+	NetworkService net.NetworkServicer
 	ID             Identity
 	Ops            OperationalState
 	Convey         Convey
