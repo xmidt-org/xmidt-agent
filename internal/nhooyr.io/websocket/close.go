@@ -156,6 +156,7 @@ func (c *Conn) writeClose(code StatusCode, reason string) error {
 	if ce.Code != StatusNoStatusRcvd {
 		p, marshalErr = ce.bytes()
 	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
