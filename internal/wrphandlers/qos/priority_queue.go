@@ -16,6 +16,8 @@ type priorityQueue struct {
 	queue []wrp.Message
 	// maxQueueSize is the allowable max size of the queue based on the sum of all queued wrp message's payloads
 	maxQueueSize int
+	// MaxMessageBytes is the largest allowable wrp message payload.
+	maxMessageBytes int
 }
 
 // Dequeue returns the next highest priority message.
@@ -32,8 +34,8 @@ func (pq *priorityQueue) Dequeue() (wrp.Message, bool) {
 
 // Enqueue queues the given message.
 func (pq *priorityQueue) Enqueue(msg wrp.Message) {
-	// Check whether msg would already violate maxQueueSize.
-	if len(msg.Payload) > pq.maxQueueSize {
+	// Check whether msg violates maxMessageBytes.
+	if len(msg.Payload) > pq.maxMessageBytes {
 		return
 	}
 

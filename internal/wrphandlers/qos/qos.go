@@ -38,6 +38,8 @@ type Handler struct {
 	queue chan wrp.Message
 	// maxQueueSize is the allowable max size of the qos' priority queue, based on the sum of all queued wrp message's payload
 	maxQueueSize int
+	// MaxMessageBytes is the largest allowable wrp message payload.
+	maxMessageBytes int
 
 	lock   sync.Mutex
 	ctx    context.Context
@@ -53,8 +55,10 @@ func New(next wrpkit.Handler, opts ...Option) (h *Handler, err error) {
 		return nil, ErrInvalidInput
 	}
 
+	opts = append(opts, validateQueueConstraints())
+
 	h = &Handler{
-		next: handleWRPWrapper(next),
+		next: curryWRPHandler(next),
 	}
 
 	var errs error
@@ -62,9 +66,12 @@ func New(next wrpkit.Handler, opts ...Option) (h *Handler, err error) {
 		if opt != nil {
 			if err := opt.apply(h); err != nil {
 				errs = errors.Join(errs, err)
-				h = nil
 			}
 		}
+	}
+
+	if errs != nil {
+		h = nil
 	}
 
 	return h, errs
@@ -81,7 +88,7 @@ func (h *Handler) Start() error {
 	h.queue = make(chan wrp.Message)
 	// h.cancel() stops serviceQOS by closing its `done` chan.
 	h.ctx, h.cancel = context.WithCancel(context.Background())
-	go serviceQOS(h.ctx.Done(), h.queue, h.maxQueueSize, h.next)
+	go serviceQOS(h.ctx.Done(), h.queue, h.maxQueueSize, h.maxMessageBytes, h.next)
 
 	return nil
 }
@@ -117,7 +124,7 @@ func (h *Handler) HandleWrp(msg wrp.Message) error {
 	return nil
 }
 
-func handleWRPWrapper(next wrpkit.Handler) serviceQOSHandler {
+func curryWRPHandler(next wrpkit.Handler) serviceQOSHandler {
 	return func(msg wrp.Message) (<-chan wrp.Message, <-chan struct{}) {
 		ready := make(chan struct{})
 		failedMsg := make(chan wrp.Message, 1)
@@ -141,9 +148,9 @@ func handleWRPWrapper(next wrpkit.Handler) serviceQOSHandler {
 // where the highest QOS messages are prioritized.
 // serviceQOS starts when Handler.Start() is called.
 // serviceQOS stops when Handler.Stop() is called, closing its `done` chan.
-func serviceQOS(done <-chan struct{}, queue <-chan wrp.Message, maxQueueSize int, handleWRP serviceQOSHandler) {
+func serviceQOS(done <-chan struct{}, queue <-chan wrp.Message, maxQueueSize, maxMessageBytes int, handleWRP serviceQOSHandler) {
 	// create and manage the priority queue
-	pq := priorityQueue{maxQueueSize: maxQueueSize}
+	pq := priorityQueue{maxQueueSize: maxQueueSize, maxMessageBytes: maxMessageBytes}
 	var (
 		// Signaling channel from the handleWRP.
 		ready <-chan struct{}

@@ -43,8 +43,10 @@ type Config struct {
 }
 
 type QOS struct {
-	// MaxQueueSize is the allowable max size of the qos' priority queue, based on the sum of all queued wrp message's payload
+	// MaxQueueSize is the allowable max size of the qos' priority queue, based on the sum of all queued wrp message's payload.
 	MaxQueueSize int
+	// MaxMessageBytes is the largest allowable wrp message payload.
+	MaxMessageBytes int64
 }
 
 type Pubsub struct {
@@ -381,6 +383,7 @@ var defaultConfig = Config{
 		ServiceName: "xmidt_agent",
 	},
 	QOS: QOS{
-		MaxQueueSize: 1 * 1024 * 1024, // 1MB max/queue,
+		MaxQueueSize:    1 * 1024 * 1024, // 1MB max/queue,
+		MaxMessageBytes: 256 * 1024,      // 256 KB
 	},
 }

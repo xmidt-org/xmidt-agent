@@ -30,8 +30,9 @@ func TestHandler_HandleWrp(t *testing.T) {
 	)
 
 	tests := []struct {
-		description  string
-		maxQueueSize int
+		description     string
+		maxQueueSize    int
+		maxMessageBytes int
 		// int64 required for nextCallCount atomic.Int64 comparison
 		nextCallCount        int64
 		next                 wrpkit.Handler
@@ -43,9 +44,10 @@ func TestHandler_HandleWrp(t *testing.T) {
 	}{
 		// success cases
 		{
-			description:   "enqueued and delivered message",
-			maxQueueSize:  100,
-			nextCallCount: 1,
+			description:     "enqueued and delivered message",
+			maxQueueSize:    100,
+			maxMessageBytes: 50,
+			nextCallCount:   1,
 			next: wrpkit.HandlerFunc(func(wrp.Message) error {
 				nextCallCount.Add(1)
 
@@ -53,9 +55,10 @@ func TestHandler_HandleWrp(t *testing.T) {
 			}),
 		},
 		{
-			description:   "re-enqueue message that failed its delivery",
-			maxQueueSize:  100,
-			nextCallCount: 2,
+			description:     "re-enqueue message that failed its delivery",
+			maxQueueSize:    100,
+			maxMessageBytes: 50,
+			nextCallCount:   2,
 			next: wrpkit.HandlerFunc(func(wrp.Message) error {
 				nextCallCount.Add(1)
 				if nextCallCount.Load() < 2 {
@@ -68,9 +71,10 @@ func TestHandler_HandleWrp(t *testing.T) {
 			failDeliveryOnce: true,
 		},
 		{
-			description:   "queue messages while message delivery is blocked",
-			maxQueueSize:  100,
-			nextCallCount: 0,
+			description:     "queue messages while message delivery is blocked",
+			maxQueueSize:    100,
+			maxMessageBytes: 50,
+			nextCallCount:   0,
 			next: wrpkit.HandlerFunc(func(wrp.Message) error {
 				// halt qos message delivery
 				time.Sleep(1 * time.Second)
@@ -80,9 +84,21 @@ func TestHandler_HandleWrp(t *testing.T) {
 			shouldHalt: true,
 		},
 		{
-			description:   "zero MaxQueueSize option value",
-			maxQueueSize:  0,
-			nextCallCount: 1,
+			description:     "zero MaxQueueSize option value",
+			maxQueueSize:    0,
+			maxMessageBytes: 50,
+			nextCallCount:   1,
+			next: wrpkit.HandlerFunc(func(wrp.Message) error {
+				nextCallCount.Add(1)
+
+				return nil
+			}),
+		},
+		{
+			description:     "zero MaxMessageBytes option value",
+			maxQueueSize:    qos.DefaultMaxQueueSize,
+			maxMessageBytes: 0,
+			nextCallCount:   1,
 			next: wrpkit.HandlerFunc(func(wrp.Message) error {
 				nextCallCount.Add(1)
 
@@ -91,13 +107,15 @@ func TestHandler_HandleWrp(t *testing.T) {
 		},
 		// failure cases
 		{
-			description:    "invalid inputs for qos.New",
-			maxQueueSize:   100,
-			expectedNewErr: qos.ErrInvalidInput,
+			description:     "invalid inputs for qos.New",
+			maxQueueSize:    100,
+			maxMessageBytes: 50,
+			expectedNewErr:  qos.ErrInvalidInput,
 		},
 		{
-			description:  "negative MaxQueueSize option value",
-			maxQueueSize: -1,
+			description:     "negative MaxQueueSize option value",
+			maxQueueSize:    -1,
+			maxMessageBytes: 50,
 			next: wrpkit.HandlerFunc(func(wrp.Message) error {
 				nextCallCount.Add(1)
 
@@ -106,9 +124,21 @@ func TestHandler_HandleWrp(t *testing.T) {
 			expectedNewErr: qos.ErrMisconfiguredQOS,
 		},
 		{
-			description:   "qos has stopped",
-			maxQueueSize:  100,
-			nextCallCount: 0,
+			description:     "negative MaxMessageBytes option value",
+			maxQueueSize:    100,
+			maxMessageBytes: -1,
+			next: wrpkit.HandlerFunc(func(wrp.Message) error {
+				nextCallCount.Add(1)
+
+				return nil
+			}),
+			expectedNewErr: qos.ErrMisconfiguredQOS,
+		},
+		{
+			description:     "qos has stopped",
+			maxQueueSize:    100,
+			maxMessageBytes: 50,
+			nextCallCount:   0,
 			next: wrpkit.HandlerFunc(func(wrp.Message) error {
 				nextCallCount.Add(1)
 
@@ -123,7 +153,7 @@ func TestHandler_HandleWrp(t *testing.T) {
 			assert := assert.New(t)
 			require := require.New(t)
 
-			h, err := qos.New(tc.next, qos.MaxQueueSize(tc.maxQueueSize))
+			h, err := qos.New(tc.next, qos.MaxQueueSize(tc.maxQueueSize), qos.MaxMessageBytes(tc.maxMessageBytes))
 			if tc.expectedNewErr != nil {
 				assert.ErrorIs(err, tc.expectedNewErr)
 				assert.Nil(h)
