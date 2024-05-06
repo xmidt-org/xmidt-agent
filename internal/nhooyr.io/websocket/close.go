@@ -156,8 +156,10 @@ func (c *Conn) writeClose(code StatusCode, reason string) error {
 	if ce.Code != StatusNoStatusRcvd {
 		p, marshalErr = ce.bytes()
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
 
-	writeErr := c.writeControl(context.Background(), opClose, p)
+	writeErr := c.writeControl(ctx, opClose, p)
 	if CloseStatus(writeErr) != -1 {
 		// Not a real error if it's due to a close frame being received.
 		writeErr = nil
