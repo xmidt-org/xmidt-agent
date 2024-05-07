@@ -64,7 +64,7 @@ type qosIn struct {
 func provideQOSHandler(in qosIn) (*qos.Handler, error) {
 	return qos.New(
 		in.WS,
-		qos.MaxQueueSize(in.QOS.MaxQueueSize),
+		qos.MaxQueueBytes(in.QOS.MaxQueueBytes),
 		qos.MaxMessageBytes(in.QOS.MaxMessageBytes),
 	)
 }

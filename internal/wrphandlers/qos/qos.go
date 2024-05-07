@@ -35,8 +35,8 @@ type Handler struct {
 	next wrpkit.Handler
 	// queue for wrp messages, ingested by serviceQOS
 	queue chan wrp.Message
-	// maxQueueSize is the allowable max size of the qos' priority queue, based on the sum of all queued wrp message's payload
-	maxQueueSize int
+	// maxQueueBytes is the allowable max size of the qos' priority queue, based on the sum of all queued wrp message's payload
+	maxQueueBytes int
 	// MaxMessageBytes is the largest allowable wrp message payload.
 	maxMessageBytes int
 
@@ -47,31 +47,31 @@ type Handler struct {
 // handler that will be called and monitored for errors.
 // Note, once Handler.Stop is called, any calls to Handler.HandleWrp will result in
 // an ErrQOSHasShutdown error
-func New(next wrpkit.Handler, opts ...Option) (h *Handler, err error) {
+func New(next wrpkit.Handler, opts ...Option) (*Handler, error) {
 	if next == nil {
 		return nil, ErrInvalidInput
 	}
 
 	opts = append(opts, validateQueueConstraints())
 
-	h = &Handler{
+	h := Handler{
 		next: next,
 	}
 
 	var errs error
 	for _, opt := range opts {
 		if opt != nil {
-			if err := opt.apply(h); err != nil {
+			if err := opt.apply(&h); err != nil {
 				errs = errors.Join(errs, err)
 			}
 		}
 	}
 
 	if errs != nil {
-		h = nil
+		return nil, errs
 	}
 
-	return h, errs
+	return &h, errs
 }
 
 func (h *Handler) Start() {
@@ -119,20 +119,17 @@ func (h *Handler) serviceQOS() {
 		ready <-chan struct{}
 		// Channel for failed deliveries, re-enqueue message.
 		failedMsg <-chan wrp.Message
+		queue     <-chan wrp.Message
 	)
 
 	// create and manage the priority queue
-	pq := priorityQueue{maxQueueSize: h.maxQueueSize, maxMessageBytes: h.maxMessageBytes}
+	pq := priorityQueue{maxQueueBytes: h.maxQueueBytes, maxMessageBytes: h.maxMessageBytes}
 	// handleWRP is promise pattern function
 	handleWRP := curryWRPHandler(h.next)
 
 	h.lock.Lock()
-	queue := h.queue
+	queue = h.queue
 	h.lock.Unlock()
-
-	if queue == nil {
-		return
-	}
 
 	for {
 		select {

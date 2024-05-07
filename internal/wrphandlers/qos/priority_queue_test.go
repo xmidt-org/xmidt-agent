@@ -79,7 +79,7 @@ func testEnqueueDequeue(t *testing.T) {
 	tests := []struct {
 		description             string
 		messages                []wrp.Message
-		maxQueueSize            int
+		maxQueueBytes           int
 		maxMessageBytes         int
 		expectedQueueSize       int
 		expectedDequeueSequence []wrp.Message
@@ -95,42 +95,42 @@ func testEnqueueDequeue(t *testing.T) {
 				emptyLowQOSMsg,
 				emptyLowQOSMsg,
 				emptyLowQOSMsg},
-			maxQueueSize:      len(smallLowQOSMsg.Payload),
+			maxQueueBytes:     len(smallLowQOSMsg.Payload),
 			maxMessageBytes:   len(smallLowQOSMsg.Payload),
 			expectedQueueSize: 5,
 		},
 		{
 			description:       "message too large with an empty queue",
 			messages:          []wrp.Message{largeCriticalQOSMsg},
-			maxQueueSize:      len(largeCriticalQOSMsg.Payload),
+			maxQueueBytes:     len(largeCriticalQOSMsg.Payload),
 			maxMessageBytes:   len(largeCriticalQOSMsg.Payload) - 1,
 			expectedQueueSize: 0,
 		},
 		{
 			description:       "message too large with a nonempty queue",
 			messages:          []wrp.Message{largeCriticalQOSMsg, largeCriticalQOSMsg},
-			maxQueueSize:      len(largeCriticalQOSMsg.Payload),
+			maxQueueBytes:     len(largeCriticalQOSMsg.Payload),
 			maxMessageBytes:   len(largeCriticalQOSMsg.Payload),
 			expectedQueueSize: 1,
 		},
 		{
 			description:       "remove some low priority messages to fit a higher priority message",
 			messages:          []wrp.Message{mediumMediumQosMsg, mediumMediumQosMsg, mediumMediumQosMsg, largeCriticalQOSMsg},
-			maxQueueSize:      len(mediumMediumQosMsg.Payload) * 3,
+			maxQueueBytes:     len(mediumMediumQosMsg.Payload) * 3,
 			maxMessageBytes:   len(largeCriticalQOSMsg.Payload),
 			expectedQueueSize: 2,
 		},
 		{
 			description:       "remove all low priority messages to fit a higher priority message",
 			messages:          []wrp.Message{smallLowQOSMsg, smallLowQOSMsg, smallLowQOSMsg, smallLowQOSMsg, largeCriticalQOSMsg},
-			maxQueueSize:      len(largeCriticalQOSMsg.Payload),
+			maxQueueBytes:     len(largeCriticalQOSMsg.Payload),
 			maxMessageBytes:   len(largeCriticalQOSMsg.Payload),
 			expectedQueueSize: 1,
 		},
 		{
 			description:             "dequeue all messages from highest to lowest priority",
 			messages:                enqueueSequenceTest,
-			maxQueueSize:            queueSizeSequenceTest,
+			maxQueueBytes:           queueSizeSequenceTest,
 			maxMessageBytes:         len(largeCriticalQOSMsg.Payload),
 			expectedQueueSize:       len(enqueueSequenceTest),
 			expectedDequeueSequence: dequeueSequenceTest,
@@ -140,7 +140,7 @@ func testEnqueueDequeue(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			assert := assert.New(t)
 			require := require.New(t)
-			pq := priorityQueue{maxQueueSize: tc.maxQueueSize, maxMessageBytes: tc.maxMessageBytes}
+			pq := priorityQueue{maxQueueBytes: tc.maxQueueBytes, maxMessageBytes: tc.maxMessageBytes}
 			for _, msg := range tc.messages {
 				pq.Enqueue(msg)
 			}

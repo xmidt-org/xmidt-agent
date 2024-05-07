@@ -5,17 +5,21 @@ package qos
 
 import (
 	"container/heap"
+	"errors"
+	"fmt"
 
 	"github.com/xmidt-org/wrp-go/v3"
 )
+
+var ErrMaxMessageBytes = errors.New("wrp message payload exceeds maxMessageBytes")
 
 // priorityQueue implements heap.Interface and holds wrp Message, using wrp.QOSValue as its priority.
 // https://xmidt.io/docs/wrp/basics/#qos-description-qos
 type priorityQueue struct {
 	// queue for wrp messages, ingested by serviceQOS
 	queue []wrp.Message
-	// maxQueueSize is the allowable max size of the queue based on the sum of all queued wrp message's payloads
-	maxQueueSize int
+	// maxQueueBytes is the allowable max size of the queue based on the sum of all queued wrp message's payloads
+	maxQueueBytes int
 	// MaxMessageBytes is the largest allowable wrp message payload.
 	maxMessageBytes int
 	// size is the sum of all queued wrp message's payloads
@@ -35,19 +39,17 @@ func (pq *priorityQueue) Dequeue() (wrp.Message, bool) {
 }
 
 // Enqueue queues the given message.
-func (pq *priorityQueue) Enqueue(msg wrp.Message) {
+func (pq *priorityQueue) Enqueue(msg wrp.Message) error {
 	// Check whether msg violates maxMessageBytes.
 	if len(msg.Payload) > pq.maxMessageBytes {
-		return
+		return fmt.Errorf("%w: %v", ErrMaxMessageBytes, pq.maxMessageBytes)
 	}
 
-	// Check whether enqueuing msg would violate maxQueueSize.
-	// If it does, then drop a message.
-	// Repeat until the queue no longer violates maxQueueSize.
+	// Enqueue the message and then resize until the queue no longer violates maxQueueBytes.
+	heap.Push(pq, msg)
 	for {
-		total := pq.size + len(msg.Payload)
 		// note, total < 0 checks for an overflow
-		if !(total > pq.maxQueueSize || total < 0) || pq.Len() == 0 {
+		if !(pq.size > pq.maxQueueBytes || pq.size < 0) || pq.Len() == 0 {
 			break
 		}
 
@@ -56,7 +58,7 @@ func (pq *priorityQueue) Enqueue(msg wrp.Message) {
 		pq.drop()
 	}
 
-	heap.Push(pq, msg)
+	return nil
 }
 
 func (pq *priorityQueue) drop() {

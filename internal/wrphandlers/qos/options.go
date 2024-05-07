@@ -8,22 +8,22 @@ import (
 )
 
 const (
-	DefaultMaxQueueSize    = 1 * 1024 * 1024 // 1MB max/queue
+	DefaultMaxQueueBytes   = 1 * 1024 * 1024 // 1MB max/queue
 	DefaultMaxMessageBytes = 256 * 1024      // 256 KB
 )
 
-// MaxQueueSize is the allowable max size of the qos' priority queue, based on the sum of all queued wrp message's payload.
+// MaxQueueBytes is the allowable max size of the qos' priority queue, based on the sum of all queued wrp message's payload.
 // Note, the default zero behavior is a queue with a 1MB size constraint.
-func MaxQueueSize(s int) Option {
+func MaxQueueBytes(s int) Option {
 	return optionFunc(
 		func(h *Handler) error {
 			if s < 0 {
-				return fmt.Errorf("%w: negative MaxQueueSize", ErrMisconfiguredQOS)
+				return fmt.Errorf("%w: negative MaxQueueBytes", ErrMisconfiguredQOS)
 			} else if s == 0 {
-				s = DefaultMaxQueueSize
+				s = DefaultMaxQueueBytes
 			}
 
-			h.maxQueueSize = s
+			h.maxQueueBytes = s
 
 			return nil
 		})
