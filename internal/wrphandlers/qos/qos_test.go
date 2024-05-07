@@ -165,7 +165,6 @@ func TestHandler_HandleWrp(t *testing.T) {
 			}
 
 			h.Start()
-			time.Sleep(time.Millisecond)
 			// Allow multiple calls to Start.
 			h.Start()
 
