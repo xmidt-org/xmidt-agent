@@ -14,7 +14,6 @@ import (
 	"github.com/xmidt-org/xmidt-agent/internal/jwtxt"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
-	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
@@ -36,7 +35,6 @@ type wsIn struct {
 
 type wsOut struct {
 	fx.Out
-	WSHandler               wrpkit.Handler
 	WS                      *websocket.Websocket
 	Egress                  websocket.Egress
 	WRPHandlerAdapterCancel event.CancelFunc
