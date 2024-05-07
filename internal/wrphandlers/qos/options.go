@@ -14,7 +14,7 @@ const (
 
 // MaxQueueBytes is the allowable max size of the qos' priority queue, based on the sum of all queued wrp message's payload.
 // Note, the default zero behavior is a queue with a 1MB size constraint.
-func MaxQueueBytes(s int) Option {
+func MaxQueueBytes(s int64) Option {
 	return optionFunc(
 		func(h *Handler) error {
 			if s < 0 {

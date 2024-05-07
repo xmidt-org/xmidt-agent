@@ -140,7 +140,7 @@ func testEnqueueDequeue(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			assert := assert.New(t)
 			require := require.New(t)
-			pq := priorityQueue{maxQueueBytes: tc.maxQueueBytes, maxMessageBytes: tc.maxMessageBytes}
+			pq := priorityQueue{maxQueueBytes: int64(tc.maxQueueBytes), maxMessageBytes: tc.maxMessageBytes}
 			for _, msg := range tc.messages {
 				pq.Enqueue(msg)
 			}
@@ -169,10 +169,10 @@ func testSize(t *testing.T) {
 	}
 	pq := priorityQueue{}
 
-	assert.Equal(0, pq.size)
+	assert.Equal(int64(0), pq.sizeBytes)
 	pq.Push(msg)
 	pq.Push(msg)
-	assert.Equal(len(msg.Payload)*2, pq.size)
+	assert.Equal(int64(len(msg.Payload)*2), pq.sizeBytes)
 }
 func testLen(t *testing.T) {
 	assert := assert.New(t)

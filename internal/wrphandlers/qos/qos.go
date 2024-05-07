@@ -28,15 +28,13 @@ func (f optionFunc) apply(c *Handler) error {
 	return f(c)
 }
 
-type promiseWRPHandler func(wrp.Message) (<-chan wrp.Message, <-chan struct{})
-
-// Handler queues incoming messages and sends them to the next wrphandler
+// Handler queues incoming messages and sends them to the next wrpkit.Handler
 type Handler struct {
 	next wrpkit.Handler
 	// queue for wrp messages, ingested by serviceQOS
 	queue chan wrp.Message
 	// maxQueueBytes is the allowable max size of the qos' priority queue, based on the sum of all queued wrp message's payload
-	maxQueueBytes int
+	maxQueueBytes int64
 	// MaxMessageBytes is the largest allowable wrp message payload.
 	maxMessageBytes int
 
@@ -80,7 +78,7 @@ func (h *Handler) Start() {
 
 	if h.queue == nil {
 		h.queue = make(chan wrp.Message)
-		go h.serviceQOS()
+		go h.serviceQOS(h.queue)
 	}
 }
 
@@ -111,79 +109,62 @@ func (h *Handler) HandleWrp(msg wrp.Message) error {
 
 // serviceQOS is a long running goroutine that sends as many queued messages as possible,
 // where the highest QOS messages are prioritized.
-// serviceQOS starts when Handler.Start().
-// serviceQOS stops when Handler.Stop() is called.
-func (h *Handler) serviceQOS() {
+// Handler.Start starts serviceQOS.
+// Handler.Stop stops serviceQOS.
+func (h *Handler) serviceQOS(queue <-chan wrp.Message) {
 	var (
 		// Signaling channel from the handleWRP.
 		ready <-chan struct{}
 		// Channel for failed deliveries, re-enqueue message.
 		failedMsg <-chan wrp.Message
-		queue     <-chan wrp.Message
 	)
 
 	// create and manage the priority queue
 	pq := priorityQueue{maxQueueBytes: h.maxQueueBytes, maxMessageBytes: h.maxMessageBytes}
-	// handleWRP is promise pattern function
-	handleWRP := curryWRPHandler(h.next)
-
-	h.lock.Lock()
-	queue = h.queue
-	h.lock.Unlock()
-
 	for {
 		select {
 		case msg, ok := <-queue:
 			if !ok {
-				// Don't enqueue an empty wrp.Message{}
-				// Handler.Stop() has been called, both `queue` and `done` are closed.
+				// Handler.Stop has been called.
 				return
 			}
 
-			pq.Enqueue(msg)
-			if ready != nil {
-				// Previous handleWRP call has not finished, do nothing.
-			} else if top, ok := pq.Dequeue(); ok {
-				failedMsg, ready = handleWRP(top)
-			}
+			// ErrMaxMessageBytes errrors are ignored.
+			_ = pq.Enqueue(msg)
 		case <-ready:
-			// Previous handleWRP call has finished, check whether handleWRP
-			// had successfully delivered its message or not.
-			// If it failed, then failedMsg will contain the failed message.
-			// Otherwise failedMsg is closed.
+			// Previous Handler.wrpHandler has finished, check whether it
+			// was successful or not.
 			if msg, ok := <-failedMsg; ok {
 				// Delivery failed, re-enqueue message and try again later.
-				pq.Enqueue(msg)
+				// ErrMaxMessageBytes errrors are ignored.
+				_ = pq.Enqueue(msg)
 			}
 
 			ready, failedMsg = nil, nil
-			if top, ok := pq.Dequeue(); ok {
-				failedMsg, ready = handleWRP(top)
-			}
+		}
+
+		if top, ok := pq.Dequeue(); ok {
+			failedMsg, ready = h.wrpHandler(top)
 		}
 	}
 }
 
-// curryWRPHandler takes a wrpkit Hanlder and returns a promise pattern function `promiseWRPHandler`.
-func curryWRPHandler(next wrpkit.Handler) promiseWRPHandler {
-	// The returned promise are the chans `ready` and `failedMsg`.
-	return func(msg wrp.Message) (<-chan wrp.Message, <-chan struct{}) {
-		ready := make(chan struct{})
-		failedMsg := make(chan wrp.Message, 1)
-		go func() {
-			defer close(ready)
-			defer close(failedMsg)
+// wrpHandler calls handler.next.HandleWrp to deliver incoming messages.
+// Returns a signaling channel indicating handler.next.HandleWrp is done
+// and a message channel for failed deliveries.
+func (h *Handler) wrpHandler(msg wrp.Message) (<-chan wrp.Message, <-chan struct{}) {
+	ready := make(chan struct{})
+	failedMsg := make(chan wrp.Message, 1)
+	go func() {
+		defer close(ready)
+		defer close(failedMsg)
 
-			if err := next.HandleWrp(msg); err != nil {
-				// Delivery failed, re-enqueue message and try again later.
-				failedMsg <- msg
-				// The err itself is ignored.
-			}
-		}()
+		if err := h.next.HandleWrp(msg); err != nil {
+			// Delivery failed, re-enqueue message and try again later.
+			failedMsg <- msg
+			// The err itself is ignored.
+		}
+	}()
 
-		// The promise is pending when `ready` is an open chan.
-		// The promise is settled (succeed or failed) when `ready` is a closed chan.
-		// If the promise failed then `failedMsg` will contained the failed msg, otherwise it'll be closed.
-		return failedMsg, ready
-	}
+	return failedMsg, ready
 }

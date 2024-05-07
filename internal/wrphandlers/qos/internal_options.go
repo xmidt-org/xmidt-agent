@@ -10,7 +10,7 @@ import (
 func validateQueueConstraints() Option {
 	return optionFunc(
 		func(h *Handler) error {
-			if h.maxMessageBytes > h.maxQueueBytes {
+			if int64(h.maxMessageBytes) > h.maxQueueBytes {
 				return fmt.Errorf("%w: MaxMessageBytes > MaxQueueBytes", ErrMisconfiguredQOS)
 			}
 

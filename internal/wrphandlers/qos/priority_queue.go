@@ -19,11 +19,12 @@ type priorityQueue struct {
 	// queue for wrp messages, ingested by serviceQOS
 	queue []wrp.Message
 	// maxQueueBytes is the allowable max size of the queue based on the sum of all queued wrp message's payloads
-	maxQueueBytes int
+	maxQueueBytes int64
 	// MaxMessageBytes is the largest allowable wrp message payload.
 	maxMessageBytes int
-	// size is the sum of all queued wrp message's payloads
-	size int
+	// sizeBytes is the sum of all queued wrp message's payloads.
+	// An int64 overflow is unlikely since that'll be over 9*10^18 bytes
+	sizeBytes int64
 }
 
 // Dequeue returns the next highest priority message.
@@ -45,20 +46,18 @@ func (pq *priorityQueue) Enqueue(msg wrp.Message) error {
 		return fmt.Errorf("%w: %v", ErrMaxMessageBytes, pq.maxMessageBytes)
 	}
 
-	// Enqueue the message and then resize until the queue no longer violates maxQueueBytes.
 	heap.Push(pq, msg)
-	for {
-		// note, total < 0 checks for an overflow
-		if !(pq.size > pq.maxQueueBytes || pq.size < 0) || pq.Len() == 0 {
-			break
-		}
+	pq.trim()
+	return nil
+}
 
-		// Note, `priorityQueue.drop()` does not drop the least prioritized queued message.
-		// i.e.: a high priority queued message may be drop instead of a lesser priority queued message.
+func (pq *priorityQueue) trim() {
+	// trim until the queue no longer violates maxQueueBytes.
+	for pq.sizeBytes > pq.maxQueueBytes {
+		// Note, priorityQueue.drop does not drop the least prioritized queued message.
+		// i.e.: a high priority queued message may be dropped instead of a lesser queued message.
 		pq.drop()
 	}
-
-	return nil
 }
 
 func (pq *priorityQueue) drop() {
@@ -79,7 +78,7 @@ func (pq *priorityQueue) Swap(i, j int) {
 
 func (pq *priorityQueue) Push(x any) {
 	item := x.(wrp.Message)
-	pq.size += len(item.Payload)
+	pq.sizeBytes += int64(len(item.Payload))
 	pq.queue = append(pq.queue, item)
 }
 
@@ -90,7 +89,7 @@ func (pq *priorityQueue) Pop() any {
 	}
 
 	item := pq.queue[last]
-	pq.size -= len(item.Payload)
+	pq.sizeBytes -= int64(len(item.Payload))
 	// avoid memory leak
 	pq.queue[last] = wrp.Message{}
 	pq.queue = pq.queue[0:last]

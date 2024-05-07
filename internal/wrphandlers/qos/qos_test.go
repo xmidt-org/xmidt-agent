@@ -153,7 +153,7 @@ func TestHandler_HandleWrp(t *testing.T) {
 			assert := assert.New(t)
 			require := require.New(t)
 
-			h, err := qos.New(tc.next, qos.MaxQueueBytes(tc.maxQueueBytes), qos.MaxMessageBytes(tc.maxMessageBytes))
+			h, err := qos.New(tc.next, qos.MaxQueueBytes(int64(tc.maxQueueBytes)), qos.MaxMessageBytes(tc.maxMessageBytes))
 			if tc.expectedNewErr != nil {
 				assert.ErrorIs(err, tc.expectedNewErr)
 				assert.Nil(h)
