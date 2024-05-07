@@ -18,7 +18,6 @@ type priorityQueue struct {
 	maxQueueSize int
 	// MaxMessageBytes is the largest allowable wrp message payload.
 	maxMessageBytes int
-
 	// size is the sum of all queued wrp message's payloads
 	size int
 }
