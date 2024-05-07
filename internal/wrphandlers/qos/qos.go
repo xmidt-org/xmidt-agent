@@ -45,7 +45,7 @@ type Handler struct {
 
 // New creates a new instance of the Handler struct.  The parameter next is the
 // handler that will be called and monitored for errors.
-// Note, once cancel is called, any calls to Handler.HandleWrp will result in
+// Note, once Handler.Stop is called, any calls to Handler.HandleWrp will result in
 // an ErrQOSHasShutdown error
 func New(next wrpkit.Handler, opts ...Option) (h *Handler, err error) {
 	if next == nil {
@@ -126,9 +126,17 @@ func (h *Handler) serviceQOS() {
 	// handleWRP is promise pattern function
 	handleWRP := curryWRPHandler(h.next)
 
+	h.lock.Lock()
+	queue := h.queue
+	h.lock.Unlock()
+
+	if queue == nil {
+		return
+	}
+
 	for {
 		select {
-		case msg, ok := <-h.queue:
+		case msg, ok := <-queue:
 			if !ok {
 				// Don't enqueue an empty wrp.Message{}
 				// Handler.Stop() has been called, both `queue` and `done` are closed.

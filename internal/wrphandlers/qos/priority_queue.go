@@ -42,7 +42,7 @@ func (pq *priorityQueue) Enqueue(msg wrp.Message) {
 	}
 
 	// Check whether enqueuing msg would violate maxQueueSize.
-	// If it does, then drop the least prioritized message.
+	// If it does, then drop a message.
 	// Repeat until the queue no longer violates maxQueueSize.
 	for {
 		total := pq.size + len(msg.Payload)
@@ -51,6 +51,8 @@ func (pq *priorityQueue) Enqueue(msg wrp.Message) {
 			break
 		}
 
+		// Note, `priorityQueue.drop()` does not drop the least prioritized queued message.
+		// i.e.: a high priority queued message may be drop instead of a lesser priority queued message.
 		pq.drop()
 	}
 
