@@ -65,6 +65,7 @@ func provideQOSHandler(in qosIn) (*qos.Handler, error) {
 	return qos.New(
 		in.WS,
 		qos.MaxQueueSize(in.QOS.MaxQueueSize),
+		qos.MaxMessageBytes(in.QOS.MaxMessageBytes),
 	)
 }
 

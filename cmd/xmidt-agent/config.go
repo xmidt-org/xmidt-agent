@@ -46,7 +46,7 @@ type QOS struct {
 	// MaxQueueSize is the allowable max size of the qos' priority queue, based on the sum of all queued wrp message's payload.
 	MaxQueueSize int
 	// MaxMessageBytes is the largest allowable wrp message payload.
-	MaxMessageBytes int64
+	MaxMessageBytes int
 }
 
 type Pubsub struct {

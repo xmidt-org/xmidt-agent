@@ -18,6 +18,9 @@ type priorityQueue struct {
 	maxQueueSize int
 	// MaxMessageBytes is the largest allowable wrp message payload.
 	maxMessageBytes int
+
+	// size is the sum of all queued wrp message's payloads
+	size int
 }
 
 // Dequeue returns the next highest priority message.
@@ -40,34 +43,23 @@ func (pq *priorityQueue) Enqueue(msg wrp.Message) {
 	}
 
 	// Check whether enqueuing msg would violate maxQueueSize.
-	// If it does, then determine whether to enqueue msg.
+	// If it does, then drop the least prioritized message.
 	// Repeat until the queue no longer violates maxQueueSize.
 	for {
-		total := pq.Size() + len(msg.Payload)
+		total := pq.size + len(msg.Payload)
 		// note, total < 0 checks for an overflow
 		if !(total > pq.maxQueueSize || total < 0) || pq.Len() == 0 {
 			break
 		}
 
-		// Determine whether msg is of lower priority than the least
-		// prioritized queued message `bottom`.
-		bottom := heap.Remove(pq, pq.Len()-1).(wrp.Message)
-		// if it is then keep bottom, otherwise discard leastMsg and queue msg (the latest)
-		if bottom.QualityOfService > msg.QualityOfService {
-			msg = bottom
-		}
+		pq.dropLeastPrioritized()
 	}
 
 	heap.Push(pq, msg)
 }
 
-func (pq *priorityQueue) Size() int {
-	var s int
-	for _, msg := range pq.queue {
-		s += len(msg.Payload)
-	}
-
-	return s
+func (pq *priorityQueue) dropLeastPrioritized() {
+	_ = heap.Remove(pq, pq.Len()-1).(wrp.Message)
 }
 
 // heap.Interface related implementations https://pkg.go.dev/container/heap#Interface
@@ -75,7 +67,9 @@ func (pq *priorityQueue) Size() int {
 func (pq *priorityQueue) Len() int { return len(pq.queue) }
 
 func (pq *priorityQueue) Less(i, j int) bool {
-	return pq.queue[i].QualityOfService > pq.queue[j].QualityOfService
+	m1 := pq.queue[i].QualityOfService
+	m2 := pq.queue[j].QualityOfService
+	return m1 > m2
 }
 
 func (pq *priorityQueue) Swap(i, j int) {
@@ -83,7 +77,9 @@ func (pq *priorityQueue) Swap(i, j int) {
 }
 
 func (pq *priorityQueue) Push(x any) {
-	pq.queue = append(pq.queue, x.(wrp.Message))
+	item := x.(wrp.Message)
+	pq.size += len(item.Payload)
+	pq.queue = append(pq.queue, item)
 }
 
 func (pq *priorityQueue) Pop() any {
@@ -93,6 +89,7 @@ func (pq *priorityQueue) Pop() any {
 	}
 
 	item := pq.queue[last]
+	pq.size -= len(item.Payload)
 	// avoid memory leak
 	pq.queue[last] = wrp.Message{}
 	pq.queue = pq.queue[0:last]

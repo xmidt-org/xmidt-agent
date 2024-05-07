@@ -4,7 +4,6 @@
 package qos
 
 import (
-	"context"
 	"errors"
 	"sync"
 
@@ -29,11 +28,11 @@ func (f optionFunc) apply(c *Handler) error {
 	return f(c)
 }
 
-type serviceQOSHandler func(wrp.Message) (<-chan wrp.Message, <-chan struct{})
+type promiseWRPHandler func(wrp.Message) (<-chan wrp.Message, <-chan struct{})
 
 // Handler queues incoming messages and sends them to the next wrphandler
 type Handler struct {
-	next serviceQOSHandler
+	next wrpkit.Handler
 	// queue for wrp messages, ingested by serviceQOS
 	queue chan wrp.Message
 	// maxQueueSize is the allowable max size of the qos' priority queue, based on the sum of all queued wrp message's payload
@@ -41,9 +40,7 @@ type Handler struct {
 	// MaxMessageBytes is the largest allowable wrp message payload.
 	maxMessageBytes int
 
-	lock   sync.Mutex
-	ctx    context.Context
-	cancel context.CancelFunc
+	lock sync.Mutex
 }
 
 // New creates a new instance of the Handler struct.  The parameter next is the
@@ -58,7 +55,7 @@ func New(next wrpkit.Handler, opts ...Option) (h *Handler, err error) {
 	opts = append(opts, validateQueueConstraints())
 
 	h = &Handler{
-		next: curryWRPHandler(next),
+		next: next,
 	}
 
 	var errs error
@@ -77,36 +74,24 @@ func New(next wrpkit.Handler, opts ...Option) (h *Handler, err error) {
 	return h, errs
 }
 
-func (h *Handler) Start() error {
+func (h *Handler) Start() {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	if h.ctx != nil {
-		return nil
+	if h.queue == nil {
+		h.queue = make(chan wrp.Message)
+		go h.serviceQOS()
 	}
-
-	h.queue = make(chan wrp.Message)
-	// h.cancel() stops serviceQOS by closing its `done` chan.
-	h.ctx, h.cancel = context.WithCancel(context.Background())
-	go serviceQOS(h.ctx.Done(), h.queue, h.maxQueueSize, h.maxMessageBytes, h.next)
-
-	return nil
 }
 
 func (h *Handler) Stop() {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	if h.ctx == nil {
-		return
+	if h.queue != nil {
+		close(h.queue)
+		h.queue = nil
 	}
-
-	h.cancel()
-	h.ctx = nil
-	h.cancel = nil
-	// defensive: cancelling the context should be enough, but this makes things bulletproof
-	close(h.queue)
-	h.queue = nil
 }
 
 // HandleWRP queues incoming messages while the background serviceQOS goroutine attempts
@@ -124,33 +109,11 @@ func (h *Handler) HandleWrp(msg wrp.Message) error {
 	return nil
 }
 
-func curryWRPHandler(next wrpkit.Handler) serviceQOSHandler {
-	return func(msg wrp.Message) (<-chan wrp.Message, <-chan struct{}) {
-		ready := make(chan struct{})
-		failedMsg := make(chan wrp.Message, 1)
-		go func() {
-			defer close(ready)
-			defer close(failedMsg)
-
-			// Note, Websocket.HandleWrp already locks between writes.
-			if err := next.HandleWrp(msg); err != nil {
-				// Delivery failed, re-enqueue message and try again later.
-				failedMsg <- msg
-				// The err itself is ignored.
-			}
-		}()
-
-		return failedMsg, ready
-	}
-}
-
 // serviceQOS is a long running goroutine that sends as many queued messages as possible,
 // where the highest QOS messages are prioritized.
-// serviceQOS starts when Handler.Start() is called.
-// serviceQOS stops when Handler.Stop() is called, closing its `done` chan.
-func serviceQOS(done <-chan struct{}, queue <-chan wrp.Message, maxQueueSize, maxMessageBytes int, handleWRP serviceQOSHandler) {
-	// create and manage the priority queue
-	pq := priorityQueue{maxQueueSize: maxQueueSize, maxMessageBytes: maxMessageBytes}
+// serviceQOS starts when Handler.Start().
+// serviceQOS stops when Handler.Stop() is called.
+func (h *Handler) serviceQOS() {
 	var (
 		// Signaling channel from the handleWRP.
 		ready <-chan struct{}
@@ -158,11 +121,14 @@ func serviceQOS(done <-chan struct{}, queue <-chan wrp.Message, maxQueueSize, ma
 		failedMsg <-chan wrp.Message
 	)
 
+	// create and manage the priority queue
+	pq := priorityQueue{maxQueueSize: h.maxQueueSize, maxMessageBytes: h.maxMessageBytes}
+	// handleWRP is promise pattern function
+	handleWRP := curryWRPHandler(h.next)
+
 	for {
 		select {
-		case <-done:
-			return
-		case msg, ok := <-queue:
+		case msg, ok := <-h.queue:
 			if !ok {
 				// Don't enqueue an empty wrp.Message{}
 				// Handler.Stop() has been called, both `queue` and `done` are closed.
@@ -190,5 +156,29 @@ func serviceQOS(done <-chan struct{}, queue <-chan wrp.Message, maxQueueSize, ma
 				failedMsg, ready = handleWRP(top)
 			}
 		}
+	}
+}
+
+// curryWRPHandler takes a wrpkit Hanlder and returns a promise pattern function `promiseWRPHandler`.
+func curryWRPHandler(next wrpkit.Handler) promiseWRPHandler {
+	// The returned promise are the chans `ready` and `failedMsg`.
+	return func(msg wrp.Message) (<-chan wrp.Message, <-chan struct{}) {
+		ready := make(chan struct{})
+		failedMsg := make(chan wrp.Message, 1)
+		go func() {
+			defer close(ready)
+			defer close(failedMsg)
+
+			if err := next.HandleWrp(msg); err != nil {
+				// Delivery failed, re-enqueue message and try again later.
+				failedMsg <- msg
+				// The err itself is ignored.
+			}
+		}()
+
+		// The promise is pending when `ready` is an open chan.
+		// The promise is settled (succeed or failed) when `ready` is a closed chan.
+		// If the promise failed then `failedMsg` will contained the failed msg, otherwise it'll be closed.
+		return failedMsg, ready
 	}
 }
