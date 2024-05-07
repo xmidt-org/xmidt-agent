@@ -153,7 +153,7 @@ func testEnqueueDequeue(t *testing.T) {
 				pq.Enqueue(msg)
 			}
 
-			assert.Equal(pq.Len(), tc.expectedQueueSize)
+			assert.Equal(tc.expectedQueueSize, pq.Len())
 
 			if len(tc.expectedDequeueSequence) == 0 {
 				return
@@ -177,10 +177,10 @@ func testSize(t *testing.T) {
 	}
 	pq := priorityQueue{}
 
-	assert.Equal(pq.Size(), 0)
+	assert.Equal(0, pq.size)
 	pq.Push(msg)
 	pq.Push(msg)
-	assert.Equal(pq.Size(), len(msg.Payload)*2)
+	assert.Equal(len(msg.Payload)*2, pq.size)
 }
 func testLen(t *testing.T) {
 	assert := assert.New(t)
@@ -193,7 +193,7 @@ func testLen(t *testing.T) {
 		},
 	}}
 
-	assert.Equal(pq.Len(), len(pq.queue))
+	assert.Equal(len(pq.queue), pq.Len())
 }
 
 func testLess(t *testing.T) {
@@ -233,9 +233,9 @@ func testSwap(t *testing.T) {
 
 	pq.Swap(0, 2)
 	// pq.queue[0] should contain msg2
-	assert.Equal(pq.queue[0], msg2)
+	assert.Equal(msg2, pq.queue[0])
 	// pq.queue[2] should contain msg0
-	assert.Equal(pq.queue[2], msg0)
+	assert.Equal(msg0, pq.queue[2])
 }
 
 func testPush(t *testing.T) {
@@ -312,7 +312,7 @@ func testPop(t *testing.T) {
 				assert.Equal(tc.expectedMessage, msg)
 				require.NotEmpty(tc.messages, "Pop() should have returned a nil instead of a wrp.Message")
 				// check for memory leak
-				assert.Equal(tc.messages[len(tc.messages)-1], wrp.Message{})
+				assert.Equal(wrp.Message{}, tc.messages[len(tc.messages)-1])
 			default:
 				require.Fail("Pop() returned an unknown type")
 			}
