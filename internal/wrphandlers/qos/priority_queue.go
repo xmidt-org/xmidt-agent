@@ -51,13 +51,13 @@ func (pq *priorityQueue) Enqueue(msg wrp.Message) {
 			break
 		}
 
-		pq.dropLeastPrioritized()
+		pq.drop()
 	}
 
 	heap.Push(pq, msg)
 }
 
-func (pq *priorityQueue) dropLeastPrioritized() {
+func (pq *priorityQueue) drop() {
 	_ = heap.Remove(pq, pq.Len()-1).(wrp.Message)
 }
 
@@ -66,9 +66,7 @@ func (pq *priorityQueue) dropLeastPrioritized() {
 func (pq *priorityQueue) Len() int { return len(pq.queue) }
 
 func (pq *priorityQueue) Less(i, j int) bool {
-	m1 := pq.queue[i].QualityOfService
-	m2 := pq.queue[j].QualityOfService
-	return m1 > m2
+	return pq.queue[i].QualityOfService > pq.queue[j].QualityOfService
 }
 
 func (pq *priorityQueue) Swap(i, j int) {
