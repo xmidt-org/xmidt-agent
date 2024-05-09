@@ -13,6 +13,7 @@ import (
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/auth"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/missing"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/mocktr181"
+	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/qos"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/xmidt_agent_crud"
 	"go.uber.org/fx"
 )
@@ -28,6 +29,7 @@ func provideWRPHandlers() fx.Option {
 			provideMissingHandler,
 			provideAuthHandler,
 			provideCrudHandler,
+			provideQOSHandler,
 		),
 		fx.Invoke(provideWSEventorToHandlerAdapter),
 	)
@@ -64,6 +66,21 @@ func provideWSEventorToHandlerAdapter(in wsAdapterIn) wsAdapterOut {
 	}
 }
 
+type qosIn struct {
+	fx.In
+
+	QOS QOS
+	WS  *websocket.Websocket
+}
+
+func provideQOSHandler(in qosIn) (*qos.Handler, error) {
+	return qos.New(
+		in.WS,
+		qos.MaxQueueBytes(in.QOS.MaxQueueBytes),
+		qos.MaxMessageBytes(in.QOS.MaxMessageBytes),
+	)
+}
+
 type missingIn struct {
 	fx.In
 
@@ -72,7 +89,7 @@ type missingIn struct {
 	Identity Identity
 
 	// wrphandlers
-	Egress websocket.Egress
+	Egress *qos.Handler
 	Pubsub *pubsub.PubSub
 }
 
@@ -94,7 +111,7 @@ type authIn struct {
 
 	// wrphandlers
 
-	Egress         websocket.Egress
+	Egress         *qos.Handler
 	MissingHandler *missing.Handler
 }
 
@@ -144,7 +161,7 @@ type pubsubIn struct {
 	MockTr181 MockTr181
 
 	// wrphandlers
-	Egress websocket.Egress
+	Egress *qos.Handler
 }
 
 type pubsubOut struct {
