@@ -391,7 +391,7 @@ var defaultConfig = Config{
 		MaxQueueBytes:   1 * 1024 * 1024, // 1MB max/queue,
 		MaxMessageBytes: 256 * 1024,      // 256 KB
 	},
-	Metadata: Metadata {
+	Metadata: Metadata{
 		Fields: []string{"fw-name", "hw-model", "hw-manufacturer", "hw-serial-number", "hw-last-reboot-reason", "webpa-protocol", "boot-time", "boot-time-retry-wait", "webpa-interface-used", "interfaces-available"},
 	},
 }
