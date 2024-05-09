@@ -37,9 +37,17 @@ type Config struct {
 	Logger           sallust.Config
 	Storage          Storage
 	MockTr181        MockTr181
+	QOS              QOS
 	Externals        []configuration.External
 	XmidtAgentCrud   XmidtAgentCrud
 	Metadata         Metadata
+}
+
+type QOS struct {
+	// MaxQueueBytes is the allowable max size of the qos' priority queue, based on the sum of all queued wrp message's payload.
+	MaxQueueBytes int64
+	// MaxMessageBytes is the largest allowable wrp message payload.
+	MaxMessageBytes int
 }
 
 type Pubsub struct {
@@ -378,8 +386,5 @@ var defaultConfig = Config{
 	},
 	XmidtAgentCrud: XmidtAgentCrud{
 		ServiceName: "xmidt_agent",
-	},
-	Metadata: Metadata{
-		Fields: []string{"fw-name", "hw-model", "hw-manufacturer", "hw-serial-number", "hw-last-reboot-reason", "webpa-protocol", "boot-time", "boot-time-retry-wait", "webpa-interface-used", "interfaces-available"},
 	},
 }
