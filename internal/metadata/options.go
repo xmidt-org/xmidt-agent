@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
 // SPDX-License-Identifier: Apache-2.0
 
-package convey
+package metadata
 
 import (
 	"errors"
@@ -18,7 +18,7 @@ var (
 
 func NetworkServiceOpt(networkService net.NetworkServicer) Option {
 	return optionFunc(
-		func(c *ConveyHeaderProvider) error {
+		func(c *MetadataProvider) error {
 			if networkService == nil {
 				fmt.Printf("nil networkService")
 				return ErrInvalidInput
@@ -30,7 +30,7 @@ func NetworkServiceOpt(networkService net.NetworkServicer) Option {
 
 func FieldsOpt(fields []string) Option {
 	return optionFunc(
-		func(c *ConveyHeaderProvider) error {
+		func(c *MetadataProvider) error {
 			for _, field := range fields {
 				valid := false
 				for _, validField := range validFields {
@@ -50,7 +50,7 @@ func FieldsOpt(fields []string) Option {
 
 func SerialNumberOpt(serialNumber string) Option {
 	return optionFunc(
-		func(c *ConveyHeaderProvider) error {
+		func(c *MetadataProvider) error {
 			c.serialNumber = serialNumber
 			return nil
 		})
@@ -58,7 +58,7 @@ func SerialNumberOpt(serialNumber string) Option {
 
 func HardwareModelOpt(hardwareModel string) Option {
 	return optionFunc(
-		func(c *ConveyHeaderProvider) error {
+		func(c *MetadataProvider) error {
 			c.hardware = hardwareModel
 			return nil
 		})
@@ -66,7 +66,7 @@ func HardwareModelOpt(hardwareModel string) Option {
 
 func FirmwareOpt(firmware string) Option {
 	return optionFunc(
-		func(c *ConveyHeaderProvider) error {
+		func(c *MetadataProvider) error {
 			c.firmware = firmware
 			return nil
 		})
@@ -74,7 +74,7 @@ func FirmwareOpt(firmware string) Option {
 
 func ManufacturerOpt(manufacturer string) Option {
 	return optionFunc(
-		func(c *ConveyHeaderProvider) error {
+		func(c *MetadataProvider) error {
 			c.manufacturer = manufacturer
 			return nil
 		})
@@ -82,7 +82,7 @@ func ManufacturerOpt(manufacturer string) Option {
 
 func LastRebootReasonOpt(lastRebootReason string) Option {
 	return optionFunc(
-		func(c *ConveyHeaderProvider) error {
+		func(c *MetadataProvider) error {
 			c.lastRebootReason = lastRebootReason
 			return nil
 		})
@@ -90,7 +90,7 @@ func LastRebootReasonOpt(lastRebootReason string) Option {
 
 func XmidtProtocolOpt(protocol string) Option {
 	return optionFunc(
-		func(c *ConveyHeaderProvider) error {
+		func(c *MetadataProvider) error {
 			c.protocol = protocol
 			return nil
 		})
@@ -98,7 +98,7 @@ func XmidtProtocolOpt(protocol string) Option {
 
 func BootTimeOpt(bootTime string) Option {
 	return optionFunc(
-		func(c *ConveyHeaderProvider) error {
+		func(c *MetadataProvider) error {
 			c.bootTime = bootTime
 			return nil
 		})
@@ -106,7 +106,7 @@ func BootTimeOpt(bootTime string) Option {
 
 func BootRetryWaitOpt(bootTimeRetryDelay time.Duration) Option {
 	return optionFunc(
-		func(c *ConveyHeaderProvider) error {
+		func(c *MetadataProvider) error {
 			c.bootTimeRetryDelay = fmt.Sprint(bootTimeRetryDelay.Seconds())
 			return nil
 		})

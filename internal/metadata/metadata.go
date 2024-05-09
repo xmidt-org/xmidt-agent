@@ -1,23 +1,25 @@
 // SPDX-FileCopyrightText: 2024 Comcast Cable Communications Management, LLC
 // SPDX-License-Identifier: Apache-2.0
 
-package convey
+package metadata
 
 import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
+	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/net"
 )
 
 type Option interface {
-	apply(*ConveyHeaderProvider) error
+	apply(*MetadataProvider) error
 }
 
-type optionFunc func(*ConveyHeaderProvider) error
+type optionFunc func(*MetadataProvider) error
 
-func (f optionFunc) apply(c *ConveyHeaderProvider) error {
+func (f optionFunc) apply(c *MetadataProvider) error {
 	return f(c)
 }
 
@@ -38,7 +40,7 @@ const (
 	InterfacesAvailable        = "interfaces-available"
 )
 
-type ConveyHeaderProvider struct {
+type MetadataProvider struct {
 	networkService     net.NetworkServicer
 	fields             []string
 	firmware           string
@@ -51,21 +53,21 @@ type ConveyHeaderProvider struct {
 	bootTimeRetryDelay string
 }
 
-func New(opts ...Option) (*ConveyHeaderProvider, error) {
-	conveyHeaderProvider := &ConveyHeaderProvider{}
+func New(opts ...Option) (*MetadataProvider, error) {
+	metadataProvider := &MetadataProvider{}
 
 	for _, opt := range opts {
 		if opt != nil {
-			if err := opt.apply(conveyHeaderProvider); err != nil {
+			if err := opt.apply(metadataProvider); err != nil {
 				return nil, err
 			}
 		}
 	}
 
-	return conveyHeaderProvider, nil
+	return metadataProvider, nil
 }
 
-func (c *ConveyHeaderProvider) GetConveyHeader() map[string]interface{} {
+func (c *MetadataProvider) GetMetadata() map[string]interface{} {
 	header := make(map[string]interface{})
 
 	for _, field := range c.fields {
@@ -92,7 +94,7 @@ func (c *ConveyHeaderProvider) GetConveyHeader() map[string]interface{} {
 				fmt.Printf("unable to get network interfaces %s", err.Error())
 				continue
 			}
-			header[field] = names
+			header[field] = strings.Join(names, ",")
 		default:
 
 		}
@@ -101,15 +103,33 @@ func (c *ConveyHeaderProvider) GetConveyHeader() map[string]interface{} {
 	return header
 }
 
-func (c *ConveyHeaderProvider) Decorate(headers http.Header) error {
-	header := c.GetConveyHeader()
+func (c *MetadataProvider) Decorate(headers http.Header) error {
+	header := c.GetMetadata()
 	headerBytes, err := json.Marshal(header)
 	if err != nil {
 		// use eventor to log
 		fmt.Printf("error marshaling convey header %s", err)
+		return err
 	}
 
 	headers.Set(HeaderName, string(headerBytes))
+
+	return nil
+}
+
+func (c *MetadataProvider) DecorateMsg(msg *wrp.Message) error {
+	header := c.GetMetadata()
+
+	// test this
+	if msg.Metadata == nil {
+		msg.Metadata = make(map[string]string)
+	}
+
+	for key, value := range header {
+		if value != nil {
+			msg.Metadata[key] = value.(string)
+		}
+	}
 
 	return nil
 }

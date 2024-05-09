@@ -91,7 +91,7 @@ func ConveyDecorator(f func(http.Header) error) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
 			if f == nil {
-				return fmt.Errorf("%w: nil ConveyHeaderDecorator", ErrMisconfiguredWS)
+				return fmt.Errorf("%w: nil ConveyDecorator", ErrMisconfiguredWS)
 			}
 
 			ws.conveyDecorator = f

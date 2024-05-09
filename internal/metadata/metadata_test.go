@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2024 Comcast Cable Communications Management, LLC
 // SPDX-License-Identifier: Apache-2.0
 
-package convey
+package metadata
 
 import (
 	"net/http"
@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	"github.com/xmidt-org/wrp-go/v3"
 )
 
 type mockNetworkService struct {
@@ -25,7 +26,7 @@ func (m *mockNetworkService) GetInterfaceNames() ([]string, error) {
 
 type ConveySuite struct {
 	suite.Suite
-	conveyHeaderProvider *ConveyHeaderProvider
+	conveyHeaderProvider *MetadataProvider
 	mockNetworkService   *mockNetworkService
 }
 
@@ -58,8 +59,8 @@ func TestConveySuite(t *testing.T) {
 }
 
 func (suite *ConveySuite) TestGetConveyHeader() {
-	suite.mockNetworkService.On("GetInterfaceNames").Return([]string{"docsis"}, nil)
-	header := suite.conveyHeaderProvider.GetConveyHeader()
+	suite.mockNetworkService.On("GetInterfaceNames").Return([]string{"erouter0", "eth0"}, nil)
+	header := suite.conveyHeaderProvider.GetMetadata()
 
 	suite.Equal("1.1", header["fw-name"])
 	suite.Equal("some-model", header["hw-model"])
@@ -69,14 +70,14 @@ func (suite *ConveySuite) TestGetConveyHeader() {
 	suite.Equal("some-protocol", header["webpa-protocol"])
 	suite.Equal("1111111111", header["boot-time"])
 	suite.Equal("1", header["boot-time-retry-wait"])
-	suite.Equal([]string{"docsis"}, header["interfaces-available"])
+	suite.Equal("erouter0,eth0", header["interfaces-available"])
 }
 
 func (suite *ConveySuite) TestGetConveyHeaderSubsetFields() {
 	suite.mockNetworkService.On("GetInterfaceNames").Return([]string{"docsis"}, nil)
 	suite.conveyHeaderProvider.fields = []string{"fw-name", "hw-model"}
 
-	header := suite.conveyHeaderProvider.GetConveyHeader()
+	header := suite.conveyHeaderProvider.GetMetadata()
 
 	suite.Equal("1.1", header["fw-name"])
 	suite.Equal("some-model", header["hw-model"])
@@ -100,4 +101,15 @@ func (suite *ConveySuite) TestDecorate() {
 	suite.NoError(err)
 
 	suite.NotNil(req.Header.Get(HeaderName))
+}
+
+func (suite *ConveySuite) TestDecorateMsg() {
+	suite.mockNetworkService.On("GetInterfaceNames").Return([]string{"erouter0"}, nil)
+
+	msg := new(wrp.Message)
+
+	err := suite.conveyHeaderProvider.DecorateMsg(msg)
+	suite.NoError(err)
+
+	suite.Equal("erouter0", msg.Metadata["interfaces-available"])
 }
