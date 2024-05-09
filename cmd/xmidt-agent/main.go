@@ -14,9 +14,11 @@ import (
 	"github.com/goschtalt/goschtalt"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials"
+	"github.com/xmidt-org/xmidt-agent/internal/loglevel"
 	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
+	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/qos"
 
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -49,6 +51,7 @@ type LifeCycleIn struct {
 	LC               fx.Lifecycle
 	Shutdowner       fx.Shutdowner
 	WS               *websocket.Websocket
+	QOS              *qos.Handler
 	Cred             *credentials.Credentials
 	EventCancelList  []event.CancelFunc
 	PubSubCancelList []pubsub.CancelFunc
@@ -94,8 +97,10 @@ func xmidtAgent(args []string) (*fx.App, error) {
 			goschtalt.UnmarshalFunc[Websocket]("websocket"),
 			goschtalt.UnmarshalFunc[MockTr181]("mock_tr_181"),
 			goschtalt.UnmarshalFunc[Pubsub]("pubsub"),
+			goschtalt.UnmarshalFunc[QOS]("qos"),
 
 			provideNetworkService,
+			loglevel.New,
 		),
 
 		fsProvide(),
@@ -185,7 +190,7 @@ type LoggerIn struct {
 
 // Create the logger and configure it based on if the program is in
 // debug mode or normal mode.
-func provideLogger(in LoggerIn) (*zap.Logger, error) {
+func provideLogger(in LoggerIn) (*zap.AtomicLevel, *zap.Logger, error) {
 	if in.CLI.Dev {
 		in.Cfg.EncoderConfig.EncodeLevel = "capitalColor"
 		in.Cfg.EncoderConfig.EncodeTime = "RFC3339"
@@ -196,10 +201,17 @@ func provideLogger(in LoggerIn) (*zap.Logger, error) {
 		in.Cfg.ErrorOutputPaths = append(in.Cfg.ErrorOutputPaths, "stderr")
 	}
 
-	return in.Cfg.Build()
+	zcfg, err := in.Cfg.NewZapConfig()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	logger, err := in.Cfg.Build()
+
+	return &zcfg.Level, logger, err
 }
 
-func onStart(cred *credentials.Credentials, ws *websocket.Websocket, logger *zap.Logger) func(context.Context) error {
+func onStart(cred *credentials.Credentials, ws *websocket.Websocket, qos *qos.Handler, logger *zap.Logger) func(context.Context) error {
 	logger = logger.Named("on_start")
 
 	return func(ctx context.Context) error {
@@ -219,12 +231,13 @@ func onStart(cred *credentials.Credentials, ws *websocket.Websocket, logger *zap
 		// blocks until an attempt to fetch the credentials has been made or the context is canceled
 		cred.WaitUntilFetched(ctx)
 		ws.Start()
+		qos.Start()
 
 		return nil
 	}
 }
 
-func onStop(ws *websocket.Websocket, shutdowner fx.Shutdowner, eventCancelList []event.CancelFunc, pubsubCancelList []pubsub.CancelFunc, logger *zap.Logger) func(context.Context) error {
+func onStop(ws *websocket.Websocket, qos *qos.Handler, shutdowner fx.Shutdowner, eventCancelList []event.CancelFunc, pubsubCancelList []pubsub.CancelFunc, logger *zap.Logger) func(context.Context) error {
 	logger = logger.Named("on_stop")
 
 	return func(_ context.Context) error {
@@ -244,6 +257,7 @@ func onStop(ws *websocket.Websocket, shutdowner fx.Shutdowner, eventCancelList [
 		}
 
 		ws.Stop()
+		qos.Stop()
 		for _, c := range eventCancelList {
 			c()
 		}
@@ -260,8 +274,8 @@ func lifeCycle(in LifeCycleIn) {
 	logger := in.Logger.Named("fx_lifecycle")
 	in.LC.Append(
 		fx.Hook{
-			OnStart: onStart(in.Cred, in.WS, logger),
-			OnStop:  onStop(in.WS, in.Shutdowner, in.EventCancelList, in.PubSubCancelList, logger),
+			OnStart: onStart(in.Cred, in.WS, in.QOS, logger),
+			OnStop:  onStop(in.WS, in.QOS, in.Shutdowner, in.EventCancelList, in.PubSubCancelList, logger),
 		},
 	)
 }

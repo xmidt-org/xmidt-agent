@@ -71,29 +71,29 @@ func Test_xmidtAgent(t *testing.T) {
 		expectedErr error
 		panic       bool
 	}{
-		// {
-		// 	description: "show config and exit",
-		// 	args:        []string{"-s"},
-		// 	panic:       true,
-		// }, {
-		// 	description: "show help and exit",
-		// 	args:        []string{"-h"},
-		// 	panic:       true,
-		// }, {
-		// 	description: "confirm invalid config file check works",
-		// 	args:        []string{"-f", "invalid.yml"},
-		// 	panic:       true,
-		// },
-		// {
-		// 	description: "enable debug mode",
-		// 	args:        []string{"-d"},
-		// }, {
-		// 	description: "output graph",
-		// 	args:        []string{"-g", "graph.dot"},
-		// }, {
-		// 	description: "start and stop",
-		// 	duration:    time.Millisecond,
-		// },
+		{
+			description: "show config and exit",
+			args:        []string{"-s"},
+			panic:       true,
+		}, {
+			description: "show help and exit",
+			args:        []string{"-h"},
+			panic:       true,
+		}, {
+			description: "confirm invalid config file check works",
+			args:        []string{"-f", "invalid.yml"},
+			panic:       true,
+		}, {
+			description: "enable debug mode",
+			args:        []string{"-d", "-f", "xmidt_agent.yaml"},
+		}, {
+			description: "output graph",
+			args:        []string{"-g", "graph.dot", "-f", "xmidt_agent.yaml"},
+		}, {
+			description: "start and stop",
+			duration:    time.Millisecond,
+			args:        []string{"-f", "xmidt_agent.yaml"},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.description, func(t *testing.T) {
@@ -158,10 +158,11 @@ func Test_provideLogger(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			assert := assert.New(t)
 
-			got, err := provideLogger(LoggerIn{CLI: tc.cli, Cfg: tc.cfg})
+			level, got, err := provideLogger(LoggerIn{CLI: tc.cli, Cfg: tc.cfg})
 
 			if tc.expectedErr == nil {
 				assert.NotNil(got)
+				assert.NotNil(level)
 				assert.NoError(err)
 				return
 			}

@@ -37,7 +37,16 @@ type Config struct {
 	Logger           sallust.Config
 	Storage          Storage
 	MockTr181        MockTr181
+	QOS              QOS
 	Externals        []configuration.External
+	XmidtAgentCrud   XmidtAgentCrud
+}
+
+type QOS struct {
+	// MaxQueueBytes is the allowable max size of the qos' priority queue, based on the sum of all queued wrp message's payload.
+	MaxQueueBytes int64
+	// MaxMessageBytes is the largest allowable wrp message payload.
+	MaxMessageBytes int
 }
 
 type Pubsub struct {
@@ -178,6 +187,10 @@ type JwtTxtRedirector struct {
 
 	// PEMFiles is the list of files containing PEM-encoded public keys to use
 	PEMFiles []string
+}
+
+type XmidtAgentCrud struct {
+	ServiceName string
 }
 
 // Backoff defines the parameters that limit the retry backoff algorithm.
@@ -368,5 +381,12 @@ var defaultConfig = Config{
 	MockTr181: MockTr181{
 		FilePath:    "./mock_tr181.json",
 		ServiceName: "config",
+	},
+	XmidtAgentCrud: XmidtAgentCrud{
+		ServiceName: "xmidt_agent",
+	},
+	QOS: QOS{
+		MaxQueueBytes:   1 * 1024 * 1024, // 1MB max/queue,
+		MaxMessageBytes: 256 * 1024,      // 256 KB
 	},
 }
