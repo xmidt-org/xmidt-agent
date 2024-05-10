@@ -12,6 +12,7 @@ import (
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials"
 	"github.com/xmidt-org/xmidt-agent/internal/jwtxt"
+	"github.com/xmidt-org/xmidt-agent/internal/metadata"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
 	"go.uber.org/fx"
@@ -30,6 +31,7 @@ type wsIn struct {
 	CLI       *CLI
 	JWTXT     *jwtxt.Instructions
 	Cred      *credentials.Credentials
+	Metadata  *metadata.MetadataProvider
 	Websocket Websocket
 }
 
@@ -62,6 +64,7 @@ func provideWS(in wsIn) (wsOut, error) {
 				fetchURLFunc)),
 		websocket.PingInterval(in.Websocket.PingInterval),
 		websocket.PingTimeout(in.Websocket.PingTimeout),
+		websocket.SendTimeout(in.Websocket.SendTimeout),
 		websocket.ConnectTimeout(in.Websocket.ConnectTimeout),
 		websocket.KeepAliveInterval(in.Websocket.KeepAliveInterval),
 		websocket.IdleConnTimeout(in.Websocket.IdleConnTimeout),
@@ -69,6 +72,7 @@ func provideWS(in wsIn) (wsOut, error) {
 		websocket.ExpectContinueTimeout(in.Websocket.ExpectContinueTimeout),
 		websocket.MaxMessageBytes(in.Websocket.MaxMessageBytes),
 		websocket.CredentialsDecorator(in.Cred.Decorate),
+		websocket.ConveyDecorator(in.Metadata.Decorate),
 		websocket.AdditionalHeaders(in.Websocket.AdditionalHeaders),
 		websocket.NowFunc(time.Now),
 		websocket.WithIPv6(!in.Websocket.DisableV6),

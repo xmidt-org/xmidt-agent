@@ -87,6 +87,18 @@ func CredentialsDecorator(f func(http.Header) error) Option {
 		})
 }
 
+func ConveyDecorator(f func(http.Header) error) Option {
+	return optionFunc(
+		func(ws *Websocket) error {
+			if f == nil {
+				return fmt.Errorf("%w: nil ConveyDecorator", ErrMisconfiguredWS)
+			}
+
+			ws.conveyDecorator = f
+			return nil
+		})
+}
+
 // PingInterval sets the time expected between PINGs for the WS connection.
 // If this is not set, the default is 30 seconds.
 func PingInterval(d time.Duration) Option {
@@ -189,6 +201,19 @@ func WithIPv6(with ...bool) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
 			ws.withIPv6 = with[0]
+			return nil
+		})
+}
+
+// SendTimeout sets the send timeout for the WS connection.
+func SendTimeout(d time.Duration) Option {
+	return optionFunc(
+		func(ws *Websocket) error {
+			if d < 0 {
+				return fmt.Errorf("%w: negative SendTimeout", ErrMisconfiguredWS)
+			}
+
+			ws.sendTimeout = d
 			return nil
 		})
 }
