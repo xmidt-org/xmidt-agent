@@ -91,7 +91,7 @@ func (c *MetadataProvider) GetMetadata() map[string]interface{} {
 		case InterfacesAvailable: // what if we can't get interfaces available?
 			names, err := c.networkService.GetInterfaceNames()
 			if err != nil {
-				fmt.Printf("unable to get network interfaces %s", err.Error())
+				// The err itself is ignored.
 				continue
 			}
 			header[field] = strings.Join(names, ",")
@@ -107,9 +107,8 @@ func (c *MetadataProvider) Decorate(headers http.Header) error {
 	header := c.GetMetadata()
 	headerBytes, err := json.Marshal(header)
 	if err != nil {
-		// use eventor to log
-		fmt.Printf("error marshaling convey header %s", err)
-		return err
+		// TODO use eventor to log
+		return fmt.Errorf("error marshaling convey header: %w", err)
 	}
 
 	headers.Set(HeaderName, string(headerBytes))
