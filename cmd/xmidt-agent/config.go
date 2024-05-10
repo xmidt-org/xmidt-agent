@@ -40,6 +40,7 @@ type Config struct {
 	QOS              QOS
 	Externals        []configuration.External
 	XmidtAgentCrud   XmidtAgentCrud
+	Metadata         Metadata
 }
 
 type QOS struct {
@@ -69,6 +70,8 @@ type Websocket struct {
 	PingInterval time.Duration
 	// PingTimeout is the ping timeout for the WS connection.
 	PingTimeout time.Duration
+	// SendTimeout is the send timeout for the WS connection.
+	SendTimeout time.Duration
 	// ConnectTimeout is the connect timeout for the WS connection.
 	ConnectTimeout time.Duration
 	// KeepAliveInterval is the keep alive interval for the WS connection.
@@ -210,6 +213,10 @@ type MockTr181 struct {
 	ServiceName string
 }
 
+type Metadata struct {
+	Fields []string
+}
+
 // Collect and process the configuration files and env vars and
 // produce a configuration object.
 func provideConfig(cli *CLI) (*goschtalt.Config, error) {
@@ -317,6 +324,7 @@ var defaultConfig = Config{
 		FetchURLTimeout:       30 * time.Second,
 		PingInterval:          30 * time.Second,
 		PingTimeout:           90 * time.Second,
+		SendTimeout:           90 * time.Second,
 		ConnectTimeout:        30 * time.Second,
 		KeepAliveInterval:     30 * time.Second,
 		IdleConnTimeout:       10 * time.Second,
@@ -385,5 +393,8 @@ var defaultConfig = Config{
 	QOS: QOS{
 		MaxQueueBytes:   1 * 1024 * 1024, // 1MB max/queue,
 		MaxMessageBytes: 256 * 1024,      // 256 KB
+	},
+	Metadata: Metadata{
+		Fields: []string{"fw-name", "hw-model", "hw-manufacturer", "hw-serial-number", "hw-last-reboot-reason", "webpa-protocol", "boot-time", "boot-time-retry-wait", "webpa-interface-used", "interfaces-available"},
 	},
 }

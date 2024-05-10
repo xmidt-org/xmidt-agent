@@ -6,7 +6,6 @@ package libparodus
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
@@ -195,7 +194,6 @@ func (a *Adapter) receive(ctx context.Context) {
 
 		switch msg.Type {
 		case wrp.ServiceRegistrationMessageType:
-			fmt.Println("Registering service: ", msg.ServiceName)
 			a.register(ctx, msg)
 		case wrp.Invalid0MessageType,
 			wrp.Invalid1MessageType,

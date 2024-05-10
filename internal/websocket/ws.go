@@ -44,11 +44,17 @@ type Websocket struct {
 	// credDecorator is the credentials decorator for the WS connection.
 	credDecorator func(http.Header) error
 
+	// credDecorator is the credentials decorator for the WS connection.
+	conveyDecorator func(http.Header) error
+
 	// pingInterval is the ping interval allowed for the WS connection.
 	pingInterval time.Duration
 
 	// pingTimeout is the ping timeout for the WS connection.
 	pingTimeout time.Duration
+
+	// sendTimeout is the send timeout for the WS connection.
+	sendTimeout time.Duration
 
 	// connectTimeout is the connect timeout for the WS connection.
 	connectTimeout time.Duration
@@ -126,6 +132,7 @@ func New(opts ...Option) (*Websocket, error) {
 		validateIPMode(),
 		validateFetchURL(),
 		validateCredentialsDecorator(),
+		validateConveyDecorator(),
 		validateNowFunc(),
 		validRetryPolicy(),
 	)
@@ -188,6 +195,8 @@ func (ws *Websocket) AddMessageListener(listener event.MsgListener, cancel ...*f
 // call synchronously blocks until the write is complete.
 func (ws *Websocket) Send(ctx context.Context, msg wrp.Message) error {
 	err := ErrClosed
+	ctx, cancel := context.WithTimeout(ctx, ws.sendTimeout)
+	defer cancel()
 
 	ws.m.Lock()
 	if ws.conn != nil {
@@ -218,6 +227,8 @@ func (ws *Websocket) run(ctx context.Context) {
 
 		// If auth fails, then continue with openfail xmidt connection
 		ws.credDecorator(ws.additionalHeaders)
+
+		ws.conveyDecorator(ws.additionalHeaders)
 
 		conn, _, dialErr := ws.dial(ctx, mode) //nolint:bodyclose
 		cEvent.At = ws.nowFunc()

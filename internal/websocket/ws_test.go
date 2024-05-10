@@ -54,6 +54,10 @@ func TestNew(t *testing.T) {
 					h.Add("Credentials-Decorator", "some value")
 					return nil
 				}),
+				ConveyDecorator(func(h http.Header) error {
+					h.Add("Convey-Decorator", "some value")
+					return nil
+				}),
 				NowFunc(time.Now),
 				RetryPolicy(retry.Config{}),
 			),
@@ -68,9 +72,11 @@ func TestNew(t *testing.T) {
 				// Headers
 				assert.NotNil(c.additionalHeaders)
 				assert.NoError(c.credDecorator(c.additionalHeaders))
+				assert.NoError(c.conveyDecorator(c.additionalHeaders))
 				assert.Equal("mac:112233445566", c.additionalHeaders.Get("X-Webpa-Device-Name"))
 				assert.Equal("vAlUE", c.additionalHeaders.Get("Some-Other-Header"))
 				assert.Equal("some value", c.additionalHeaders.Get("Credentials-Decorator"))
+				assert.Equal("some value", c.additionalHeaders.Get("Convey-Decorator"))
 			},
 		},
 
@@ -88,6 +94,9 @@ func TestNew(t *testing.T) {
 				DeviceID("mac:112233445566"),
 				FetchURL(fetcher),
 				CredentialsDecorator(func(h http.Header) error {
+					return nil
+				}),
+				ConveyDecorator(func(h http.Header) error {
 					return nil
 				}),
 				NowFunc(time.Now),
@@ -152,6 +161,9 @@ func TestNew(t *testing.T) {
 				CredentialsDecorator(func(h http.Header) error {
 					return nil
 				}),
+				ConveyDecorator(func(h http.Header) error {
+					return nil
+				}),
 				RetryPolicy(retry.Config{}),
 			),
 			check: func(assert *assert.Assertions, c *Websocket) {
@@ -211,6 +223,9 @@ func TestMessageListener(t *testing.T) {
 		CredentialsDecorator(func(h http.Header) error {
 			return nil
 		}),
+		ConveyDecorator(func(h http.Header) error {
+			return nil
+		}),
 		NowFunc(time.Now),
 		RetryPolicy(retry.Config{}),
 	)
@@ -237,6 +252,9 @@ func TestConnectListener(t *testing.T) {
 		AddConnectListener(&m),
 		WithIPv6(),
 		CredentialsDecorator(func(h http.Header) error {
+			return nil
+		}),
+		ConveyDecorator(func(h http.Header) error {
 			return nil
 		}),
 		NowFunc(time.Now),
@@ -267,6 +285,9 @@ func TestDisconnectListener(t *testing.T) {
 		CredentialsDecorator(func(h http.Header) error {
 			return nil
 		}),
+		ConveyDecorator(func(h http.Header) error {
+			return nil
+		}),
 		NowFunc(time.Now),
 		RetryPolicy(retry.Config{}),
 	)
@@ -295,6 +316,9 @@ func TestHeartbeatListener(t *testing.T) {
 		CredentialsDecorator(func(h http.Header) error {
 			return nil
 		}),
+		ConveyDecorator(func(h http.Header) error {
+			return nil
+		}),
 		NowFunc(time.Now),
 		RetryPolicy(retry.Config{}),
 	)
@@ -311,6 +335,9 @@ func TestHeartbeatListener(t *testing.T) {
 func TestNextMode(t *testing.T) {
 	defaults := []Option{
 		CredentialsDecorator(func(h http.Header) error {
+			return nil
+		}),
+		ConveyDecorator(func(h http.Header) error {
 			return nil
 		}),
 		NowFunc(time.Now),
