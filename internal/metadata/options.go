@@ -20,8 +20,7 @@ func NetworkServiceOpt(networkService net.NetworkServicer) Option {
 	return optionFunc(
 		func(c *MetadataProvider) error {
 			if networkService == nil {
-				fmt.Printf("nil networkService")
-				return ErrInvalidInput
+				return fmt.Errorf("%w: nil networkService", ErrInvalidInput)
 			}
 			c.networkService = networkService
 			return nil
@@ -39,8 +38,7 @@ func FieldsOpt(fields []string) Option {
 					}
 				}
 				if !valid {
-					fmt.Printf("invalid metadata field %s", field)
-					return ErrInvalidInput
+					return fmt.Errorf("%w: invalid metadata field", ErrInvalidInput)
 				}
 			}
 			c.fields = fields
