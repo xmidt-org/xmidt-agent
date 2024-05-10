@@ -64,6 +64,7 @@ func provideWS(in wsIn) (wsOut, error) {
 				fetchURLFunc)),
 		websocket.PingInterval(in.Websocket.PingInterval),
 		websocket.PingTimeout(in.Websocket.PingTimeout),
+		websocket.SendTimeout(in.Websocket.SendTimeout),
 		websocket.KeepAliveInterval(in.Websocket.KeepAliveInterval),
 		websocket.HTTPClient(in.Websocket.HTTPClient),
 		websocket.MaxMessageBytes(in.Websocket.MaxMessageBytes),

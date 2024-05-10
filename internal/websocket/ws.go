@@ -53,9 +53,13 @@ type Websocket struct {
 	// pingTimeout is the ping timeout for the WS connection.
 	pingTimeout time.Duration
 
+	// sendTimeout is the send timeout for the WS connection.
+	sendTimeout time.Duration
+
 	// keepAliveInterval is the keep alive interval for the WS connection.
 	keepAliveInterval time.Duration
 
+	// client is a HTTP client used for connection attempts.
 	client *http.Client
 
 	// additionalHeaders are any additional headers for the WS connection.
@@ -182,6 +186,8 @@ func (ws *Websocket) AddMessageListener(listener event.MsgListener, cancel ...*e
 // call synchronously blocks until the write is complete.
 func (ws *Websocket) Send(ctx context.Context, msg wrp.Message) error {
 	err := ErrClosed
+	ctx, cancel := context.WithTimeout(ctx, ws.sendTimeout)
+	defer cancel()
 
 	ws.m.Lock()
 	if ws.conn != nil {

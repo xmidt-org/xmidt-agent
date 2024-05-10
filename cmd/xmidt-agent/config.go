@@ -70,8 +70,9 @@ type Websocket struct {
 	PingInterval time.Duration
 	// PingTimeout is the ping timeout for the WS connection.
 	PingTimeout time.Duration
-	// HTTPClient is the configuration for the HTTP client used to retrieve the
-	// credentials.
+	// SendTimeout is the send timeout for the WS connection.
+	SendTimeout time.Duration
+	// HTTPClient is the configuration for the HTTP client used for connection attempts.
 	HTTPClient arrangehttp.ClientConfig
 	// KeepAliveInterval is the keep alive interval for the WS connection.
 	KeepAliveInterval time.Duration
@@ -317,6 +318,7 @@ var defaultConfig = Config{
 		FetchURLTimeout:   30 * time.Second,
 		PingInterval:      30 * time.Second,
 		PingTimeout:       90 * time.Second,
+		SendTimeout:       90 * time.Second,
 		KeepAliveInterval: 30 * time.Second,
 		HTTPClient: arrangehttp.ClientConfig{
 			Timeout: 30 * time.Second,
