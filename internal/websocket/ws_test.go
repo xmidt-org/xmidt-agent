@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
@@ -143,7 +144,7 @@ func TestNew(t *testing.T) {
 		}, {
 			description: "negative connect timeout",
 			opts: []Option{
-				ConnectTimeout(-1),
+				HTTPClient(arrangehttp.ClientConfig{Timeout: -1}),
 			},
 			expectedErr: ErrMisconfiguredWS,
 		},

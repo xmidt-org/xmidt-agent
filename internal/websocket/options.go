@@ -5,10 +5,12 @@ package websocket
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
@@ -141,48 +143,6 @@ func KeepAliveInterval(d time.Duration) Option {
 		})
 }
 
-// TLSHandshakeTimeout sets the TLS handshake timeout for the WS connection.
-// If this is not set, the default is 10 seconds.
-func TLSHandshakeTimeout(d time.Duration) Option {
-	return optionFunc(
-		func(ws *Websocket) error {
-			if d < 0 {
-				return fmt.Errorf("%w: negative TLSHandshakeTimeout", ErrMisconfiguredWS)
-			}
-
-			ws.tlsHandshakeTimeout = d
-			return nil
-		})
-}
-
-// IdleConnTimeout sets the idle connection timeout for the WS connection.
-// If this is not set, the default is 10 seconds.
-func IdleConnTimeout(d time.Duration) Option {
-	return optionFunc(
-		func(ws *Websocket) error {
-			if d < 0 {
-				return fmt.Errorf("%w: negative IdleConnTimeout", ErrMisconfiguredWS)
-			}
-
-			ws.idleConnTimeout = d
-			return nil
-		})
-}
-
-// ExpectContinueTimeout sets the expect continue timeout for the WS connection.
-// If this is not set, the default is 1 second.
-func ExpectContinueTimeout(d time.Duration) Option {
-	return optionFunc(
-		func(ws *Websocket) error {
-			if d < 0 {
-				return fmt.Errorf("%w: negative ExpectContinueTimeout", ErrMisconfiguredWS)
-			}
-
-			ws.expectContinueTimeout = d
-			return nil
-		})
-}
-
 // WithIPv4 sets whether or not to allow IPv4 for the WS connection.  If this
 // is not set, the default is true.
 func WithIPv4(with ...bool) Option {
@@ -205,16 +165,51 @@ func WithIPv6(with ...bool) Option {
 		})
 }
 
-// ConnectTimeout sets the timeout for the WS connection.  If this is not set,
-// the default is 30 seconds.
-func ConnectTimeout(d time.Duration) Option {
+// HTTPClient is the configuration for the HTTP client used to retrieve the
+// credentials.
+func HTTPClient(c arrangehttp.ClientConfig) Option {
 	return optionFunc(
-		func(ws *Websocket) error {
-			if d < 0 {
-				return fmt.Errorf("%w: negative ConnectTimeout", ErrMisconfiguredWS)
+		func(ws *Websocket) (err error) {
+			var errs error
+			// Timeout sets the timeout for the WS connection.
+			if c.Timeout < 0 {
+				errs = errors.Join(errs, fmt.Errorf("%w: negative Client.Timeout", ErrMisconfiguredWS))
+			}
+			// IdleConnTimeout sets the idle connection timeout for the WS connection.
+			if c.Transport.IdleConnTimeout < 0 {
+				errs = errors.Join(errs, fmt.Errorf("%w: negative Client.Transport.IdleConnTimeout", ErrMisconfiguredWS))
+			}
+			// TLSHandshakeTimeout sets the TLS handshake timeout for the WS connection.
+			if c.Transport.TLSHandshakeTimeout < 0 {
+				errs = errors.Join(errs, fmt.Errorf("%w: negative Client.Transport.TLSHandshakeTimeout", ErrMisconfiguredWS))
+			}
+			// ExpectContinueTimeout sets the TLS handshake timeout for the WS connection.
+			if c.Transport.ExpectContinueTimeout < 0 {
+				errs = errors.Join(errs, fmt.Errorf("%w: negative Client.Transport.ExpectContinueTimeout", ErrMisconfiguredWS))
 			}
 
-			ws.connectTimeout = d
+			if errs != nil {
+				return errs
+			}
+
+			ws.client, err = c.NewClient()
+			if err != nil {
+				return err
+			}
+
+			// override NewClient()'s Transport and update it's DialContext
+			// with Websocket.updateTransportDialContext before every connection attempt
+			ws.client.Transport = &custRT{
+				transport: http.Transport{
+					Proxy:                 http.ProxyFromEnvironment,
+					MaxIdleConns:          1,
+					MaxIdleConnsPerHost:   1,
+					MaxConnsPerHost:       1,
+					TLSHandshakeTimeout:   c.Transport.TLSHandshakeTimeout,
+					ExpectContinueTimeout: c.Transport.ExpectContinueTimeout,
+				},
+			}
+
 			return nil
 		})
 }

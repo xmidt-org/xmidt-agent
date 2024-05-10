@@ -53,20 +53,10 @@ type Websocket struct {
 	// pingTimeout is the ping timeout for the WS connection.
 	pingTimeout time.Duration
 
-	// connectTimeout is the connect timeout for the WS connection.
-	connectTimeout time.Duration
-
 	// keepAliveInterval is the keep alive interval for the WS connection.
 	keepAliveInterval time.Duration
 
-	// idleConnTimeout is the idle connection timeout for the WS connection.
-	idleConnTimeout time.Duration
-
-	// tlsHandshakeTimeout is the TLS handshake timeout for the WS connection.
-	tlsHandshakeTimeout time.Duration
-
-	// expectContinueTimeout is the expect continue timeout for the WS connection.
-	expectContinueTimeout time.Duration
+	client *http.Client
 
 	// additionalHeaders are any additional headers for the WS connection.
 	additionalHeaders http.Header
@@ -325,14 +315,11 @@ func (ws *Websocket) dial(ctx context.Context, mode ipMode) (*nhws.Conn, *http.R
 	if err != nil {
 		return nil, nil, err
 	}
-
+	ws.updateTransportDialContext(mode)
 	conn, resp, err := nhws.Dial(ctx, url,
 		&nhws.DialOptions{
 			HTTPHeader: ws.additionalHeaders,
-			HTTPClient: &http.Client{
-				Transport: ws.getRT(mode),
-				Timeout:   ws.connectTimeout,
-			},
+			HTTPClient: ws.client,
 		},
 	)
 	if err != nil {
@@ -351,27 +338,15 @@ func (rt *custRT) RoundTrip(r *http.Request) (*http.Response, error) {
 	return rt.transport.RoundTrip(r)
 }
 
-// getRT returns a custom RoundTripper for the WS connection.
-func (ws *Websocket) getRT(mode ipMode) *custRT {
+// updateTransportDialContext updates Websocket's http client's RoundTripper DialContext with the given mode.
+func (ws *Websocket) updateTransportDialContext(mode ipMode) {
 	dialer := &net.Dialer{
-		Timeout:   ws.connectTimeout,
+		Timeout:   ws.client.Timeout,
 		KeepAlive: ws.keepAliveInterval,
 		DualStack: false,
 	}
-
-	return &custRT{
-		transport: http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return dialer.DialContext(ctx, string(mode), addr)
-			},
-			MaxIdleConns:          1,
-			MaxIdleConnsPerHost:   1,
-			MaxConnsPerHost:       1,
-			IdleConnTimeout:       ws.idleConnTimeout,
-			TLSHandshakeTimeout:   ws.tlsHandshakeTimeout,
-			ExpectContinueTimeout: ws.expectContinueTimeout,
-		},
+	ws.client.Transport.(*custRT).transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		return dialer.DialContext(ctx, string(mode), addr)
 	}
 }
 
