@@ -7,11 +7,15 @@ import (
 	"net"
 )
 
-type NetworkService struct {
-	N NetworkInterface
+type NetworkServicer interface {
+	GetInterfaceNames() ([]string, error)
 }
 
-func New(n NetworkInterface) *NetworkService {
+type NetworkService struct {
+	N NetworkWrapper
+}
+
+func New(n NetworkWrapper) NetworkServicer {
 	return &NetworkService{
 		N: n,
 	}

@@ -44,6 +44,9 @@ type Websocket struct {
 	// credDecorator is the credentials decorator for the WS connection.
 	credDecorator func(http.Header) error
 
+	// credDecorator is the credentials decorator for the WS connection.
+	conveyDecorator func(http.Header) error
+
 	// pingInterval is the ping interval allowed for the WS connection.
 	pingInterval time.Duration
 
@@ -126,6 +129,7 @@ func New(opts ...Option) (*Websocket, error) {
 		validateIPMode(),
 		validateFetchURL(),
 		validateCredentialsDecorator(),
+		validateConveyDecorator(),
 		validateNowFunc(),
 		validRetryPolicy(),
 	)
@@ -218,6 +222,8 @@ func (ws *Websocket) run(ctx context.Context) {
 
 		// If auth fails, then continue with openfail xmidt connection
 		ws.credDecorator(ws.additionalHeaders)
+
+		ws.conveyDecorator(ws.additionalHeaders)
 
 		conn, _, dialErr := ws.dial(ctx, mode) //nolint:bodyclose
 		cEvent.At = ws.nowFunc()

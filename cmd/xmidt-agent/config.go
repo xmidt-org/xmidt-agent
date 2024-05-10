@@ -40,6 +40,7 @@ type Config struct {
 	QOS              QOS
 	Externals        []configuration.External
 	XmidtAgentCrud   XmidtAgentCrud
+	Metadata         Metadata
 }
 
 type QOS struct {
@@ -208,6 +209,10 @@ type MockTr181 struct {
 	FilePath    string
 	Enabled     bool
 	ServiceName string
+}
+
+type Metadata struct {
+	Fields []string
 }
 
 // Collect and process the configuration files and env vars and
@@ -385,5 +390,8 @@ var defaultConfig = Config{
 	QOS: QOS{
 		MaxQueueBytes:   1 * 1024 * 1024, // 1MB max/queue,
 		MaxMessageBytes: 256 * 1024,      // 256 KB
+	},
+	Metadata: Metadata{
+		Fields: []string{"fw-name", "hw-model", "hw-manufacturer", "hw-serial-number", "hw-last-reboot-reason", "webpa-protocol", "boot-time", "boot-time-retry-wait", "webpa-interface-used", "interfaces-available"},
 	},
 }

@@ -103,6 +103,9 @@ func TestEndToEnd(t *testing.T) {
 		ws.CredentialsDecorator(func(h http.Header) error {
 			return nil
 		}),
+		ws.ConveyDecorator(func(h http.Header) error {
+			return nil
+		}),
 	)
 	require.NoError(err)
 	require.NotNil(got)
@@ -226,6 +229,9 @@ func TestEndToEndBadData(t *testing.T) {
 				ws.CredentialsDecorator(func(h http.Header) error {
 					return nil
 				}),
+				ws.ConveyDecorator(func(h http.Header) error {
+					return nil
+				}),
 			)
 			require.NoError(err)
 			require.NotNil(got)
@@ -317,6 +323,9 @@ func TestEndToEndConnectionIssues(t *testing.T) {
 		ws.FetchURLTimeout(30*time.Second),
 		ws.MaxMessageBytes(256*1024),
 		ws.CredentialsDecorator(func(h http.Header) error {
+			return nil
+		}),
+		ws.ConveyDecorator(func(h http.Header) error {
 			return nil
 		}),
 	)
