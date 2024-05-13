@@ -426,6 +426,9 @@ func TestEndToEndPingTimeout(t *testing.T) {
 		ws.CredentialsDecorator(func(h http.Header) error {
 			return nil
 		}),
+		ws.ConveyDecorator(func(h http.Header) error {
+			return nil
+		}),
 		// Triggers ping timeouts
 		ws.PingTimeout(time.Nanosecond),
 	)
