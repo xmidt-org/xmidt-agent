@@ -26,13 +26,14 @@ var (
 type wsIn struct {
 	fx.In
 	// Note, DeviceID is pulled from the Identity configuration
-	Identity  Identity
-	Logger    *zap.Logger
-	CLI       *CLI
-	JWTXT     *jwtxt.Instructions
-	Cred      *credentials.Credentials
-	Metadata  *metadata.MetadataProvider
-	Websocket Websocket
+	Identity      Identity
+	Logger        *zap.Logger
+	CLI           *CLI
+	JWTXT         *jwtxt.Instructions
+	Cred          *credentials.Credentials
+	Metadata      *metadata.MetadataProvider
+	InterfaceUsed *metadata.InterfaceUsedProvider
+	Websocket     Websocket
 }
 
 type wsOut struct {
@@ -79,6 +80,7 @@ func provideWS(in wsIn) (wsOut, error) {
 		websocket.WithIPv4(!in.Websocket.DisableV4),
 		websocket.Once(in.Websocket.Once),
 		websocket.RetryPolicy(in.Websocket.RetryPolicy),
+		websocket.InterfaceUsedProvider(in.InterfaceUsed),
 	}
 
 	// Listener options

@@ -40,6 +40,23 @@ func (suite *NetworkServiceSuite) SetupTest() {
 	suite.mockNetworkWrapper = mockNetworkWrapper
 }
 
+func (suite *NetworkServiceSuite) TestGetInterfaces() {
+	hwa, err := net.ParseMAC("11:22:33:44:55:66")
+	suite.NoError(err)
+	iface := net.Interface{
+		Name:         "erouter0",
+		HardwareAddr: hwa,
+		Flags:        32,
+	}
+
+	suite.mockNetworkWrapper.On("Interfaces").Return([]net.Interface{iface}, nil)
+	ifaces, err := suite.networkService.GetInterfaces()
+	suite.NoError(err)
+	suite.Equal(1, len(ifaces))
+	suite.Equal("erouter0", ifaces[0].Name)
+	suite.Equal("11:22:33:44:55:66", ifaces[0].HardwareAddr.String())
+}
+
 func (suite *NetworkServiceSuite) TestGetInterfaceNames() {
 	iface := net.Interface{
 		Name:  "erouter0",

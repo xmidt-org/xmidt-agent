@@ -8,6 +8,7 @@ import (
 )
 
 type NetworkServicer interface {
+	GetInterfaces() ([]net.Interface, error)
 	GetInterfaceNames() ([]string, error)
 }
 
@@ -21,22 +22,31 @@ func New(n NetworkWrapper) NetworkServicer {
 	}
 }
 
-func (ns *NetworkService) GetInterfaceNames() ([]string, error) {
+func (ns *NetworkService) GetInterfaces() ([]net.Interface, error) {
 	ifaces, err := ns.N.Interfaces()
+	if err != nil {
+		return []net.Interface{}, err
+	}
+
+	var running []net.Interface
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagRunning != 0 {
+			running = append(running, iface)
+		}
+	}
+
+	return running, nil
+}
+
+func (ns *NetworkService) GetInterfaceNames() ([]string, error) {
+	ifaces, err := ns.GetInterfaces()
 	if err != nil {
 		return []string{}, err
 	}
 
-	m := make(map[string]bool)
-	for _, i := range ifaces {
-		if i.Flags&net.FlagRunning != 0 {
-			m[i.Name] = true
-		}
-	}
-
 	names := []string{}
-	for name := range m {
-		names = append(names, name)
+	for _, iface := range ifaces {
+		names = append(names, iface.Name)
 	}
 
 	return names, nil

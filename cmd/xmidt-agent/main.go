@@ -15,6 +15,7 @@ import (
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials"
 	"github.com/xmidt-org/xmidt-agent/internal/loglevel"
+	"github.com/xmidt-org/xmidt-agent/internal/metadata"
 	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
@@ -103,6 +104,7 @@ func xmidtAgent(args []string) (*fx.App, error) {
 			provideNetworkService,
 			provideMetadataProvider,
 			loglevel.New,
+			metadata.NewInterfaceUsedProvider,
 		),
 
 		fsProvide(),
