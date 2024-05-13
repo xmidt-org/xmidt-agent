@@ -34,7 +34,7 @@ func Normify(opts ...wrp.NormifierOption) Option {
 // WithEgressHandler is an option that adds a handler for egress messages.
 // If the optional cancel parameter is provided, it will be set to a function
 // that can be used to cancel the subscription.
-func WithEgressHandler(handler wrpkit.Handler, cancel ...*func()) Option {
+func WithEgressHandler(handler wrpkit.Handler, cancel ...*CancelFunc) Option {
 	return optionFunc(func(ps *PubSub) error {
 		c, err := ps.SubscribeEgress(handler)
 		if err != nil {
@@ -51,7 +51,7 @@ func WithEgressHandler(handler wrpkit.Handler, cancel ...*func()) Option {
 // WithServiceHandler is an option that adds a handler for service messages.
 // If the optional cancel parameter is provided, it will be set to a function
 // that can be used to cancel the subscription.
-func WithServiceHandler(service string, handler wrpkit.Handler, cancel ...*func()) Option {
+func WithServiceHandler(service string, handler wrpkit.Handler, cancel ...*CancelFunc) Option {
 	return optionFunc(func(ps *PubSub) error {
 		c, err := ps.SubscribeService(service, handler)
 		if err != nil {
@@ -68,7 +68,7 @@ func WithServiceHandler(service string, handler wrpkit.Handler, cancel ...*func(
 // WithEventHandler is an option that adds a handler for event messages.
 // If the optional cancel parameter is provided, it will be set to a function
 // that can be used to cancel the subscription.
-func WithEventHandler(event string, handler wrpkit.Handler, cancel ...*func()) Option {
+func WithEventHandler(event string, handler wrpkit.Handler, cancel ...*CancelFunc) Option {
 	return optionFunc(func(ps *PubSub) error {
 		c, err := ps.SubscribeEvent(event, handler)
 		if err != nil {

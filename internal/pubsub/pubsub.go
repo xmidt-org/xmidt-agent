@@ -21,6 +21,13 @@ var (
 	ErrTimeout      = fmt.Errorf("timeout")
 )
 
+// CancelFunc removes the associated listener with and cancels any future events
+// sent to that listener.
+//
+// A CancelFunc is idempotent: after the first invocation, calling this closure
+// will have no effect.
+type CancelFunc func()
+
 // PubSub is a struct representing a publish-subscribe system focusing on wrp
 // messages.
 type PubSub struct {
@@ -84,17 +91,17 @@ func New(self wrp.DeviceID, opts ...Option) (*PubSub, error) {
 
 // SubscribeEgress subscribes to the egress route.  The listener will be called
 // when a message targets something other than this device.  The returned
-// cancel may be called to remove the listener and cancel any future events
+// CancelFunc may be called to remove the listener and cancel any future events
 // sent to that listener.
-func (ps *PubSub) SubscribeEgress(h wrpkit.Handler) (cancel func(), err error) {
+func (ps *PubSub) SubscribeEgress(h wrpkit.Handler) (CancelFunc, error) {
 	return ps.subscribe(egressRoute(), h)
 }
 
 // SubscribeService subscribes to the specified service.  The listener will be
 // called when a message matches the service.  A service value of '*' may be
-// used to match any service.  The returned cancel may be called to remove
+// used to match any service.  The returned CancelFunc may be called to remove
 // the listener and cancel any future events sent to that listener.
-func (ps *PubSub) SubscribeService(service string, h wrpkit.Handler) (cancel func(), err error) {
+func (ps *PubSub) SubscribeService(service string, h wrpkit.Handler) (CancelFunc, error) {
 	if err := validateString(service, "service"); err != nil {
 		return nil, err
 	}
@@ -104,9 +111,9 @@ func (ps *PubSub) SubscribeService(service string, h wrpkit.Handler) (cancel fun
 
 // SubscribeEvent subscribes to the specified event.  The listener will be called
 // when a message matches the event.  An event value of '*' may be used to match
-// any event.  The returned cancel may be called to remove the listener and
+// any event.  The returned CancelFunc may be called to remove the listener and
 // cancel any future events sent to that listener.
-func (ps *PubSub) SubscribeEvent(event string, h wrpkit.Handler) (cancel func(), err error) {
+func (ps *PubSub) SubscribeEvent(event string, h wrpkit.Handler) (CancelFunc, error) {
 	if err := validateString(event, "event"); err != nil {
 		return nil, err
 	}
@@ -127,7 +134,7 @@ func validateString(s, typ string) error {
 	return nil
 }
 
-func (ps *PubSub) subscribe(route string, h wrpkit.Handler) (cancel func(), err error) {
+func (ps *PubSub) subscribe(route string, h wrpkit.Handler) (CancelFunc, error) {
 	if h == nil {
 		return nil, fmt.Errorf("%w: handler may not be nil", ErrInvalidInput)
 	}
@@ -139,7 +146,7 @@ func (ps *PubSub) subscribe(route string, h wrpkit.Handler) (cancel func(), err 
 		ps.routes[route] = new(eventor.Eventor[wrpkit.Handler])
 	}
 
-	return ps.routes[route].Add(h), nil
+	return CancelFunc(ps.routes[route].Add(h)), nil
 }
 
 // HandleWrp publishes a wrp message to the appropriate listeners and returns

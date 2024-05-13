@@ -212,7 +212,7 @@ func TestEndToEnd(t *testing.T) {
 			return wrpkit.ErrNotHandled
 		})
 
-	var allCancel, singleCancel, serviceCancel, egressCancel func()
+	var allCancel, singleCancel, serviceCancel, egressCancel pubsub.CancelFunc
 	ps, err := pubsub.New(id,
 		pubsub.WithEgressHandler(egressListener, &egressCancel),
 		pubsub.WithEventHandler("*", allEventListener, &allCancel),

@@ -54,11 +54,12 @@ type wsAdapterOut struct {
 }
 
 func provideWSEventorToHandlerAdapter(in wsAdapterIn) wsAdapterOut {
+	cancel := event.CancelFunc(in.WRPHandlerAdapter)
 	in.WS.AddMessageListener(
 		event.MsgListenerFunc(func(m wrp.Message) {
 			_ = in.AuthHandler.HandleWrp(m)
 		}),
-		&in.WRPHandlerAdapter,
+		&cancel,
 	)
 
 	return wsAdapterOut{
@@ -174,7 +175,7 @@ type pubsubOut struct {
 
 func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 	var (
-		egress, mocktr func()
+		egress, mocktr pubsub.CancelFunc
 	)
 
 	opts := []pubsub.Option{

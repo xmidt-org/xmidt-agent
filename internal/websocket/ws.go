@@ -187,8 +187,8 @@ func (ws *Websocket) HandleWrp(m wrp.Message) error {
 
 // AddMessageListener adds a message listener to the WS connection.
 // The listener will be called for every message received from the WS.
-func (ws *Websocket) AddMessageListener(listener event.MsgListener, cancel ...*func()) func() {
-	return ws.msgListeners.Add(listener)
+func (ws *Websocket) AddMessageListener(listener event.MsgListener, cancel ...*event.CancelFunc) event.CancelFunc {
+	return event.CancelFunc(ws.msgListeners.Add(listener))
 }
 
 // Send sends the provided WRP message through the existing websocket.  This

@@ -87,7 +87,7 @@ func provideWS(in wsIn) (wsOut, error) {
 
 	// Listener options
 	var (
-		msg, con, discon, heartbeat, wrphandlerAdapter func()
+		msg, con, discon, heartbeat, wrphandlerAdapter event.CancelFunc
 	)
 	if in.CLI.Dev {
 		logger := in.Logger.Named("websocket")
