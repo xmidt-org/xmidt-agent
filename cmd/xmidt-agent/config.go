@@ -72,7 +72,7 @@ type Websocket struct {
 	PingTimeout time.Duration
 	// SendTimeout is the send timeout for the WS connection.
 	SendTimeout time.Duration
-	// HTTPClient is the configuration for the HTTP client used for connection attempts.
+	// HTTPClient is the configuration for the HTTP client.
 	HTTPClient arrangehttp.ClientConfig
 	// KeepAliveInterval is the keep alive interval for the WS connection.
 	KeepAliveInterval time.Duration

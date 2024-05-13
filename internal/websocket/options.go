@@ -178,8 +178,7 @@ func SendTimeout(d time.Duration) Option {
 		})
 }
 
-// HTTPClient is the configuration for the HTTP client used to retrieve the
-// credentials.
+// HTTPClient is the configuration for the HTTP client used for connection attempts.
 func HTTPClient(c arrangehttp.ClientConfig) Option {
 	return optionFunc(
 		func(ws *Websocket) (err error) {
@@ -205,22 +204,10 @@ func HTTPClient(c arrangehttp.ClientConfig) Option {
 				return errs
 			}
 
-			ws.client, err = c.NewClient()
+			// test new client
+			_, err = c.NewClient()
 			if err != nil {
-				return err
-			}
-
-			// override NewClient()'s Transport and update it's DialContext
-			// with Websocket.updateTransportDialContext before every connection attempt
-			ws.client.Transport = &custRT{
-				transport: http.Transport{
-					Proxy:                 http.ProxyFromEnvironment,
-					MaxIdleConns:          1,
-					MaxIdleConnsPerHost:   1,
-					MaxConnsPerHost:       1,
-					TLSHandshakeTimeout:   c.Transport.TLSHandshakeTimeout,
-					ExpectContinueTimeout: c.Transport.ExpectContinueTimeout,
-				},
+				return errors.Join(errs, err)
 			}
 
 			return nil
