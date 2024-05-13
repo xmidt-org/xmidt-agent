@@ -43,8 +43,7 @@ type wsOut struct {
 	Egress    websocket.Egress
 
 	// cancels
-	Msg, Con, Discon, Heartbeat func() `group:"cancels"`
-	WRPHandlerAdapter           func() `name:"wrp_handler_adapter_cancel"`
+	Cancels []func() `group:"cancels,flatten"`
 }
 
 func provideWS(in wsIn) (wsOut, error) {
@@ -87,7 +86,8 @@ func provideWS(in wsIn) (wsOut, error) {
 
 	// Listener options
 	var (
-		msg, con, discon, heartbeat, wrphandlerAdapter event.CancelFunc
+		msg, con, discon, heartbeat event.CancelFunc
+		cancels                     []func()
 	)
 	if in.CLI.Dev {
 		logger := in.Logger.Named("websocket")
@@ -119,14 +119,14 @@ func provideWS(in wsIn) (wsOut, error) {
 		err = errors.Join(ErrWebsocketConfig, err)
 	}
 
+	if in.CLI.Dev {
+		cancels = append(cancels, msg, con, discon, heartbeat)
+	}
+
 	return wsOut{
-		WS:                ws,
-		Egress:            ws,
-		Msg:               msg,
-		Con:               con,
-		Discon:            discon,
-		Heartbeat:         heartbeat,
-		WRPHandlerAdapter: wrphandlerAdapter,
+		WS:      ws,
+		Egress:  ws,
+		Cancels: cancels,
 	}, err
 }
 

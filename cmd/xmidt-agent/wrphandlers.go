@@ -30,8 +30,8 @@ func provideWRPHandlers() fx.Option {
 			provideAuthHandler,
 			provideCrudHandler,
 			provideQOSHandler,
+			provideWSEventorToHandlerAdapter,
 		),
-		fx.Invoke(provideWSEventorToHandlerAdapter),
 	)
 }
 
@@ -42,29 +42,23 @@ type wsAdapterIn struct {
 
 	// wrphandlers
 	AuthHandler *auth.Handler
-
-	// cancels
-	WRPHandlerAdapter func() `name:"wrp_handler_adapter_cancel"`
 }
 
 type wsAdapterOut struct {
 	fx.Out
 
-	WRPHandlerAdapter func() `name:"wrp_handler_adapter_cancel"`
+	Cancels []func() `group:"cancels,flatten"`
 }
 
 func provideWSEventorToHandlerAdapter(in wsAdapterIn) wsAdapterOut {
-	cancel := event.CancelFunc(in.WRPHandlerAdapter)
-	in.WS.AddMessageListener(
-		event.MsgListenerFunc(func(m wrp.Message) {
-			_ = in.AuthHandler.HandleWrp(m)
-		}),
-		&cancel,
-	)
-
 	return wsAdapterOut{
-		WRPHandlerAdapter: in.WRPHandlerAdapter,
-	}
+		Cancels: []func(){
+			in.WS.AddMessageListener(
+				event.MsgListenerFunc(func(m wrp.Message) {
+					_ = in.AuthHandler.HandleWrp(m)
+				}),
+			),
+		}}
 }
 
 type qosIn struct {
@@ -168,14 +162,14 @@ type pubsubIn struct {
 type pubsubOut struct {
 	fx.Out
 
-	PubSub *pubsub.PubSub
-	Egress func() `group:"cancels"`
-	Mocktr func() `group:"cancels"`
+	PubSub  *pubsub.PubSub
+	Cancels []func() `group:"cancels,flatten"`
 }
 
 func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 	var (
 		egress, mocktr pubsub.CancelFunc
+		cancels        []func()
 	)
 
 	opts := []pubsub.Option{
@@ -191,6 +185,7 @@ func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 		return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
 	}
 
+	cancels = append(cancels, egress)
 	if in.MockTr181.Enabled {
 		mockDefaults := []mocktr181.Option{
 			mocktr181.FilePath(in.MockTr181.FilePath),
@@ -206,11 +201,11 @@ func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 			return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
 		}
 
+		cancels = append(cancels, mocktr)
 	}
 
 	return pubsubOut{
-		PubSub: ps,
-		Egress: egress,
-		Mocktr: mocktr,
+		PubSub:  ps,
+		Cancels: cancels,
 	}, err
 }
