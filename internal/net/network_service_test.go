@@ -35,7 +35,7 @@ func TestNetworkServiceSuite(t *testing.T) {
 
 func (suite *NetworkServiceSuite) SetupTest() {
 	mockNetworkWrapper := newMockNetworkWrapper()
-	networkService := New(mockNetworkWrapper)
+	networkService := New(mockNetworkWrapper, []string{"erouter0", "eth0"})
 	suite.networkService = networkService
 	suite.mockNetworkWrapper = mockNetworkWrapper
 }
@@ -49,11 +49,23 @@ func (suite *NetworkServiceSuite) TestGetInterfaces() {
 		Flags:        32,
 	}
 
-	suite.mockNetworkWrapper.On("Interfaces").Return([]net.Interface{iface}, nil)
+	lowerPriorityIface := net.Interface{
+		Name:         "eth0",
+		HardwareAddr: hwa,
+		Flags:        32,
+	}
+
+	someIfaceNotAllowed := net.Interface{
+		Name:  "joeinterface",
+		Flags: 32,
+	}
+
+	suite.mockNetworkWrapper.On("Interfaces").Return([]net.Interface{iface, lowerPriorityIface, someIfaceNotAllowed}, nil)
 	ifaces, err := suite.networkService.GetInterfaces()
 	suite.NoError(err)
-	suite.Equal(1, len(ifaces))
+	suite.Equal(2, len(ifaces))
 	suite.Equal("erouter0", ifaces[0].Name)
+	suite.Equal("eth0", ifaces[1].Name)
 	suite.Equal("11:22:33:44:55:66", ifaces[0].HardwareAddr.String())
 }
 
@@ -63,7 +75,12 @@ func (suite *NetworkServiceSuite) TestGetInterfaceNames() {
 		Flags: 32,
 	}
 
-	suite.mockNetworkWrapper.On("Interfaces").Return([]net.Interface{iface}, nil)
+	someIfaceNotAllowed := net.Interface{
+		Name:  "joeinterface",
+		Flags: 32,
+	}
+
+	suite.mockNetworkWrapper.On("Interfaces").Return([]net.Interface{iface, someIfaceNotAllowed}, nil)
 	names, err := suite.networkService.GetInterfaceNames()
 	suite.NoError(err)
 	suite.Equal(1, len(names))

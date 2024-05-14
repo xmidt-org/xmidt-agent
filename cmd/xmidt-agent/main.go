@@ -96,6 +96,7 @@ func xmidtAgent(args []string) (*fx.App, error) {
 			goschtalt.UnmarshalFunc[MockTr181]("mock_tr_181"),
 			goschtalt.UnmarshalFunc[Pubsub]("pubsub"),
 			goschtalt.UnmarshalFunc[Metadata]("metadata"),
+			goschtalt.UnmarshalFunc[NetworkService]("network_service"),
 			goschtalt.UnmarshalFunc[QOS]("qos"),
 
 			provideNetworkService,

@@ -5,6 +5,8 @@ package net
 
 import (
 	"net"
+	"sort"
+	"strings"
 )
 
 type NetworkServicer interface {
@@ -13,15 +15,18 @@ type NetworkServicer interface {
 }
 
 type NetworkService struct {
-	N NetworkWrapper
+	N                 NetworkWrapper
+	AllowedInterfaces []string // should be supplied in priority order
 }
 
-func New(n NetworkWrapper) NetworkServicer {
+func New(n NetworkWrapper, allowedInterfaces []string) NetworkServicer {
 	return &NetworkService{
-		N: n,
+		N:                 n,
+		AllowedInterfaces: allowedInterfaces,
 	}
 }
 
+/** returns available interfaces in priority use order */
 func (ns *NetworkService) GetInterfaces() ([]net.Interface, error) {
 	ifaces, err := ns.N.Interfaces()
 	if err != nil {
@@ -30,10 +35,14 @@ func (ns *NetworkService) GetInterfaces() ([]net.Interface, error) {
 
 	var running []net.Interface
 	for _, iface := range ifaces {
-		if iface.Flags&net.FlagRunning != 0 {
+		if (iface.Flags&net.FlagRunning != 0) && (ns.isAllowed(iface.Name)) {
 			running = append(running, iface)
 		}
 	}
+
+	sort.Slice(running, func(i, j int) bool {
+		return ns.getPriority(running[i].Name) < ns.getPriority(running[j].Name)
+	})
 
 	return running, nil
 }
@@ -50,4 +59,24 @@ func (ns *NetworkService) GetInterfaceNames() ([]string, error) {
 	}
 
 	return names, nil
+}
+
+func (ns *NetworkService) isAllowed(name string) bool {
+	for _, n := range ns.AllowedInterfaces {
+		if strings.EqualFold(name, n) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (ns *NetworkService) getPriority(name string) int {
+	for i, n := range ns.AllowedInterfaces {
+		if strings.EqualFold(name, n) {
+			return i
+		}
+	}
+
+	return 100 // this should never happen
 }

@@ -41,6 +41,7 @@ type Config struct {
 	Externals        []configuration.External
 	XmidtAgentCrud   XmidtAgentCrud
 	Metadata         Metadata
+	NetworkService   NetworkService
 }
 
 type QOS struct {
@@ -215,6 +216,10 @@ type MockTr181 struct {
 
 type Metadata struct {
 	Fields []string
+}
+
+type NetworkService struct {
+	AllowedInterfaces []string
 }
 
 // Collect and process the configuration files and env vars and
@@ -396,5 +401,8 @@ var defaultConfig = Config{
 	},
 	Metadata: Metadata{
 		Fields: []string{"fw-name", "hw-model", "hw-manufacturer", "hw-serial-number", "hw-last-reboot-reason", "webpa-protocol", "boot-time", "boot-time-retry-wait", "webpa-interface-used", "interfaces-available"},
+	},
+	NetworkService: NetworkService{
+		AllowedInterfaces: []string{"erouter0", "eroutev0", "br-home", "brrwan", "vdsl0", "wwan0", "wlan0", "eth0", "qmapmux0.127", "cm0"},
 	},
 }
