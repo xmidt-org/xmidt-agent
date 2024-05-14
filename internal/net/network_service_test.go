@@ -35,7 +35,8 @@ func TestNetworkServiceSuite(t *testing.T) {
 
 func (suite *NetworkServiceSuite) SetupTest() {
 	mockNetworkWrapper := newMockNetworkWrapper()
-	networkService := New(mockNetworkWrapper, []string{"erouter0", "eth0"})
+	networkService := New(mockNetworkWrapper, map[string]AllowedInterface{
+		"erouter0": {1, true}, "eth0": {2, true}, "br-home": {3, false}})
 	suite.networkService = networkService
 	suite.mockNetworkWrapper = mockNetworkWrapper
 }

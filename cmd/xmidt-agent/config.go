@@ -22,6 +22,7 @@ import (
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/configuration"
+	"github.com/xmidt-org/xmidt-agent/internal/net"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/dealancer/validate.v2"
 )
@@ -220,7 +221,7 @@ type Metadata struct {
 
 type NetworkService struct {
 	// list of allowed network interfaces to connect to xmidt in priority order, first is highest
-	AllowedInterfaces []string
+	AllowedInterfaces map[string]net.AllowedInterface
 }
 
 // Collect and process the configuration files and env vars and
@@ -404,6 +405,6 @@ var defaultConfig = Config{
 		Fields: []string{"fw-name", "hw-model", "hw-manufacturer", "hw-serial-number", "hw-last-reboot-reason", "webpa-protocol", "boot-time", "boot-time-retry-wait", "webpa-interface-used", "interfaces-available"},
 	},
 	NetworkService: NetworkService{
-		AllowedInterfaces: []string{"erouter0", "eroutev0", "br-home", "brrwan", "vdsl0", "wwan0", "wlan0", "eth0", "qmapmux0.127", "cm0"},
+		AllowedInterfaces: map[string]net.AllowedInterface{"erouter0": {Priority: 1, Enabled: true}, "eroutev0": {Priority: 2, Enabled: true}, "br-home": {Priority: 3, Enabled: true}, "brrwan": {Priority: 4, Enabled: true}, "vdsl0": {Priority: 5, Enabled: true}, "wwan0": {Priority: 6, Enabled: true}, "wlan0": {Priority: 7, Enabled: true}, "eth0": {Priority: 8, Enabled: true}, "qmapmux0.127": {Priority: 9, Enabled: true}, "cm0": {Priority: 10, Enabled: true}},
 	},
 }

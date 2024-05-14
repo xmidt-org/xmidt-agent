@@ -16,10 +16,15 @@ type NetworkServicer interface {
 
 type NetworkService struct {
 	N                 NetworkWrapper
-	AllowedInterfaces []string // should be supplied in priority order
+	AllowedInterfaces map[string]AllowedInterface
 }
 
-func New(n NetworkWrapper, allowedInterfaces []string) NetworkServicer {
+type AllowedInterface struct {
+	Priority int
+	Enabled  bool
+}
+
+func New(n NetworkWrapper, allowedInterfaces map[string]AllowedInterface) NetworkServicer {
 	return &NetworkService{
 		N:                 n,
 		AllowedInterfaces: allowedInterfaces,
@@ -62,9 +67,13 @@ func (ns *NetworkService) GetInterfaceNames() ([]string, error) {
 }
 
 func (ns *NetworkService) isAllowed(name string) bool {
-	for _, n := range ns.AllowedInterfaces {
-		if strings.EqualFold(name, n) {
-			return true
+	for k, v := range ns.AllowedInterfaces {
+		if strings.EqualFold(name, k) {
+			if v.Enabled {
+				return true
+			} else {
+				return false
+			}
 		}
 	}
 
@@ -72,11 +81,11 @@ func (ns *NetworkService) isAllowed(name string) bool {
 }
 
 func (ns *NetworkService) getPriority(name string) int {
-	for i, n := range ns.AllowedInterfaces {
-		if strings.EqualFold(name, n) {
-			return i
+	for k, v := range ns.AllowedInterfaces {
+		if strings.EqualFold(name, k) {
+			return v.Priority
 		}
 	}
 
-	return 100 // this should never happen
+	return 100 // not found should never happen
 }
