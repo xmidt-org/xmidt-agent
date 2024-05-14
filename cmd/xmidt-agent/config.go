@@ -219,6 +219,7 @@ type Metadata struct {
 }
 
 type NetworkService struct {
+	// list of allowed network interfaces to connect to xmidt in priority order, first is highest
 	AllowedInterfaces []string
 }
 
