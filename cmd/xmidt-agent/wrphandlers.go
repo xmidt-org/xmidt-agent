@@ -30,8 +30,8 @@ func provideWRPHandlers() fx.Option {
 			provideAuthHandler,
 			provideCrudHandler,
 			provideQOSHandler,
+			provideWSEventorToHandlerAdapter,
 		),
-		fx.Invoke(provideWSEventorToHandlerAdapter),
 	)
 }
 
@@ -41,17 +41,24 @@ type wsAdapterIn struct {
 	WS *websocket.Websocket
 
 	// wrphandlers
-	AuthHandler             *auth.Handler
-	WRPHandlerAdapterCancel event.CancelFunc
+	AuthHandler *auth.Handler
 }
 
-func provideWSEventorToHandlerAdapter(in wsAdapterIn) {
-	in.WS.AddMessageListener(
-		event.MsgListenerFunc(func(m wrp.Message) {
-			_ = in.AuthHandler.HandleWrp(m)
-		}),
-		&in.WRPHandlerAdapterCancel,
-	)
+type wsAdapterOut struct {
+	fx.Out
+
+	Cancels []func() `group:"cancels,flatten"`
+}
+
+func provideWSEventorToHandlerAdapter(in wsAdapterIn) wsAdapterOut {
+	return wsAdapterOut{
+		Cancels: []func(){
+			in.WS.AddMessageListener(
+				event.MsgListenerFunc(func(m wrp.Message) {
+					_ = in.AuthHandler.HandleWrp(m)
+				}),
+			),
+		}}
 }
 
 type qosIn struct {
@@ -155,14 +162,14 @@ type pubsubIn struct {
 type pubsubOut struct {
 	fx.Out
 
-	PubSub           *pubsub.PubSub
-	PubSubCancelList []pubsub.CancelFunc
+	PubSub  *pubsub.PubSub
+	Cancels []func() `group:"cancels,flatten"`
 }
 
 func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 	var (
-		egress     pubsub.CancelFunc
-		cancelList = []pubsub.CancelFunc{egress}
+		egress, mocktr pubsub.CancelFunc
+		cancels        []func()
 	)
 
 	opts := []pubsub.Option{
@@ -178,6 +185,7 @@ func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 		return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
 	}
 
+	cancels = append(cancels, egress)
 	if in.MockTr181.Enabled {
 		mockDefaults := []mocktr181.Option{
 			mocktr181.FilePath(in.MockTr181.FilePath),
@@ -188,16 +196,16 @@ func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 			return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
 		}
 
-		mocktr, err := ps.SubscribeService(in.MockTr181.ServiceName, mocktr181Handler)
+		mocktr, err = ps.SubscribeService(in.MockTr181.ServiceName, mocktr181Handler)
 		if err != nil {
 			return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
 		}
 
-		cancelList = append(cancelList, mocktr)
+		cancels = append(cancels, mocktr)
 	}
 
 	return pubsubOut{
-		PubSub:           ps,
-		PubSubCancelList: cancelList,
+		PubSub:  ps,
+		Cancels: cancels,
 	}, err
 }
