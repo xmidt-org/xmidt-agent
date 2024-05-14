@@ -324,10 +324,6 @@ func (ws *Websocket) dial(ctx context.Context, mode ipMode) (*nhws.Conn, *http.R
 	}
 
 	ws.updateClientTransport(mode)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	conn, resp, err := nhws.Dial(ctx, url,
 		&nhws.DialOptions{
 			HTTPHeader: ws.additionalHeaders,
