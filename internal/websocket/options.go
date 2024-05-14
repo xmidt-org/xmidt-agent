@@ -5,6 +5,7 @@ package websocket
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -185,6 +186,10 @@ func HTTPClient(client *http.Client) Option {
 			if client == nil {
 				// Can't use http.DefaultClient since its Transport is nil.
 				client, err = arrangehttp.ClientConfig{}.NewClient()
+			}
+
+			if err != nil {
+				return errors.Join(ErrMisconfiguredWS, err)
 			}
 
 			ws.client = client
