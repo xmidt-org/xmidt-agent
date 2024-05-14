@@ -207,7 +207,7 @@ func HTTPClient(c arrangehttp.ClientConfig) Option {
 			// test new client
 			_, err = c.NewClient()
 			if err != nil {
-				return errors.Join(errs, err)
+				return errors.Join(ErrMisconfiguredWS, err)
 			}
 
 			return nil
