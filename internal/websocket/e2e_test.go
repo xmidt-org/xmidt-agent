@@ -16,7 +16,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/nhooyr.io/websocket"
@@ -99,7 +98,6 @@ func TestEndToEnd(t *testing.T) {
 		ws.WithIPv4(),
 		ws.NowFunc(time.Now),
 		ws.SendTimeout(90*time.Second),
-		ws.HTTPClient(arrangehttp.ClientConfig{Timeout: 30 * time.Second}),
 		ws.FetchURLTimeout(30*time.Second),
 		ws.MaxMessageBytes(256*1024),
 		ws.CredentialsDecorator(func(h http.Header) error {
@@ -108,6 +106,7 @@ func TestEndToEnd(t *testing.T) {
 		ws.ConveyDecorator(func(h http.Header) error {
 			return nil
 		}),
+		ws.HTTPClient(nil),
 	)
 	require.NoError(err)
 	require.NotNil(got)
@@ -226,7 +225,6 @@ func TestEndToEndBadData(t *testing.T) {
 				ws.WithIPv4(),
 				ws.NowFunc(time.Now),
 				ws.SendTimeout(90*time.Second),
-				ws.HTTPClient(arrangehttp.ClientConfig{Timeout: 30 * time.Second}),
 				ws.FetchURLTimeout(30*time.Second),
 				ws.MaxMessageBytes(256*1024),
 				ws.CredentialsDecorator(func(h http.Header) error {
@@ -235,6 +233,7 @@ func TestEndToEndBadData(t *testing.T) {
 				ws.ConveyDecorator(func(h http.Header) error {
 					return nil
 				}),
+				ws.HTTPClient(nil),
 			)
 			require.NoError(err)
 			require.NotNil(got)
@@ -323,7 +322,6 @@ func TestEndToEndConnectionIssues(t *testing.T) {
 		ws.WithIPv4(),
 		ws.NowFunc(time.Now),
 		ws.SendTimeout(90*time.Second),
-		ws.HTTPClient(arrangehttp.ClientConfig{Timeout: 30 * time.Second}),
 		ws.FetchURLTimeout(30*time.Second),
 		ws.MaxMessageBytes(256*1024),
 		ws.CredentialsDecorator(func(h http.Header) error {
@@ -332,6 +330,7 @@ func TestEndToEndConnectionIssues(t *testing.T) {
 		ws.ConveyDecorator(func(h http.Header) error {
 			return nil
 		}),
+		ws.HTTPClient(nil),
 	)
 	require.NoError(err)
 	require.NotNil(got)

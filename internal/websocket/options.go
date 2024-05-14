@@ -5,7 +5,6 @@ package websocket
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -178,39 +177,18 @@ func SendTimeout(d time.Duration) Option {
 		})
 }
 
-// HTTPClient is the configuration for the HTTP client used for connection attempts.
-func HTTPClient(c arrangehttp.ClientConfig) Option {
+// HTTPClient is the HTTP client used for connection attempts.
+func HTTPClient(client *http.Client) Option {
 	return optionFunc(
-		func(ws *Websocket) (err error) {
-			var errs error
-			// Timeout sets the timeout for the WS connection.
-			if c.Timeout < 0 {
-				errs = errors.Join(errs, fmt.Errorf("%w: negative Client.Timeout", ErrMisconfiguredWS))
-			}
-			// IdleConnTimeout sets the idle connection timeout for the WS connection.
-			if c.Transport.IdleConnTimeout < 0 {
-				errs = errors.Join(errs, fmt.Errorf("%w: negative Client.Transport.IdleConnTimeout", ErrMisconfiguredWS))
-			}
-			// TLSHandshakeTimeout sets the TLS handshake timeout for the WS connection.
-			if c.Transport.TLSHandshakeTimeout < 0 {
-				errs = errors.Join(errs, fmt.Errorf("%w: negative Client.Transport.TLSHandshakeTimeout", ErrMisconfiguredWS))
-			}
-			// ExpectContinueTimeout sets the TLS handshake timeout for the WS connection.
-			if c.Transport.ExpectContinueTimeout < 0 {
-				errs = errors.Join(errs, fmt.Errorf("%w: negative Client.Transport.ExpectContinueTimeout", ErrMisconfiguredWS))
+		func(ws *Websocket) error {
+			var err error
+			if client == nil {
+				// Can't use http.DefaultClient since its Transport is nil.
+				client, err = arrangehttp.ClientConfig{}.NewClient()
 			}
 
-			if errs != nil {
-				return errs
-			}
-
-			// test new client
-			_, err = c.NewClient()
-			if err != nil {
-				return errors.Join(errs, err)
-			}
-
-			return nil
+			ws.client = client
+			return err
 		})
 }
 
