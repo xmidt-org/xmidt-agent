@@ -33,7 +33,8 @@ func provideInstructions(in instructionsIn) (instructionsOut, error) {
 	// have any keys to use.
 	if in.Service.URL == "" ||
 		(in.Service.JwtTxtRedirector.PEMFiles == nil && in.Service.JwtTxtRedirector.PEMs == nil) {
-		return instructionsOut{}, nil
+		// return with DeviceID since ID.DeviceID is required for other fx components
+		return instructionsOut{DeviceID: in.ID.DeviceID}, nil
 	}
 
 	logger := in.Logger.Named("jwtxt")
