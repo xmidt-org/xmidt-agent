@@ -15,9 +15,7 @@ import (
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials"
 	"github.com/xmidt-org/xmidt-agent/internal/loglevel"
-	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
-	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/qos"
 
 	"go.uber.org/fx"
@@ -53,8 +51,8 @@ type LifeCycleIn struct {
 	WS               *websocket.Websocket
 	QOS              *qos.Handler
 	Cred             *credentials.Credentials
-	EventCancelList  []event.CancelFunc
-	PubSubCancelList []pubsub.CancelFunc
+	WaitUntilFetched time.Duration `name:"wait_until_fetched"`
+	Cancels          []func()      `group:"cancels"`
 }
 
 // xmidtAgent is the main entry point for the program.  It is responsible for
@@ -213,7 +211,7 @@ func provideLogger(in LoggerIn) (*zap.AtomicLevel, *zap.Logger, error) {
 	return &zcfg.Level, logger, err
 }
 
-func onStart(cred *credentials.Credentials, ws *websocket.Websocket, qos *qos.Handler, logger *zap.Logger) func(context.Context) error {
+func onStart(cred *credentials.Credentials, ws *websocket.Websocket, qos *qos.Handler, waitUntilFetched time.Duration, logger *zap.Logger) func(context.Context) error {
 	logger = logger.Named("on_start")
 
 	return func(ctx context.Context) error {
@@ -228,7 +226,7 @@ func onStart(cred *credentials.Credentials, ws *websocket.Websocket, qos *qos.Ha
 			return nil
 		}
 
-		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, waitUntilFetched)
 		defer cancel()
 		// blocks until an attempt to fetch the credentials has been made or the context is canceled
 		cred.WaitUntilFetched(ctx)
@@ -239,7 +237,7 @@ func onStart(cred *credentials.Credentials, ws *websocket.Websocket, qos *qos.Ha
 	}
 }
 
-func onStop(ws *websocket.Websocket, qos *qos.Handler, shutdowner fx.Shutdowner, eventCancelList []event.CancelFunc, pubsubCancelList []pubsub.CancelFunc, logger *zap.Logger) func(context.Context) error {
+func onStop(ws *websocket.Websocket, qos *qos.Handler, shutdowner fx.Shutdowner, cancels []func(), logger *zap.Logger) func(context.Context) error {
 	logger = logger.Named("on_stop")
 
 	return func(_ context.Context) error {
@@ -260,11 +258,7 @@ func onStop(ws *websocket.Websocket, qos *qos.Handler, shutdowner fx.Shutdowner,
 
 		ws.Stop()
 		qos.Stop()
-		for _, c := range eventCancelList {
-			c()
-		}
-
-		for _, c := range pubsubCancelList {
+		for _, c := range cancels {
 			c()
 		}
 
@@ -276,8 +270,8 @@ func lifeCycle(in LifeCycleIn) {
 	logger := in.Logger.Named("fx_lifecycle")
 	in.LC.Append(
 		fx.Hook{
-			OnStart: onStart(in.Cred, in.WS, in.QOS, logger),
-			OnStop:  onStop(in.WS, in.QOS, in.Shutdowner, in.EventCancelList, in.PubSubCancelList, logger),
+			OnStart: onStart(in.Cred, in.WS, in.QOS, in.WaitUntilFetched, logger),
+			OnStop:  onStop(in.WS, in.QOS, in.Shutdowner, in.Cancels, logger),
 		},
 	)
 }

@@ -29,6 +29,7 @@ func TestNew(t *testing.T) {
 
 	wsDefaults := []Option{
 		WithIPv6(),
+		HTTPClient(nil),
 	}
 	tests := []struct {
 		description string
@@ -60,6 +61,7 @@ func TestNew(t *testing.T) {
 				}),
 				NowFunc(time.Now),
 				RetryPolicy(retry.Config{}),
+				HTTPClient(nil),
 			),
 			check: func(assert *assert.Assertions, c *Websocket) {
 				// URL Related
@@ -101,6 +103,7 @@ func TestNew(t *testing.T) {
 				}),
 				NowFunc(time.Now),
 				RetryPolicy(retry.Config{}),
+				HTTPClient(nil),
 			),
 			check: func(assert *assert.Assertions, c *Websocket) {
 				u, err := c.urlFetcher(context.Background())
@@ -140,12 +143,6 @@ func TestNew(t *testing.T) {
 				PingTimeout(-1),
 			},
 			expectedErr: ErrMisconfiguredWS,
-		}, {
-			description: "negative connect timeout",
-			opts: []Option{
-				ConnectTimeout(-1),
-			},
-			expectedErr: ErrMisconfiguredWS,
 		},
 
 		// Test the now func option
@@ -165,6 +162,7 @@ func TestNew(t *testing.T) {
 					return nil
 				}),
 				RetryPolicy(retry.Config{}),
+				HTTPClient(nil),
 			),
 			check: func(assert *assert.Assertions, c *Websocket) {
 				if assert.NotNil(c.nowFunc) {
@@ -228,6 +226,7 @@ func TestMessageListener(t *testing.T) {
 		}),
 		NowFunc(time.Now),
 		RetryPolicy(retry.Config{}),
+		HTTPClient(nil),
 	)
 
 	assert.NoError(err)
@@ -259,6 +258,7 @@ func TestConnectListener(t *testing.T) {
 		}),
 		NowFunc(time.Now),
 		RetryPolicy(retry.Config{}),
+		HTTPClient(nil),
 	)
 
 	assert.NoError(err)
@@ -290,6 +290,7 @@ func TestDisconnectListener(t *testing.T) {
 		}),
 		NowFunc(time.Now),
 		RetryPolicy(retry.Config{}),
+		HTTPClient(nil),
 	)
 
 	assert.NoError(err)
@@ -321,6 +322,7 @@ func TestHeartbeatListener(t *testing.T) {
 		}),
 		NowFunc(time.Now),
 		RetryPolicy(retry.Config{}),
+		HTTPClient(nil),
 	)
 
 	assert.NoError(err)
@@ -342,6 +344,7 @@ func TestNextMode(t *testing.T) {
 		}),
 		NowFunc(time.Now),
 		RetryPolicy(retry.Config{}),
+		HTTPClient(nil),
 	}
 	tests := []struct {
 		description string
