@@ -31,6 +31,7 @@ func provideWRPHandlers() fx.Option {
 			provideCrudHandler,
 			provideQOSHandler,
 			provideWSEventorToHandlerAdapter,
+			provideMockTr181Handler,
 		),
 	)
 }
@@ -151,9 +152,8 @@ type pubsubIn struct {
 
 	// Configuration
 	// Note, DeviceID and PartnerID is pulled from the Identity configuration
-	Identity  Identity
-	Pubsub    Pubsub
-	MockTr181 MockTr181
+	Identity Identity
+	Pubsub   Pubsub
 
 	// wrphandlers
 	Egress *qos.Handler
@@ -162,21 +162,17 @@ type pubsubIn struct {
 type pubsubOut struct {
 	fx.Out
 
-	PubSub  *pubsub.PubSub
-	Cancels []func() `group:"cancels,flatten"`
+	PubSub *pubsub.PubSub
+	Cancel func() `group:"cancels"`
 }
 
 func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
-	var (
-		egress, mocktr pubsub.CancelFunc
-		cancels        []func()
-	)
+	var egress pubsub.CancelFunc
 
 	opts := []pubsub.Option{
 		pubsub.WithPublishTimeout(in.Pubsub.PublishTimeout),
 		pubsub.WithEgressHandler(in.Egress, &egress),
 	}
-
 	ps, err := pubsub.New(
 		in.Identity.DeviceID,
 		opts...,
@@ -185,27 +181,51 @@ func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 		return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
 	}
 
-	cancels = append(cancels, egress)
-	if in.MockTr181.Enabled {
-		mockDefaults := []mocktr181.Option{
-			mocktr181.FilePath(in.MockTr181.FilePath),
-			mocktr181.Enabled(in.MockTr181.Enabled),
-		}
-		mocktr181Handler, err := mocktr181.New(ps, string(in.Identity.DeviceID), mockDefaults...)
-		if err != nil {
-			return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
-		}
+	return pubsubOut{
+		PubSub: ps,
+		Cancel: egress,
+	}, err
+}
 
-		mocktr, err = ps.SubscribeService(in.MockTr181.ServiceName, mocktr181Handler)
-		if err != nil {
-			return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
-		}
+type mockTr181In struct {
+	fx.In
 
-		cancels = append(cancels, mocktr)
+	// Configuration
+	// Note, DeviceID and PartnerID is pulled from the Identity configuration
+	Identity  Identity
+	MockTr181 MockTr181
+
+	PubSub *pubsub.PubSub
+
+	// wrphandlers
+	Egress *qos.Handler
+}
+
+type mockTr181Out struct {
+	fx.Out
+	Cancel func() `group:"cancels"`
+}
+
+func provideMockTr181Handler(in mockTr181In) (mockTr181Out, error) {
+	if !in.MockTr181.Enabled {
+		return mockTr181Out{}, nil
 	}
 
-	return pubsubOut{
-		PubSub:  ps,
-		Cancels: cancels,
-	}, err
+	mockDefaults := []mocktr181.Option{
+		mocktr181.FilePath(in.MockTr181.FilePath),
+		mocktr181.Enabled(in.MockTr181.Enabled),
+	}
+	mocktr181Handler, err := mocktr181.New(in.PubSub, string(in.Identity.DeviceID), mockDefaults...)
+	if err != nil {
+		return mockTr181Out{}, errors.Join(ErrWRPHandlerConfig, err)
+	}
+
+	mocktr, err := in.PubSub.SubscribeService(in.MockTr181.ServiceName, mocktr181Handler)
+	if err != nil {
+		return mockTr181Out{}, errors.Join(ErrWRPHandlerConfig, err)
+	}
+
+	return mockTr181Out{
+		Cancel: mocktr,
+	}, nil
 }
