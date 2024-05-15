@@ -274,7 +274,27 @@ func provideConfig(cli *CLI) (*goschtalt.Config, error) {
 // -----------------------------------------------------------------------------
 
 var defaultConfig = Config{
+	Identity: Identity {
+		DeviceID: "mac:4ca161000109",
+		SerialNumber: "1800deadbeef",
+		HardwareModel: "fooModel",
+		HardwareManufacturer: "barManufacturer",
+		FirmwareVersion: "v0.0.1",
+		PartnerID: "foobar",
+	},
+	// xmidt_credentials:
+//   url: http://localhost:6501/issue
+//   file_name: outputJwt.txt
+//   file_permissions: 0777
+//   http_client:
+//     tls:
+//       insecure_skip_verify: true
+//       certificates: 
+//         - certificate_file: certs/cert.pem
+//          key_file:         certs/key.pem
+//      min_version: 771 # 0x0303, the TLS 1.2 version uint16
 	XmidtCredentials: XmidtCredentials{
+		//URL: "http://localhost:6501/issue",
 		RefetchPercent:  90.0,
 		FileName:        "credentials.msgpack",
 		FilePermissions: fs.FileMode(0600),
@@ -285,7 +305,12 @@ var defaultConfig = Config{
 				MaxIdleConns:      1,
 			},
 			TLS: &arrangetls.Config{
+				InsecureSkipVerify: true,
 				MinVersion: tls.VersionTLS13,
+				// Certificates: []arrangetls.ExternalCertificate{
+				// 	{CertificateFile: "/certs/cert.pem"},
+				// 	{KeyFile: "/certs/key.pem"},
+				// },
 			},
 		},
 	},
@@ -368,7 +393,7 @@ var defaultConfig = Config{
 		},
 	},
 	MockTr181: MockTr181{
-		FilePath:    "./mock_tr181.json",
+		FilePath:    "/mock_tr181.json",
 		ServiceName: "config",
 	},
 	XmidtAgentCrud: XmidtAgentCrud{

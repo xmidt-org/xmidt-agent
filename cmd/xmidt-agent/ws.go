@@ -25,7 +25,6 @@ var (
 
 type wsIn struct {
 	fx.In
-	// Note, DeviceID is pulled from the Identity configuration
 	Identity  Identity
 	Logger    *zap.Logger
 	CLI       *CLI
