@@ -147,6 +147,9 @@ type XmidtCredentials struct {
 	// FilePermissions is the permissions to use when creating the credentials
 	// file.
 	FilePermissions fs.FileMode
+
+	// WaitUntilFetched is the time the xmidt-agent blocks on startup until an attempt to fetch the credentials has been made.
+	WaitUntilFetched time.Duration
 }
 
 // XmidtService contains the configuration for the XMiDT service endpoint.
@@ -297,6 +300,7 @@ var defaultConfig = Config{
 				MinVersion: tls.VersionTLS13,
 			},
 		},
+		WaitUntilFetched: 30 * time.Second,
 	},
 	XmidtService: XmidtService{
 		Backoff: Backoff{
