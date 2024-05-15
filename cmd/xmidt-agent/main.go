@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"runtime/debug"
@@ -214,16 +215,19 @@ func provideLogger(in LoggerIn) (*zap.AtomicLevel, *zap.Logger, error) {
 func onStart(cred *credentials.Credentials, ws *websocket.Websocket, qos *qos.Handler, waitUntilFetched time.Duration, logger *zap.Logger) func(context.Context) error {
 	logger = logger.Named("on_start")
 
-	return func(ctx context.Context) error {
+	return func(ctx context.Context) (err error) {
+		// err is set during a panic recovery in order to allow fx to rolling back
 		defer func() {
 			if r := recover(); nil != r {
 				logger.Error("stacktrace from panic", zap.String("stacktrace", string(debug.Stack())), zap.Any("panic", r))
+				err = errors.New("panic occured during fx lifecycle Start")
 			}
+
 		}()
 
 		if ws == nil {
 			logger.Debug("websocket disabled")
-			return nil
+			return err
 		}
 
 		ctx, cancel := context.WithTimeout(ctx, waitUntilFetched)
@@ -233,7 +237,7 @@ func onStart(cred *credentials.Credentials, ws *websocket.Websocket, qos *qos.Ha
 		ws.Start()
 		qos.Start()
 
-		return nil
+		return err
 	}
 }
 
