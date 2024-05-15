@@ -6,7 +6,6 @@ package main
 import (
 	"context"
 	"errors"
-	"net/http"
 	"net/url"
 	"time"
 
@@ -59,20 +58,20 @@ func provideWS(in wsIn) (wsOut, error) {
 		fetchURLFunc = in.JWTXT.Endpoint
 	}
 
-	credDecorator := func(http.Header) error { return nil }
-	// Cred is not required
-	// Agent will openfail if its config section `xmidt_credentials` is omitted (in.Cred will be nil).
-	if in.Cred != nil {
-		credDecorator = in.Cred.Decorate
-	}
-
 	client, err := in.Websocket.HTTPClient.NewClient()
 	if err != nil {
 		return wsOut{}, err
 	}
 
+	var opts []websocket.Option
+	// Cred is not required
+	// Agent will openfail if its config section `xmidt_credentials` is omitted (in.Cred will be nil).
+	if in.Cred != nil {
+		opts = append(opts, websocket.CredentialsDecorator(in.Cred.Decorate))
+	}
+
 	// Configuration options
-	opts := []websocket.Option{
+	opts = append(opts,
 		websocket.DeviceID(in.Identity.DeviceID),
 		websocket.FetchURLTimeout(in.Websocket.FetchURLTimeout),
 		websocket.FetchURL(
@@ -84,7 +83,6 @@ func provideWS(in wsIn) (wsOut, error) {
 		websocket.KeepAliveInterval(in.Websocket.KeepAliveInterval),
 		websocket.HTTPClient(client),
 		websocket.MaxMessageBytes(in.Websocket.MaxMessageBytes),
-		websocket.CredentialsDecorator(credDecorator),
 		websocket.ConveyDecorator(in.Metadata.Decorate),
 		websocket.AdditionalHeaders(in.Websocket.AdditionalHeaders),
 		websocket.NowFunc(time.Now),
@@ -92,7 +90,7 @@ func provideWS(in wsIn) (wsOut, error) {
 		websocket.WithIPv4(!in.Websocket.DisableV4),
 		websocket.Once(in.Websocket.Once),
 		websocket.RetryPolicy(in.Websocket.RetryPolicy),
-	}
+	)
 
 	// Listener options
 	var (
