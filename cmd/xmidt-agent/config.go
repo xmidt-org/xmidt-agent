@@ -298,17 +298,6 @@ var defaultConfig = Config{
 		LastRebootReason: "client init reboot",
 		BootTime: time.Now(),
 	},
-	// xmidt_credentials:
-	//   url: http://localhost:6501/issue
-	//   file_name: outputJwt.txt
-	//   file_permissions: 0777
-	//   http_client:
-	//     tls:
-	//       insecure_skip_verify: true
-	//       certificates:
-	//         - certificate_file: certs/cert.pem
-	//          key_file:         certs/key.pem
-	//      min_version: 771 # 0x0303, the TLS 1.2 version uint16
 	XmidtCredentials: XmidtCredentials{
 		RefetchPercent:  90.0,
 		FileName:        "credentials.msgpack",
