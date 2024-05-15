@@ -310,7 +310,6 @@ var defaultConfig = Config{
 	//          key_file:         certs/key.pem
 	//      min_version: 771 # 0x0303, the TLS 1.2 version uint16
 	XmidtCredentials: XmidtCredentials{
-		//URL: "http://localhost:6501/issue",
 		RefetchPercent:  90.0,
 		FileName:        "credentials.msgpack",
 		FilePermissions: fs.FileMode(0600),
@@ -323,10 +322,6 @@ var defaultConfig = Config{
 			TLS: &arrangetls.Config{
 				InsecureSkipVerify: true,
 				MinVersion:         tls.VersionTLS13,
-				Certificates: []arrangetls.ExternalCertificate{
-					{CertificateFile: "/certs/cert.pem"},
-					{KeyFile: "/certs/key.pem"},
-				},
 			},
 		},
 		WaitUntilFetched: 30 * time.Second,
