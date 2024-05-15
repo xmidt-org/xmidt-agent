@@ -58,6 +58,11 @@ func provideWS(in wsIn) (wsOut, error) {
 		fetchURLFunc = in.JWTXT.Endpoint
 	}
 
+	client, err := in.Websocket.HTTPClient.NewClient()
+	if err != nil {
+		return wsOut{}, err
+	}
+
 	// Configuration options
 	opts := []websocket.Option{
 		websocket.DeviceID(in.Identity.DeviceID),
@@ -68,11 +73,8 @@ func provideWS(in wsIn) (wsOut, error) {
 		websocket.PingInterval(in.Websocket.PingInterval),
 		websocket.PingTimeout(in.Websocket.PingTimeout),
 		websocket.SendTimeout(in.Websocket.SendTimeout),
-		websocket.ConnectTimeout(in.Websocket.ConnectTimeout),
 		websocket.KeepAliveInterval(in.Websocket.KeepAliveInterval),
-		websocket.IdleConnTimeout(in.Websocket.IdleConnTimeout),
-		websocket.TLSHandshakeTimeout(in.Websocket.TLSHandshakeTimeout),
-		websocket.ExpectContinueTimeout(in.Websocket.ExpectContinueTimeout),
+		websocket.HTTPClient(client),
 		websocket.MaxMessageBytes(in.Websocket.MaxMessageBytes),
 		websocket.CredentialsDecorator(in.Cred.Decorate),
 		websocket.ConveyDecorator(in.Metadata.Decorate),
