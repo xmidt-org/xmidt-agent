@@ -27,8 +27,10 @@ COPY mock_tr181.json /
 
 # Make the location for the configuration file that will be used.
 RUN     mkdir /etc/xmidt-agent/
-
 COPY ./.release/docker/config/config.yml  /etc/xmidt-agent/xmidt-agent.yaml
+
+RUN mkdir /certs
+COPY certs/*.pem /certs
 
 USER root
 
