@@ -61,7 +61,7 @@ func provideWS(in wsIn) (wsOut, error) {
 
 	credDecorator := func(http.Header) error { return nil }
 	// Cred is not required
-	// credDecorator() will default to openfail if in.Cred is nil
+	// Agent will openfail if its config section `xmidt_credentials` is omitted (in.Cred will be nil).
 	if in.Cred != nil {
 		credDecorator = in.Cred.Decorate
 	}

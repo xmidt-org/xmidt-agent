@@ -226,7 +226,7 @@ func onStart(cred *credentials.Credentials, ws *websocket.Websocket, qos *qos.Ha
 			return nil
 		}
 
-		// in case of openfail, cred will be nil
+		// Agent will openfail if its config section `xmidt_credentials` is omitted (cred will be nil).
 		if cred != nil {
 			ctx, cancel := context.WithTimeout(ctx, waitUntilFetched)
 			defer cancel()
