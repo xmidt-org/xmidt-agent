@@ -225,7 +225,7 @@ func (ws *Websocket) run(ctx context.Context) {
 			Mode:    mode.ToEvent(),
 		}
 
-		// If auth fails, then continue with openfail xmidt connection
+		// If auth fails, then continue with no credentials.
 		ws.credDecorator(ws.additionalHeaders)
 
 		ws.conveyDecorator(ws.additionalHeaders)
