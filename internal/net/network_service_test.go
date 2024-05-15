@@ -25,7 +25,7 @@ func (m *mockNetworkWrapper) Interfaces() ([]net.Interface, error) {
 
 type NetworkServiceSuite struct {
 	suite.Suite
-	networkService     *NetworkService
+	networkService     NetworkServicer
 	mockNetworkWrapper *mockNetworkWrapper
 }
 

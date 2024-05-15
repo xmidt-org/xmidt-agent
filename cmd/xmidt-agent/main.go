@@ -15,9 +15,8 @@ import (
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials"
 	"github.com/xmidt-org/xmidt-agent/internal/loglevel"
-	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
-	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
+	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/qos"
 
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -50,9 +49,10 @@ type LifeCycleIn struct {
 	LC               fx.Lifecycle
 	Shutdowner       fx.Shutdowner
 	WS               *websocket.Websocket
+	QOS              *qos.Handler
 	Cred             *credentials.Credentials
-	EventCancelList  []event.CancelFunc
-	PubSubCancelList []pubsub.CancelFunc
+	WaitUntilFetched time.Duration `name:"wait_until_fetched"`
+	Cancels          []func()      `group:"cancels"`
 }
 
 // xmidtAgent is the main entry point for the program.  It is responsible for
@@ -95,8 +95,11 @@ func xmidtAgent(args []string) (*fx.App, error) {
 			goschtalt.UnmarshalFunc[Websocket]("websocket"),
 			goschtalt.UnmarshalFunc[MockTr181]("mock_tr_181"),
 			goschtalt.UnmarshalFunc[Pubsub]("pubsub"),
+			goschtalt.UnmarshalFunc[Metadata]("metadata"),
+			goschtalt.UnmarshalFunc[QOS]("qos"),
 
 			provideNetworkService,
+			provideMetadataProvider,
 			loglevel.New,
 		),
 
@@ -208,7 +211,7 @@ func provideLogger(in LoggerIn) (*zap.AtomicLevel, *zap.Logger, error) {
 	return &zcfg.Level, logger, err
 }
 
-func onStart(cred *credentials.Credentials, ws *websocket.Websocket, logger *zap.Logger) func(context.Context) error {
+func onStart(cred *credentials.Credentials, ws *websocket.Websocket, qos *qos.Handler, waitUntilFetched time.Duration, logger *zap.Logger) func(context.Context) error {
 	logger = logger.Named("on_start")
 
 	return func(ctx context.Context) error {
@@ -223,17 +226,22 @@ func onStart(cred *credentials.Credentials, ws *websocket.Websocket, logger *zap
 			return nil
 		}
 
-		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		defer cancel()
-		// blocks until an attempt to fetch the credentials has been made or the context is canceled
-		cred.WaitUntilFetched(ctx)
+		// Allow operations where no credentials are desired (cred will be nil).
+		if cred != nil {
+			ctx, cancel := context.WithTimeout(ctx, waitUntilFetched)
+			defer cancel()
+			// blocks until an attempt to fetch the credentials has been made or the context is canceled
+			cred.WaitUntilFetched(ctx)
+		}
+
 		ws.Start()
+		qos.Start()
 
 		return nil
 	}
 }
 
-func onStop(ws *websocket.Websocket, shutdowner fx.Shutdowner, eventCancelList []event.CancelFunc, pubsubCancelList []pubsub.CancelFunc, logger *zap.Logger) func(context.Context) error {
+func onStop(ws *websocket.Websocket, qos *qos.Handler, shutdowner fx.Shutdowner, cancels []func(), logger *zap.Logger) func(context.Context) error {
 	logger = logger.Named("on_stop")
 
 	return func(_ context.Context) error {
@@ -253,11 +261,8 @@ func onStop(ws *websocket.Websocket, shutdowner fx.Shutdowner, eventCancelList [
 		}
 
 		ws.Stop()
-		for _, c := range eventCancelList {
-			c()
-		}
-
-		for _, c := range pubsubCancelList {
+		qos.Stop()
+		for _, c := range cancels {
 			c()
 		}
 
@@ -269,8 +274,8 @@ func lifeCycle(in LifeCycleIn) {
 	logger := in.Logger.Named("fx_lifecycle")
 	in.LC.Append(
 		fx.Hook{
-			OnStart: onStart(in.Cred, in.WS, logger),
-			OnStop:  onStop(in.WS, in.Shutdowner, in.EventCancelList, in.PubSubCancelList, logger),
+			OnStart: onStart(in.Cred, in.WS, in.QOS, in.WaitUntilFetched, logger),
+			OnStop:  onStop(in.WS, in.QOS, in.Shutdowner, in.Cancels, logger),
 		},
 	)
 }

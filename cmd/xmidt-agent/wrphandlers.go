@@ -13,6 +13,7 @@ import (
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/auth"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/missing"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/mocktr181"
+	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/qos"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/xmidt_agent_crud"
 	"go.uber.org/fx"
 )
@@ -28,8 +29,9 @@ func provideWRPHandlers() fx.Option {
 			provideMissingHandler,
 			provideAuthHandler,
 			provideCrudHandler,
+			provideQOSHandler,
+			provideWSEventorToHandlerAdapter,
 		),
-		fx.Invoke(provideWSEventorToHandlerAdapter),
 	)
 }
 
@@ -39,16 +41,38 @@ type wsAdapterIn struct {
 	WS *websocket.Websocket
 
 	// wrphandlers
-	AuthHandler             *auth.Handler
-	WRPHandlerAdapterCancel event.CancelFunc
+	AuthHandler *auth.Handler
 }
 
-func provideWSEventorToHandlerAdapter(in wsAdapterIn) {
-	in.WS.AddMessageListener(
-		event.MsgListenerFunc(func(m wrp.Message) {
-			_ = in.AuthHandler.HandleWrp(m)
-		}),
-		&in.WRPHandlerAdapterCancel,
+type wsAdapterOut struct {
+	fx.Out
+
+	Cancels []func() `group:"cancels,flatten"`
+}
+
+func provideWSEventorToHandlerAdapter(in wsAdapterIn) wsAdapterOut {
+	return wsAdapterOut{
+		Cancels: []func(){
+			in.WS.AddMessageListener(
+				event.MsgListenerFunc(func(m wrp.Message) {
+					_ = in.AuthHandler.HandleWrp(m)
+				}),
+			),
+		}}
+}
+
+type qosIn struct {
+	fx.In
+
+	QOS QOS
+	WS  *websocket.Websocket
+}
+
+func provideQOSHandler(in qosIn) (*qos.Handler, error) {
+	return qos.New(
+		in.WS,
+		qos.MaxQueueBytes(in.QOS.MaxQueueBytes),
+		qos.MaxMessageBytes(in.QOS.MaxMessageBytes),
 	)
 }
 
@@ -60,7 +84,7 @@ type missingIn struct {
 	Identity Identity
 
 	// wrphandlers
-	Egress websocket.Egress
+	Egress *qos.Handler
 	Pubsub *pubsub.PubSub
 }
 
@@ -82,7 +106,7 @@ type authIn struct {
 
 	// wrphandlers
 
-	Egress         websocket.Egress
+	Egress         *qos.Handler
 	MissingHandler *missing.Handler
 }
 
@@ -132,20 +156,20 @@ type pubsubIn struct {
 	MockTr181 MockTr181
 
 	// wrphandlers
-	Egress websocket.Egress
+	Egress *qos.Handler
 }
 
 type pubsubOut struct {
 	fx.Out
 
-	PubSub           *pubsub.PubSub
-	PubSubCancelList []pubsub.CancelFunc
+	PubSub  *pubsub.PubSub
+	Cancels []func() `group:"cancels,flatten"`
 }
 
 func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 	var (
-		egress     pubsub.CancelFunc
-		cancelList = []pubsub.CancelFunc{egress}
+		egress, mocktr pubsub.CancelFunc
+		cancels        []func()
 	)
 
 	opts := []pubsub.Option{
@@ -161,6 +185,7 @@ func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 		return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
 	}
 
+	cancels = append(cancels, egress)
 	if in.MockTr181.Enabled {
 		mockDefaults := []mocktr181.Option{
 			mocktr181.FilePath(in.MockTr181.FilePath),
@@ -171,16 +196,16 @@ func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 			return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
 		}
 
-		mocktr, err := ps.SubscribeService(in.MockTr181.ServiceName, mocktr181Handler)
+		mocktr, err = ps.SubscribeService(in.MockTr181.ServiceName, mocktr181Handler)
 		if err != nil {
 			return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
 		}
 
-		cancelList = append(cancelList, mocktr)
+		cancels = append(cancels, mocktr)
 	}
 
 	return pubsubOut{
-		PubSub:           ps,
-		PubSubCancelList: cancelList,
+		PubSub:  ps,
+		Cancels: cancels,
 	}, err
 }

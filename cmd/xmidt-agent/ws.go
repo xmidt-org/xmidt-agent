@@ -12,6 +12,7 @@ import (
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials"
 	"github.com/xmidt-org/xmidt-agent/internal/jwtxt"
+	"github.com/xmidt-org/xmidt-agent/internal/metadata"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
 	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
@@ -30,16 +31,18 @@ type wsIn struct {
 	CLI       *CLI
 	JWTXT     *jwtxt.Instructions
 	Cred      *credentials.Credentials
+	Metadata  *metadata.MetadataProvider
 	Websocket Websocket
 }
 
 type wsOut struct {
 	fx.Out
-	WSHandler               wrpkit.Handler
-	WS                      *websocket.Websocket
-	Egress                  websocket.Egress
-	WRPHandlerAdapterCancel event.CancelFunc
-	EventCancelList         []event.CancelFunc
+	WSHandler wrpkit.Handler
+	WS        *websocket.Websocket
+	Egress    websocket.Egress
+
+	// cancels
+	Cancels []func() `group:"cancels,flatten"`
 }
 
 func provideWS(in wsIn) (wsOut, error) {
@@ -47,34 +50,50 @@ func provideWS(in wsIn) (wsOut, error) {
 		return wsOut{}, nil
 	}
 
+	var fetchURLFunc func(context.Context) (string, error)
+	// JWTXT is not required
+	// fetchURL() will use in.Websocket.BackUpURL if in.JWTXT is nil
+	if in.JWTXT != nil {
+		fetchURLFunc = in.JWTXT.Endpoint
+	}
+
+	client, err := in.Websocket.HTTPClient.NewClient()
+	if err != nil {
+		return wsOut{}, err
+	}
+
+	var opts []websocket.Option
+	// Allow operations where no credentials are desired (in.Cred will be nil).
+	if in.Cred != nil {
+		opts = append(opts, websocket.CredentialsDecorator(in.Cred.Decorate))
+	}
+
 	// Configuration options
-	opts := []websocket.Option{
+	opts = append(opts,
 		websocket.DeviceID(in.Identity.DeviceID),
 		websocket.FetchURLTimeout(in.Websocket.FetchURLTimeout),
 		websocket.FetchURL(
 			fetchURL(in.Websocket.URLPath, in.Websocket.BackUpURL,
-				in.JWTXT.Endpoint)),
+				fetchURLFunc)),
 		websocket.PingInterval(in.Websocket.PingInterval),
 		websocket.PingTimeout(in.Websocket.PingTimeout),
-		websocket.ConnectTimeout(in.Websocket.ConnectTimeout),
+		websocket.SendTimeout(in.Websocket.SendTimeout),
 		websocket.KeepAliveInterval(in.Websocket.KeepAliveInterval),
-		websocket.IdleConnTimeout(in.Websocket.IdleConnTimeout),
-		websocket.TLSHandshakeTimeout(in.Websocket.TLSHandshakeTimeout),
-		websocket.ExpectContinueTimeout(in.Websocket.ExpectContinueTimeout),
+		websocket.HTTPClient(client),
 		websocket.MaxMessageBytes(in.Websocket.MaxMessageBytes),
-		websocket.CredentialsDecorator(in.Cred.Decorate),
+		websocket.ConveyDecorator(in.Metadata.Decorate),
 		websocket.AdditionalHeaders(in.Websocket.AdditionalHeaders),
 		websocket.NowFunc(time.Now),
 		websocket.WithIPv6(!in.Websocket.DisableV6),
 		websocket.WithIPv4(!in.Websocket.DisableV4),
 		websocket.Once(in.Websocket.Once),
 		websocket.RetryPolicy(in.Websocket.RetryPolicy),
-	}
+	)
 
 	// Listener options
 	var (
-		msg, con, discon, heartbeat, wrphandlerAdapter event.CancelFunc
-		cancelList                                     = []event.CancelFunc{wrphandlerAdapter}
+		msg, con, discon, heartbeat event.CancelFunc
+		cancels                     []func()
 	)
 	if in.CLI.Dev {
 		logger := in.Logger.Named("websocket")
@@ -99,7 +118,6 @@ func provideWS(in wsIn) (wsOut, error) {
 					logger.Info("heartbeat listener", zap.Any("event", e))
 				}), &heartbeat),
 		)
-		cancelList = append(cancelList, msg, con, discon, heartbeat)
 	}
 
 	ws, err := websocket.New(opts...)
@@ -107,16 +125,23 @@ func provideWS(in wsIn) (wsOut, error) {
 		err = errors.Join(ErrWebsocketConfig, err)
 	}
 
+	if in.CLI.Dev {
+		cancels = append(cancels, msg, con, discon, heartbeat)
+	}
+
 	return wsOut{
-		WS:                      ws,
-		EventCancelList:         cancelList,
-		WRPHandlerAdapterCancel: wrphandlerAdapter,
-		Egress:                  ws,
+		WS:      ws,
+		Egress:  ws,
+		Cancels: cancels,
 	}, err
 }
 
 func fetchURL(path, backUpURL string, f func(context.Context) (string, error)) func(context.Context) (string, error) {
 	return func(ctx context.Context) (string, error) {
+		if f == nil {
+			return url.JoinPath(backUpURL, path)
+		}
+
 		baseURL, err := f(ctx)
 		if err != nil {
 			if backUpURL != "" {

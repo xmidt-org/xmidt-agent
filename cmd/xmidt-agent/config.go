@@ -37,8 +37,17 @@ type Config struct {
 	Logger           sallust.Config
 	Storage          Storage
 	MockTr181        MockTr181
+	QOS              QOS
 	Externals        []configuration.External
 	XmidtAgentCrud   XmidtAgentCrud
+	Metadata         Metadata
+}
+
+type QOS struct {
+	// MaxQueueBytes is the allowable max size of the qos' priority queue, based on the sum of all queued wrp message's payload.
+	MaxQueueBytes int64
+	// MaxMessageBytes is the largest allowable wrp message payload.
+	MaxMessageBytes int
 }
 
 type Pubsub struct {
@@ -61,16 +70,12 @@ type Websocket struct {
 	PingInterval time.Duration
 	// PingTimeout is the ping timeout for the WS connection.
 	PingTimeout time.Duration
-	// ConnectTimeout is the connect timeout for the WS connection.
-	ConnectTimeout time.Duration
+	// SendTimeout is the send timeout for the WS connection.
+	SendTimeout time.Duration
+	// HTTPClient is the configuration for the HTTP client.
+	HTTPClient arrangehttp.ClientConfig
 	// KeepAliveInterval is the keep alive interval for the WS connection.
 	KeepAliveInterval time.Duration
-	// IdleConnTimeout is the idle connection timeout for the WS connection.
-	IdleConnTimeout time.Duration
-	// TLSHandshakeTimeout is the TLS handshake timeout for the WS connection.
-	TLSHandshakeTimeout time.Duration
-	// ExpectContinueTimeout is the expect continue timeout for the WS connection.
-	ExpectContinueTimeout time.Duration
 	// MaxMessageBytes is the largest allowable message to send or receive.
 	MaxMessageBytes int64
 	// (optional) DisableV4 determines whether or not to allow IPv4 for the WS connection.
@@ -142,6 +147,9 @@ type XmidtCredentials struct {
 	// FilePermissions is the permissions to use when creating the credentials
 	// file.
 	FilePermissions fs.FileMode
+
+	// WaitUntilFetched is the time the xmidt-agent blocks on startup until an attempt to fetch the credentials has been made.
+	WaitUntilFetched time.Duration
 }
 
 // XmidtService contains the configuration for the XMiDT service endpoint.
@@ -200,6 +208,10 @@ type MockTr181 struct {
 	FilePath    string
 	Enabled     bool
 	ServiceName string
+}
+
+type Metadata struct {
+	Fields []string
 }
 
 // Collect and process the configuration files and env vars and
@@ -317,6 +329,7 @@ var defaultConfig = Config{
 				},
 			},
 		},
+		WaitUntilFetched: 30 * time.Second,
 	},
 	XmidtService: XmidtService{
 		Backoff: Backoff{
@@ -334,16 +347,21 @@ var defaultConfig = Config{
 		},
 	},
 	Websocket: Websocket{
-		URLPath:               "/api/v2/device",
-		FetchURLTimeout:       30 * time.Second,
-		PingInterval:          30 * time.Second,
-		PingTimeout:           90 * time.Second,
-		ConnectTimeout:        30 * time.Second,
-		KeepAliveInterval:     30 * time.Second,
-		IdleConnTimeout:       10 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-		MaxMessageBytes:       256 * 1024,
+		URLPath:           "/api/v2/device",
+		FetchURLTimeout:   30 * time.Second,
+		PingInterval:      30 * time.Second,
+		PingTimeout:       90 * time.Second,
+		SendTimeout:       90 * time.Second,
+		KeepAliveInterval: 30 * time.Second,
+		HTTPClient: arrangehttp.ClientConfig{
+			Timeout: 30 * time.Second,
+			Transport: arrangehttp.TransportConfig{
+				IdleConnTimeout:       10 * time.Second,
+				TLSHandshakeTimeout:   10 * time.Second,
+				ExpectContinueTimeout: 1 * time.Second,
+			},
+		},
+		MaxMessageBytes: 256 * 1024,
 		/*
 			This retry policy gives us a very good approximation of the prior
 			policy.  The important things about this policy are:
@@ -402,5 +420,12 @@ var defaultConfig = Config{
 	},
 	XmidtAgentCrud: XmidtAgentCrud{
 		ServiceName: "xmidt_agent",
+	},
+	QOS: QOS{
+		MaxQueueBytes:   1 * 1024 * 1024, // 1MB max/queue,
+		MaxMessageBytes: 256 * 1024,      // 256 KB
+	},
+	Metadata: Metadata{
+		Fields: []string{"fw-name", "hw-model", "hw-manufacturer", "hw-serial-number", "hw-last-reboot-reason", "webpa-protocol", "boot-time", "boot-time-retry-wait", "webpa-interface-used", "interfaces-available"},
 	},
 }

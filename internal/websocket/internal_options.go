@@ -57,6 +57,16 @@ func validateCredentialsDecorator() Option {
 		})
 }
 
+func validateConveyDecorator() Option {
+	return optionFunc(
+		func(ws *Websocket) error {
+			if ws.conveyDecorator == nil {
+				return fmt.Errorf("%w: nil ConveyDecorator", ErrMisconfiguredWS)
+			}
+			return nil
+		})
+}
+
 func validateNowFunc() Option {
 	return optionFunc(
 		func(ws *Websocket) error {
@@ -72,6 +82,16 @@ func validRetryPolicy() Option {
 		func(ws *Websocket) error {
 			if ws.retryPolicyFactory == nil {
 				return fmt.Errorf("%w: nil RetryPolicy", ErrMisconfiguredWS)
+			}
+			return nil
+		})
+}
+
+func validHTTPClient() Option {
+	return optionFunc(
+		func(ws *Websocket) error {
+			if ws.client == nil {
+				return fmt.Errorf("%w: nil client", ErrMisconfiguredWS)
 			}
 			return nil
 		})

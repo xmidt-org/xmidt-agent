@@ -29,6 +29,7 @@ func TestNew(t *testing.T) {
 
 	wsDefaults := []Option{
 		WithIPv6(),
+		HTTPClient(nil),
 	}
 	tests := []struct {
 		description string
@@ -54,8 +55,13 @@ func TestNew(t *testing.T) {
 					h.Add("Credentials-Decorator", "some value")
 					return nil
 				}),
+				ConveyDecorator(func(h http.Header) error {
+					h.Add("Convey-Decorator", "some value")
+					return nil
+				}),
 				NowFunc(time.Now),
 				RetryPolicy(retry.Config{}),
+				HTTPClient(nil),
 			),
 			check: func(assert *assert.Assertions, c *Websocket) {
 				// URL Related
@@ -68,9 +74,11 @@ func TestNew(t *testing.T) {
 				// Headers
 				assert.NotNil(c.additionalHeaders)
 				assert.NoError(c.credDecorator(c.additionalHeaders))
+				assert.NoError(c.conveyDecorator(c.additionalHeaders))
 				assert.Equal("mac:112233445566", c.additionalHeaders.Get("X-Webpa-Device-Name"))
 				assert.Equal("vAlUE", c.additionalHeaders.Get("Some-Other-Header"))
 				assert.Equal("some value", c.additionalHeaders.Get("Credentials-Decorator"))
+				assert.Equal("some value", c.additionalHeaders.Get("Convey-Decorator"))
 			},
 		},
 
@@ -90,8 +98,12 @@ func TestNew(t *testing.T) {
 				CredentialsDecorator(func(h http.Header) error {
 					return nil
 				}),
+				ConveyDecorator(func(h http.Header) error {
+					return nil
+				}),
 				NowFunc(time.Now),
 				RetryPolicy(retry.Config{}),
+				HTTPClient(nil),
 			),
 			check: func(assert *assert.Assertions, c *Websocket) {
 				u, err := c.urlFetcher(context.Background())
@@ -131,12 +143,6 @@ func TestNew(t *testing.T) {
 				PingTimeout(-1),
 			},
 			expectedErr: ErrMisconfiguredWS,
-		}, {
-			description: "negative connect timeout",
-			opts: []Option{
-				ConnectTimeout(-1),
-			},
-			expectedErr: ErrMisconfiguredWS,
 		},
 
 		// Test the now func option
@@ -152,7 +158,11 @@ func TestNew(t *testing.T) {
 				CredentialsDecorator(func(h http.Header) error {
 					return nil
 				}),
+				ConveyDecorator(func(h http.Header) error {
+					return nil
+				}),
 				RetryPolicy(retry.Config{}),
+				HTTPClient(nil),
 			),
 			check: func(assert *assert.Assertions, c *Websocket) {
 				if assert.NotNil(c.nowFunc) {
@@ -211,8 +221,12 @@ func TestMessageListener(t *testing.T) {
 		CredentialsDecorator(func(h http.Header) error {
 			return nil
 		}),
+		ConveyDecorator(func(h http.Header) error {
+			return nil
+		}),
 		NowFunc(time.Now),
 		RetryPolicy(retry.Config{}),
+		HTTPClient(nil),
 	)
 
 	assert.NoError(err)
@@ -239,8 +253,12 @@ func TestConnectListener(t *testing.T) {
 		CredentialsDecorator(func(h http.Header) error {
 			return nil
 		}),
+		ConveyDecorator(func(h http.Header) error {
+			return nil
+		}),
 		NowFunc(time.Now),
 		RetryPolicy(retry.Config{}),
+		HTTPClient(nil),
 	)
 
 	assert.NoError(err)
@@ -267,8 +285,12 @@ func TestDisconnectListener(t *testing.T) {
 		CredentialsDecorator(func(h http.Header) error {
 			return nil
 		}),
+		ConveyDecorator(func(h http.Header) error {
+			return nil
+		}),
 		NowFunc(time.Now),
 		RetryPolicy(retry.Config{}),
+		HTTPClient(nil),
 	)
 
 	assert.NoError(err)
@@ -295,8 +317,12 @@ func TestHeartbeatListener(t *testing.T) {
 		CredentialsDecorator(func(h http.Header) error {
 			return nil
 		}),
+		ConveyDecorator(func(h http.Header) error {
+			return nil
+		}),
 		NowFunc(time.Now),
 		RetryPolicy(retry.Config{}),
+		HTTPClient(nil),
 	)
 
 	assert.NoError(err)
@@ -313,8 +339,12 @@ func TestNextMode(t *testing.T) {
 		CredentialsDecorator(func(h http.Header) error {
 			return nil
 		}),
+		ConveyDecorator(func(h http.Header) error {
+			return nil
+		}),
 		NowFunc(time.Now),
 		RetryPolicy(retry.Config{}),
+		HTTPClient(nil),
 	}
 	tests := []struct {
 		description string
@@ -397,4 +427,8 @@ func TestLimit(t *testing.T) {
 			assert.Equal(tc.want, got)
 		})
 	}
+}
+
+func Test_emptyDecorator(t *testing.T) {
+	assert.NoError(t, emptyDecorator(http.Header{}))
 }
