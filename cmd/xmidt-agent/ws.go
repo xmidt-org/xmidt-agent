@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"errors"
+	"net/http"
 	"net/url"
 	"time"
 
@@ -58,6 +59,13 @@ func provideWS(in wsIn) (wsOut, error) {
 		fetchURLFunc = in.JWTXT.Endpoint
 	}
 
+	credDecorator := func(http.Header) error { return nil }
+	// Cred is not required
+	// credDecorator() will default to openfail if in.Cred is nil
+	if in.Cred != nil {
+		credDecorator = in.Cred.Decorate
+	}
+
 	client, err := in.Websocket.HTTPClient.NewClient()
 	if err != nil {
 		return wsOut{}, err
@@ -76,7 +84,7 @@ func provideWS(in wsIn) (wsOut, error) {
 		websocket.KeepAliveInterval(in.Websocket.KeepAliveInterval),
 		websocket.HTTPClient(client),
 		websocket.MaxMessageBytes(in.Websocket.MaxMessageBytes),
-		websocket.CredentialsDecorator(in.Cred.Decorate),
+		websocket.CredentialsDecorator(credDecorator),
 		websocket.ConveyDecorator(in.Metadata.Decorate),
 		websocket.AdditionalHeaders(in.Websocket.AdditionalHeaders),
 		websocket.NowFunc(time.Now),
