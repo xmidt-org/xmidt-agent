@@ -196,9 +196,6 @@ type mockTr181In struct {
 	MockTr181 MockTr181
 
 	PubSub *pubsub.PubSub
-
-	// wrphandlers
-	Egress *qos.Handler
 }
 
 type mockTr181Out struct {
