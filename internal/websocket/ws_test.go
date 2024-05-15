@@ -428,3 +428,7 @@ func TestLimit(t *testing.T) {
 		})
 	}
 }
+
+func Test_emptyDecorator(t *testing.T) {
+	assert.NoError(t, emptyDecorator(http.Header{}))
+}
