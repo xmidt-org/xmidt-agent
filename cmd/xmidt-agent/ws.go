@@ -64,8 +64,7 @@ func provideWS(in wsIn) (wsOut, error) {
 	}
 
 	var opts []websocket.Option
-	// Cred is not required
-	// Agent will openfail if its config section `xmidt_credentials` is omitted (in.Cred will be nil).
+	// Allow operations where no credentials are desired (in.Cred will be nil).
 	if in.Cred != nil {
 		opts = append(opts, websocket.CredentialsDecorator(in.Cred.Decorate))
 	}
