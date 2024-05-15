@@ -86,3 +86,13 @@ func validRetryPolicy() Option {
 			return nil
 		})
 }
+
+func validHTTPClient() Option {
+	return optionFunc(
+		func(ws *Websocket) error {
+			if ws.client == nil {
+				return fmt.Errorf("%w: nil client", ErrMisconfiguredWS)
+			}
+			return nil
+		})
+}

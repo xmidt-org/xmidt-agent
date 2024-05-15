@@ -15,6 +15,7 @@ import (
 	"github.com/xmidt-org/xmidt-agent/internal/metadata"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
+	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
@@ -37,10 +38,12 @@ type wsIn struct {
 
 type wsOut struct {
 	fx.Out
-	WS                      *websocket.Websocket
-	Egress                  websocket.Egress
-	WRPHandlerAdapterCancel event.CancelFunc
-	EventCancelList         []event.CancelFunc
+	WSHandler wrpkit.Handler
+	WS        *websocket.Websocket
+	Egress    websocket.Egress
+
+	// cancels
+	Cancels []func() `group:"cancels,flatten"`
 }
 
 func provideWS(in wsIn) (wsOut, error) {
@@ -55,6 +58,11 @@ func provideWS(in wsIn) (wsOut, error) {
 		fetchURLFunc = in.JWTXT.Endpoint
 	}
 
+	client, err := in.Websocket.HTTPClient.NewClient()
+	if err != nil {
+		return wsOut{}, err
+	}
+
 	// Configuration options
 	opts := []websocket.Option{
 		websocket.DeviceID(in.Identity.DeviceID),
@@ -65,11 +73,8 @@ func provideWS(in wsIn) (wsOut, error) {
 		websocket.PingInterval(in.Websocket.PingInterval),
 		websocket.PingTimeout(in.Websocket.PingTimeout),
 		websocket.SendTimeout(in.Websocket.SendTimeout),
-		websocket.ConnectTimeout(in.Websocket.ConnectTimeout),
 		websocket.KeepAliveInterval(in.Websocket.KeepAliveInterval),
-		websocket.IdleConnTimeout(in.Websocket.IdleConnTimeout),
-		websocket.TLSHandshakeTimeout(in.Websocket.TLSHandshakeTimeout),
-		websocket.ExpectContinueTimeout(in.Websocket.ExpectContinueTimeout),
+		websocket.HTTPClient(client),
 		websocket.MaxMessageBytes(in.Websocket.MaxMessageBytes),
 		websocket.CredentialsDecorator(in.Cred.Decorate),
 		websocket.ConveyDecorator(in.Metadata.Decorate),
@@ -83,8 +88,8 @@ func provideWS(in wsIn) (wsOut, error) {
 
 	// Listener options
 	var (
-		msg, con, discon, heartbeat, wrphandlerAdapter event.CancelFunc
-		cancelList                                     = []event.CancelFunc{wrphandlerAdapter}
+		msg, con, discon, heartbeat event.CancelFunc
+		cancels                     []func()
 	)
 	if in.CLI.Dev {
 		logger := in.Logger.Named("websocket")
@@ -109,7 +114,6 @@ func provideWS(in wsIn) (wsOut, error) {
 					logger.Info("heartbeat listener", zap.Any("event", e))
 				}), &heartbeat),
 		)
-		cancelList = append(cancelList, msg, con, discon, heartbeat)
 	}
 
 	ws, err := websocket.New(opts...)
@@ -117,11 +121,14 @@ func provideWS(in wsIn) (wsOut, error) {
 		err = errors.Join(ErrWebsocketConfig, err)
 	}
 
+	if in.CLI.Dev {
+		cancels = append(cancels, msg, con, discon, heartbeat)
+	}
+
 	return wsOut{
-		WS:                      ws,
-		EventCancelList:         cancelList,
-		WRPHandlerAdapterCancel: wrphandlerAdapter,
-		Egress:                  ws,
+		WS:      ws,
+		Egress:  ws,
+		Cancels: cancels,
 	}, err
 }
 

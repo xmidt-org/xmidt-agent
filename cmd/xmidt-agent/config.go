@@ -72,16 +72,10 @@ type Websocket struct {
 	PingTimeout time.Duration
 	// SendTimeout is the send timeout for the WS connection.
 	SendTimeout time.Duration
-	// ConnectTimeout is the connect timeout for the WS connection.
-	ConnectTimeout time.Duration
+	// HTTPClient is the configuration for the HTTP client.
+	HTTPClient arrangehttp.ClientConfig
 	// KeepAliveInterval is the keep alive interval for the WS connection.
 	KeepAliveInterval time.Duration
-	// IdleConnTimeout is the idle connection timeout for the WS connection.
-	IdleConnTimeout time.Duration
-	// TLSHandshakeTimeout is the TLS handshake timeout for the WS connection.
-	TLSHandshakeTimeout time.Duration
-	// ExpectContinueTimeout is the expect continue timeout for the WS connection.
-	ExpectContinueTimeout time.Duration
 	// MaxMessageBytes is the largest allowable message to send or receive.
 	MaxMessageBytes int64
 	// (optional) DisableV4 determines whether or not to allow IPv4 for the WS connection.
@@ -324,17 +318,21 @@ var defaultConfig = Config{
 		},
 	},
 	Websocket: Websocket{
-		URLPath:               "/api/v2/device",
-		FetchURLTimeout:       30 * time.Second,
-		PingInterval:          30 * time.Second,
-		PingTimeout:           90 * time.Second,
-		SendTimeout:           90 * time.Second,
-		ConnectTimeout:        30 * time.Second,
-		KeepAliveInterval:     30 * time.Second,
-		IdleConnTimeout:       10 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-		MaxMessageBytes:       256 * 1024,
+		URLPath:           "/api/v2/device",
+		FetchURLTimeout:   30 * time.Second,
+		PingInterval:      30 * time.Second,
+		PingTimeout:       90 * time.Second,
+		SendTimeout:       90 * time.Second,
+		KeepAliveInterval: 30 * time.Second,
+		HTTPClient: arrangehttp.ClientConfig{
+			Timeout: 30 * time.Second,
+			Transport: arrangehttp.TransportConfig{
+				IdleConnTimeout:       10 * time.Second,
+				TLSHandshakeTimeout:   10 * time.Second,
+				ExpectContinueTimeout: 1 * time.Second,
+			},
+		},
+		MaxMessageBytes: 256 * 1024,
 		/*
 			This retry policy gives us a very good approximation of the prior
 			policy.  The important things about this policy are:
