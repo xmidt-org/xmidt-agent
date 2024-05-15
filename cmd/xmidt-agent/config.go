@@ -310,7 +310,7 @@ var defaultConfig = Config{
 	//          key_file:         certs/key.pem
 	//      min_version: 771 # 0x0303, the TLS 1.2 version uint16
 	XmidtCredentials: XmidtCredentials{
-		URL: "http://localhost:6501/issue",
+		//URL: "http://localhost:6501/issue",
 		RefetchPercent:  90.0,
 		FileName:        "credentials.msgpack",
 		FilePermissions: fs.FileMode(0600),
@@ -348,6 +348,7 @@ var defaultConfig = Config{
 	},
 	Websocket: Websocket{
 		URLPath:           "/api/v2/device",
+		BackUpURL: "http://localhost:8080",
 		FetchURLTimeout:   30 * time.Second,
 		PingInterval:      30 * time.Second,
 		PingTimeout:       90 * time.Second,
