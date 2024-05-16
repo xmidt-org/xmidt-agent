@@ -226,10 +226,14 @@ func onStart(cred *credentials.Credentials, ws *websocket.Websocket, qos *qos.Ha
 			return nil
 		}
 
-		ctx, cancel := context.WithTimeout(ctx, waitUntilFetched)
-		defer cancel()
-		// blocks until an attempt to fetch the credentials has been made or the context is canceled
-		cred.WaitUntilFetched(ctx)
+		// Allow operations where no credentials are desired (cred will be nil).
+		if cred != nil {
+			ctx, cancel := context.WithTimeout(ctx, waitUntilFetched)
+			defer cancel()
+			// blocks until an attempt to fetch the credentials has been made or the context is canceled
+			cred.WaitUntilFetched(ctx)
+		}
+
 		ws.Start()
 		qos.Start()
 

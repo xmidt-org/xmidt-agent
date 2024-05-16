@@ -113,9 +113,17 @@ func (f optionFunc) apply(c *Websocket) error {
 	return f(c)
 }
 
+func emptyDecorator(http.Header) error {
+	return nil
+}
+
 // New creates a new WS connection with the given options.
 func New(opts ...Option) (*Websocket, error) {
-	var ws Websocket
+	ws := Websocket{
+		credDecorator:   emptyDecorator,
+		conveyDecorator: emptyDecorator,
+		client:          &http.Client{},
+	}
 
 	opts = append(opts,
 		validateDeviceID(),
@@ -217,7 +225,7 @@ func (ws *Websocket) run(ctx context.Context) {
 			Mode:    mode.ToEvent(),
 		}
 
-		// If auth fails, then continue with openfail xmidt connection
+		// If auth fails, then continue with no credentials.
 		ws.credDecorator(ws.additionalHeaders)
 
 		ws.conveyDecorator(ws.additionalHeaders)
