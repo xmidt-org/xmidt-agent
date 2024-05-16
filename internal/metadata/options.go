@@ -109,3 +109,14 @@ func BootRetryWaitOpt(bootTimeRetryDelay time.Duration) Option {
 			return nil
 		})
 }
+
+func InterfaceUsedOpt(interfaceUsed *InterfaceUsedProvider) Option {
+	return optionFunc(
+		func(c *MetadataProvider) error {
+			if interfaceUsed == nil {
+				return fmt.Errorf("%w: nil interfaceUsed provider", ErrInvalidInput)
+			}
+			c.interfaceUsed = interfaceUsed
+			return nil
+		})
+}

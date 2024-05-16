@@ -51,6 +51,7 @@ type MetadataProvider struct {
 	protocol           string
 	bootTime           string
 	bootTimeRetryDelay string
+	interfaceUsed      *InterfaceUsedProvider
 }
 
 func New(opts ...Option) (*MetadataProvider, error) {
@@ -88,10 +89,12 @@ func (c *MetadataProvider) GetMetadata() map[string]interface{} {
 			header[field] = c.bootTime
 		case BootTimeRetryDelay:
 			header[field] = c.bootTimeRetryDelay
+		case InterfaceUsed:
+			header[field] = c.interfaceUsed.GetInterfaceUsed()
 		case InterfacesAvailable: // what if we can't get interfaces available?
 			names, err := c.networkService.GetInterfaceNames()
 			if err != nil {
-				// The err itself is ignored.
+				// The err itself is ignored. Log this somewhere tho
 				continue
 			}
 			header[field] = strings.Join(names, ",")
