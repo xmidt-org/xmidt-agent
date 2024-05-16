@@ -369,17 +369,32 @@ func (rt *custRT) RoundTrip(r *http.Request) (*http.Response, error) {
 // updateClientTransport updates the http client's Transport and set the DialContext's
 // named network as the provided `mode`.
 func (ws *Websocket) updateClientTransport(mode ipMode) {
+	var (
+		TLSHandshakeTimeout   time.Duration
+		ExpectContinueTimeout time.Duration
+	)
+	// Unzip client's Transpot and reuse some configuration.
+	switch t := ws.client.Transport.(type) {
+	case *custRT:
+		TLSHandshakeTimeout = t.transport.TLSHandshakeTimeout
+		ExpectContinueTimeout = t.transport.ExpectContinueTimeout
+	case *http.Transport:
+		TLSHandshakeTimeout = t.TLSHandshakeTimeout
+		ExpectContinueTimeout = t.ExpectContinueTimeout
+	default:
+		// nil case, e.g.: http.DefaultClient & http.Client{}.
+	}
+
 	// Override client's Transport with custRT (reusing certain configurations)
 	// and update it's DialContext with the provided mode.
-	transport := ws.client.Transport.(*http.Transport)
 	ws.client.Transport = &custRT{
 		transport: http.Transport{
 			Proxy:                 http.ProxyFromEnvironment,
 			MaxIdleConns:          1,
 			MaxIdleConnsPerHost:   1,
 			MaxConnsPerHost:       1,
-			TLSHandshakeTimeout:   transport.TLSHandshakeTimeout,
-			ExpectContinueTimeout: transport.ExpectContinueTimeout,
+			TLSHandshakeTimeout:   TLSHandshakeTimeout,
+			ExpectContinueTimeout: ExpectContinueTimeout,
 		},
 	}
 	dialer := &net.Dialer{
