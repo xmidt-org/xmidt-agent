@@ -35,8 +35,8 @@ internal/adapters/libparodus/cmd/example/example
 
 *.dot
 *.pem
-*.yml
-*.yaml
+xmidt-agent.yml
+xmidt-agent.yaml
 
 .storage
 

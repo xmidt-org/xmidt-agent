@@ -296,7 +296,7 @@ var defaultConfig = Config{
 	},
 	OperationalState: OperationalState{
 		LastRebootReason: "client init reboot",
-		BootTime: time.Now(),
+		BootTime:         time.Now(),
 	},
 	XmidtCredentials: XmidtCredentials{
 		RefetchPercent:  90.0,
@@ -332,7 +332,7 @@ var defaultConfig = Config{
 	},
 	Websocket: Websocket{
 		URLPath:           "/api/v2/device",
-		BackUpURL: "http://localhost:8080",
+		BackUpURL:         "http://localhost:8080",
 		FetchURLTimeout:   30 * time.Second,
 		PingInterval:      30 * time.Second,
 		PingTimeout:       90 * time.Second,
