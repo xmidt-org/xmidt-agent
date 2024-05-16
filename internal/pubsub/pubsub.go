@@ -69,13 +69,6 @@ func New(self wrp.DeviceID, opts ...Option) (*PubSub, error) {
 		),
 	}
 
-	defaults := []Option{
-		WithPublishTimeout(5 * time.Second),
-	}
-
-	// Prepend the defaults to the provided options.
-	opts = append(defaults, opts...)
-
 	for _, opt := range opts {
 		if opt != nil {
 			if err := opt.apply(&ps); err != nil {

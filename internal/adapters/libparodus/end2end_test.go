@@ -124,7 +124,7 @@ func TestEnd2End(t *testing.T) {
 	require.NoError(err)
 	require.NotEmpty(self)
 
-	ps, err := pubsub.New(self)
+	ps, err := pubsub.New(self, pubsub.WithPublishTimeout(200*time.Millisecond))
 	require.NoError(err)
 	require.NotNil(ps)
 

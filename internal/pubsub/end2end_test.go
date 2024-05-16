@@ -226,6 +226,7 @@ func TestEndToEnd(t *testing.T) {
 			wrp.EnsureTransactionUUID(),
 			wrp.ValidateOnlyUTF8Strings(),
 		),
+		pubsub.WithPublishTimeout(200*time.Millisecond),
 	)
 
 	require.NoError(err)
