@@ -93,7 +93,6 @@ func provideWS(in wsIn) (wsOut, error) {
 		websocket.InterfaceUsedProvider(in.InterfaceUsed),
 	)
 
-
 	// Listener options
 	var (
 		msg, con, discon, heartbeat event.CancelFunc
