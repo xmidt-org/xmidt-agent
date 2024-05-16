@@ -16,6 +16,7 @@ import (
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials"
 	"github.com/xmidt-org/xmidt-agent/internal/loglevel"
+	"github.com/xmidt-org/xmidt-agent/internal/metadata"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/qos"
 
@@ -97,11 +98,13 @@ func xmidtAgent(args []string) (*fx.App, error) {
 			goschtalt.UnmarshalFunc[MockTr181]("mock_tr_181"),
 			goschtalt.UnmarshalFunc[Pubsub]("pubsub"),
 			goschtalt.UnmarshalFunc[Metadata]("metadata"),
+			goschtalt.UnmarshalFunc[NetworkService]("network_service"),
 			goschtalt.UnmarshalFunc[QOS]("qos"),
 
 			provideNetworkService,
 			provideMetadataProvider,
 			loglevel.New,
+			metadata.NewInterfaceUsedProvider,
 		),
 
 		fsProvide(),
@@ -230,10 +233,14 @@ func onStart(cred *credentials.Credentials, ws *websocket.Websocket, qos *qos.Ha
 			return err
 		}
 
-		ctx, cancel := context.WithTimeout(ctx, waitUntilFetched)
-		defer cancel()
-		// blocks until an attempt to fetch the credentials has been made or the context is canceled
-		cred.WaitUntilFetched(ctx)
+		// Allow operations where no credentials are desired (cred will be nil).
+		if cred != nil {
+			ctx, cancel := context.WithTimeout(ctx, waitUntilFetched)
+			defer cancel()
+			// blocks until an attempt to fetch the credentials has been made or the context is canceled
+			cred.WaitUntilFetched(ctx)
+		}
+
 		ws.Start()
 		qos.Start()
 

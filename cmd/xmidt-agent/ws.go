@@ -27,13 +27,14 @@ var (
 type wsIn struct {
 	fx.In
 	// Note, DeviceID is pulled from the Identity configuration
-	Identity  Identity
-	Logger    *zap.Logger
-	CLI       *CLI
-	JWTXT     *jwtxt.Instructions
-	Cred      *credentials.Credentials
-	Metadata  *metadata.MetadataProvider
-	Websocket Websocket
+	Identity      Identity
+	Logger        *zap.Logger
+	CLI           *CLI
+	JWTXT         *jwtxt.Instructions
+	Cred          *credentials.Credentials
+	Metadata      *metadata.MetadataProvider
+	InterfaceUsed *metadata.InterfaceUsedProvider
+	Websocket     Websocket
 }
 
 type wsOut struct {
@@ -63,8 +64,14 @@ func provideWS(in wsIn) (wsOut, error) {
 		return wsOut{}, err
 	}
 
+	var opts []websocket.Option
+	// Allow operations where no credentials are desired (in.Cred will be nil).
+	if in.Cred != nil {
+		opts = append(opts, websocket.CredentialsDecorator(in.Cred.Decorate))
+	}
+
 	// Configuration options
-	opts := []websocket.Option{
+	opts = append(opts,
 		websocket.DeviceID(in.Identity.DeviceID),
 		websocket.FetchURLTimeout(in.Websocket.FetchURLTimeout),
 		websocket.FetchURL(
@@ -76,7 +83,6 @@ func provideWS(in wsIn) (wsOut, error) {
 		websocket.KeepAliveInterval(in.Websocket.KeepAliveInterval),
 		websocket.HTTPClient(client),
 		websocket.MaxMessageBytes(in.Websocket.MaxMessageBytes),
-		websocket.CredentialsDecorator(in.Cred.Decorate),
 		websocket.ConveyDecorator(in.Metadata.Decorate),
 		websocket.AdditionalHeaders(in.Websocket.AdditionalHeaders),
 		websocket.NowFunc(time.Now),
@@ -84,7 +90,8 @@ func provideWS(in wsIn) (wsOut, error) {
 		websocket.WithIPv4(!in.Websocket.DisableV4),
 		websocket.Once(in.Websocket.Once),
 		websocket.RetryPolicy(in.Websocket.RetryPolicy),
-	}
+		websocket.InterfaceUsedProvider(in.InterfaceUsed),
+	)
 
 	// Listener options
 	var (

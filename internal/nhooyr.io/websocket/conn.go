@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // MessageType represents the type of a WebSocket message.
@@ -79,6 +80,7 @@ type Conn struct {
 	closeErr   error
 	wroteClose bool
 
+	pingTimeout   time.Duration
 	pingCounter   int32
 	activePingsMu sync.Mutex
 	activePings   map[string]chan<- struct{}

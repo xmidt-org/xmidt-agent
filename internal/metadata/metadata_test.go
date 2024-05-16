@@ -4,6 +4,7 @@
 package metadata
 
 import (
+	"net"
 	"net/http"
 	"testing"
 	"time"
@@ -19,6 +20,11 @@ type mockNetworkService struct {
 
 func newMockNetworkService() *mockNetworkService { return &mockNetworkService{} }
 
+func (m *mockNetworkService) GetInterfaces() ([]net.Interface, error) {
+	args := m.Called()
+	return args.Get(0).([]net.Interface), args.Error(1)
+}
+
 func (m *mockNetworkService) GetInterfaceNames() ([]string, error) {
 	args := m.Called()
 	return args.Get(0).([]string), args.Error(1)
@@ -33,6 +39,7 @@ type ConveySuite struct {
 func (suite *ConveySuite) SetupTest() {
 	mockNetworkService := newMockNetworkService()
 	suite.mockNetworkService = mockNetworkService
+	interfaceUsed, _ := NewInterfaceUsedProvider()
 
 	opts := []Option{
 		NetworkServiceOpt(mockNetworkService),
@@ -45,6 +52,7 @@ func (suite *ConveySuite) SetupTest() {
 		XmidtProtocolOpt("some-protocol"),
 		BootTimeOpt("1111111111"),
 		BootRetryWaitOpt(time.Second),
+		InterfaceUsedOpt(interfaceUsed),
 	}
 
 	conveyHeaderProvider, err := New(opts...)
@@ -71,6 +79,7 @@ func (suite *ConveySuite) TestGetConveyHeader() {
 	suite.Equal("1111111111", header["boot-time"])
 	suite.Equal("1", header["boot-time-retry-wait"])
 	suite.Equal("erouter0,eth0", header["interfaces-available"])
+	suite.Equal("erouter0", header["webpa-interface-used"])
 }
 
 func (suite *ConveySuite) TestGetConveyHeaderSubsetFields() {
@@ -88,6 +97,7 @@ func (suite *ConveySuite) TestGetConveyHeaderSubsetFields() {
 	suite.Nil(header["boot-time"])
 	suite.Nil(header["boot-time-retry-wait"])
 	suite.Nil(header["interfaces-available"])
+	suite.Nil(header["webpa-interface-used"])
 }
 
 func (suite *ConveySuite) TestDecorate() {

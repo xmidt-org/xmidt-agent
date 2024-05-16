@@ -14,6 +14,7 @@ import (
 	"github.com/xmidt-org/eventor"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/xmidt-agent/internal/metadata"
 	nhws "github.com/xmidt-org/xmidt-agent/internal/nhooyr.io/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
 )
@@ -100,6 +101,8 @@ type Websocket struct {
 	shutdown context.CancelFunc
 
 	conn *nhws.Conn
+
+	interfaceUsed *metadata.InterfaceUsedProvider
 }
 
 // Option is a functional option type for WS.
@@ -113,9 +116,17 @@ func (f optionFunc) apply(c *Websocket) error {
 	return f(c)
 }
 
+func emptyDecorator(http.Header) error {
+	return nil
+}
+
 // New creates a new WS connection with the given options.
 func New(opts ...Option) (*Websocket, error) {
-	var ws Websocket
+	ws := Websocket{
+		credDecorator:   emptyDecorator,
+		conveyDecorator: emptyDecorator,
+		client:          &http.Client{},
+	}
 
 	opts = append(opts,
 		validateDeviceID(),
@@ -217,7 +228,7 @@ func (ws *Websocket) run(ctx context.Context) {
 			Mode:    mode.ToEvent(),
 		}
 
-		// If auth fails, then continue with openfail xmidt connection
+		// If auth fails, then continue with no credentials.
 		ws.credDecorator(ws.additionalHeaders)
 
 		ws.conveyDecorator(ws.additionalHeaders)
@@ -236,7 +247,11 @@ func (ws *Websocket) run(ctx context.Context) {
 			// Store the connection so writing can take place.
 			ws.m.Lock()
 			ws.conn = conn
-			ws.conn.SetPingListener((func(context.Context, []byte) {
+			ws.conn.SetPingListener((func(ctx context.Context, b []byte) {
+				if ctx.Err() != nil {
+					return
+				}
+
 				ws.heartbeatListeners.Visit(func(l event.HeartbeatListener) {
 					l.OnHeartbeat(event.Heartbeat{
 						At:   ws.nowFunc(),
@@ -245,6 +260,10 @@ func (ws *Websocket) run(ctx context.Context) {
 				})
 			}))
 			ws.conn.SetPongListener(func(ctx context.Context, b []byte) {
+				if ctx.Err() != nil {
+					return
+				}
+
 				ws.heartbeatListeners.Visit(func(l event.HeartbeatListener) {
 					l.OnHeartbeat(event.Heartbeat{
 						At:   ws.nowFunc(),
@@ -335,6 +354,7 @@ func (ws *Websocket) dial(ctx context.Context, mode ipMode) (*nhws.Conn, *http.R
 	}
 
 	conn.SetReadLimit(ws.maxMessageBytes)
+	conn.SetPingTimeout(ws.pingTimeout)
 	return conn, resp, nil
 }
 
