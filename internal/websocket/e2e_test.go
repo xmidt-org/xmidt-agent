@@ -427,7 +427,6 @@ func TestEndToEndPingTimeout(t *testing.T) {
 		}),
 		// Triggers ping timeouts
 		ws.PingTimeout(time.Nanosecond),
-		ws.HTTPClient(nil),
 	)
 	require.NoError(err)
 	require.NotNil(got)
