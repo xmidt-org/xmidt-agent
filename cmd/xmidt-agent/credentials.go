@@ -28,15 +28,21 @@ type credsIn struct {
 	Logger  *zap.Logger
 }
 
-func provideCredentials(in credsIn) (*credentials.Credentials, error) {
+type credsOut struct {
+	fx.Out
+	Creds            *credentials.Credentials
+	WaitUntilFetched time.Duration `name:"wait_until_fetched"`
+}
+
+func provideCredentials(in credsIn) (credsOut, error) {
 	// If the URL is empty, then there is no credentials service to use.
 	if in.Creds.URL == "" {
-		return nil, nil
+		return credsOut{}, nil
 	}
 
 	client, err := in.Creds.HTTPClient.NewClient()
 	if err != nil {
-		return nil, err
+		return credsOut{}, err
 	}
 
 	logger := in.Logger.Named("credentials")
@@ -77,7 +83,7 @@ func provideCredentials(in credsIn) (*credentials.Credentials, error) {
 
 	creds, err := credentials.New(opts...)
 	if err != nil {
-		return nil, err
+		return credsOut{}, err
 	}
 
 	in.LC.Append(fx.Hook{
@@ -91,5 +97,8 @@ func provideCredentials(in credsIn) (*credentials.Credentials, error) {
 		},
 	})
 
-	return creds, err
+	return credsOut{
+		Creds:            creds,
+		WaitUntilFetched: in.Creds.WaitUntilFetched,
+	}, err
 }

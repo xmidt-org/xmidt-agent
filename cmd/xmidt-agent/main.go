@@ -46,13 +46,14 @@ type CLI struct {
 
 type LifeCycleIn struct {
 	fx.In
-	Logger     *zap.Logger
-	LC         fx.Lifecycle
-	Shutdowner fx.Shutdowner
-	WS         *websocket.Websocket
-	QOS        *qos.Handler
-	Cred       *credentials.Credentials
-	Cancels    []func() `group:"cancels"`
+	Logger           *zap.Logger
+	LC               fx.Lifecycle
+	Shutdowner       fx.Shutdowner
+	WS               *websocket.Websocket
+	QOS              *qos.Handler
+	Cred             *credentials.Credentials
+	WaitUntilFetched time.Duration `name:"wait_until_fetched"`
+	Cancels          []func()      `group:"cancels"`
 }
 
 // xmidtAgent is the main entry point for the program.  It is responsible for
@@ -213,7 +214,7 @@ func provideLogger(in LoggerIn) (*zap.AtomicLevel, *zap.Logger, error) {
 	return &zcfg.Level, logger, err
 }
 
-func onStart(cred *credentials.Credentials, ws *websocket.Websocket, qos *qos.Handler, logger *zap.Logger) func(context.Context) error {
+func onStart(cred *credentials.Credentials, ws *websocket.Websocket, qos *qos.Handler, waitUntilFetched time.Duration, logger *zap.Logger) func(context.Context) error {
 	logger = logger.Named("on_start")
 
 	return func(ctx context.Context) error {
@@ -228,10 +229,14 @@ func onStart(cred *credentials.Credentials, ws *websocket.Websocket, qos *qos.Ha
 			return nil
 		}
 
-		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		defer cancel()
-		// blocks until an attempt to fetch the credentials has been made or the context is canceled
-		cred.WaitUntilFetched(ctx)
+		// Allow operations where no credentials are desired (cred will be nil).
+		if cred != nil {
+			ctx, cancel := context.WithTimeout(ctx, waitUntilFetched)
+			defer cancel()
+			// blocks until an attempt to fetch the credentials has been made or the context is canceled
+			cred.WaitUntilFetched(ctx)
+		}
+
 		ws.Start()
 		qos.Start()
 
@@ -272,7 +277,7 @@ func lifeCycle(in LifeCycleIn) {
 	logger := in.Logger.Named("fx_lifecycle")
 	in.LC.Append(
 		fx.Hook{
-			OnStart: onStart(in.Cred, in.WS, in.QOS, logger),
+			OnStart: onStart(in.Cred, in.WS, in.QOS, in.WaitUntilFetched, logger),
 			OnStop:  onStop(in.WS, in.QOS, in.Shutdowner, in.Cancels, logger),
 		},
 	)

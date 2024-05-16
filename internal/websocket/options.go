@@ -5,10 +5,12 @@ package websocket
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/metadata"
@@ -142,48 +144,6 @@ func KeepAliveInterval(d time.Duration) Option {
 		})
 }
 
-// TLSHandshakeTimeout sets the TLS handshake timeout for the WS connection.
-// If this is not set, the default is 10 seconds.
-func TLSHandshakeTimeout(d time.Duration) Option {
-	return optionFunc(
-		func(ws *Websocket) error {
-			if d < 0 {
-				return fmt.Errorf("%w: negative TLSHandshakeTimeout", ErrMisconfiguredWS)
-			}
-
-			ws.tlsHandshakeTimeout = d
-			return nil
-		})
-}
-
-// IdleConnTimeout sets the idle connection timeout for the WS connection.
-// If this is not set, the default is 10 seconds.
-func IdleConnTimeout(d time.Duration) Option {
-	return optionFunc(
-		func(ws *Websocket) error {
-			if d < 0 {
-				return fmt.Errorf("%w: negative IdleConnTimeout", ErrMisconfiguredWS)
-			}
-
-			ws.idleConnTimeout = d
-			return nil
-		})
-}
-
-// ExpectContinueTimeout sets the expect continue timeout for the WS connection.
-// If this is not set, the default is 1 second.
-func ExpectContinueTimeout(d time.Duration) Option {
-	return optionFunc(
-		func(ws *Websocket) error {
-			if d < 0 {
-				return fmt.Errorf("%w: negative ExpectContinueTimeout", ErrMisconfiguredWS)
-			}
-
-			ws.expectContinueTimeout = d
-			return nil
-		})
-}
-
 // WithIPv4 sets whether or not to allow IPv4 for the WS connection.  If this
 // is not set, the default is true.
 func WithIPv4(with ...bool) Option {
@@ -219,17 +179,22 @@ func SendTimeout(d time.Duration) Option {
 		})
 }
 
-// ConnectTimeout sets the timeout for the WS connection.  If this is not set,
-// the default is 30 seconds.
-func ConnectTimeout(d time.Duration) Option {
+// HTTPClient is the HTTP client used for connection attempts.
+func HTTPClient(client *http.Client) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
-			if d < 0 {
-				return fmt.Errorf("%w: negative ConnectTimeout", ErrMisconfiguredWS)
+			var err error
+			if client == nil {
+				// Can't use http.DefaultClient since its Transport is nil.
+				client, err = arrangehttp.ClientConfig{}.NewClient()
 			}
 
-			ws.connectTimeout = d
-			return nil
+			if err != nil {
+				return errors.Join(ErrMisconfiguredWS, err)
+			}
+
+			ws.client = client
+			return err
 		})
 }
 

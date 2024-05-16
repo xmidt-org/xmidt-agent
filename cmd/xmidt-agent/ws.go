@@ -59,8 +59,19 @@ func provideWS(in wsIn) (wsOut, error) {
 		fetchURLFunc = in.JWTXT.Endpoint
 	}
 
+	client, err := in.Websocket.HTTPClient.NewClient()
+	if err != nil {
+		return wsOut{}, err
+	}
+
+	var opts []websocket.Option
+	// Allow operations where no credentials are desired (in.Cred will be nil).
+	if in.Cred != nil {
+		opts = append(opts, websocket.CredentialsDecorator(in.Cred.Decorate))
+	}
+
 	// Configuration options
-	opts := []websocket.Option{
+	opts = append(opts,
 		websocket.DeviceID(in.Identity.DeviceID),
 		websocket.FetchURLTimeout(in.Websocket.FetchURLTimeout),
 		websocket.FetchURL(
@@ -69,13 +80,9 @@ func provideWS(in wsIn) (wsOut, error) {
 		websocket.PingInterval(in.Websocket.PingInterval),
 		websocket.PingTimeout(in.Websocket.PingTimeout),
 		websocket.SendTimeout(in.Websocket.SendTimeout),
-		websocket.ConnectTimeout(in.Websocket.ConnectTimeout),
 		websocket.KeepAliveInterval(in.Websocket.KeepAliveInterval),
-		websocket.IdleConnTimeout(in.Websocket.IdleConnTimeout),
-		websocket.TLSHandshakeTimeout(in.Websocket.TLSHandshakeTimeout),
-		websocket.ExpectContinueTimeout(in.Websocket.ExpectContinueTimeout),
+		websocket.HTTPClient(client),
 		websocket.MaxMessageBytes(in.Websocket.MaxMessageBytes),
-		websocket.CredentialsDecorator(in.Cred.Decorate),
 		websocket.ConveyDecorator(in.Metadata.Decorate),
 		websocket.AdditionalHeaders(in.Websocket.AdditionalHeaders),
 		websocket.NowFunc(time.Now),
@@ -84,7 +91,8 @@ func provideWS(in wsIn) (wsOut, error) {
 		websocket.Once(in.Websocket.Once),
 		websocket.RetryPolicy(in.Websocket.RetryPolicy),
 		websocket.InterfaceUsedProvider(in.InterfaceUsed),
-	}
+	)
+
 
 	// Listener options
 	var (
