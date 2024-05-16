@@ -360,9 +360,14 @@ func (rt *custRT) RoundTrip(r *http.Request) (*http.Response, error) {
 // updateClientTransport updates the http client's Transport and set the DialContext's
 // named network as the provided `mode`.
 func (ws *Websocket) updateClientTransport(mode ipMode) {
+	// Check for nil Transports, e.g.: http.DefaultClient & http.Client{}.
+	transport, ok := ws.client.Transport.(*http.Transport)
+	if !ok {
+		transport = &http.Transport{}
+	}
+
 	// Override client's Transport with custRT (reusing certain configurations)
 	// and update it's DialContext with the provided mode.
-	transport := ws.client.Transport.(*http.Transport)
 	ws.client.Transport = &custRT{
 		transport: http.Transport{
 			Proxy:                 http.ProxyFromEnvironment,

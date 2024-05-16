@@ -5,12 +5,10 @@ package websocket
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/metadata"
@@ -185,12 +183,7 @@ func HTTPClient(client *http.Client) Option {
 		func(ws *Websocket) error {
 			var err error
 			if client == nil {
-				// Can't use http.DefaultClient since its Transport is nil.
-				client, err = arrangehttp.ClientConfig{}.NewClient()
-			}
-
-			if err != nil {
-				return errors.Join(ErrMisconfiguredWS, err)
+				return ErrMisconfiguredWS
 			}
 
 			ws.client = client
