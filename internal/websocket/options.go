@@ -13,6 +13,7 @@ import (
 	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/xmidt-agent/internal/metadata"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
 )
 
@@ -302,6 +303,18 @@ func AddHeartbeatListener(listener event.HeartbeatListener, cancel ...*event.Can
 			var ignored event.CancelFunc
 			cancel = append(cancel, &ignored)
 			*cancel[0] = event.CancelFunc(ws.heartbeatListeners.Add(listener))
+			return nil
+		})
+}
+
+func InterfaceUsedProvider(interfaceUsed *metadata.InterfaceUsedProvider) Option {
+	return optionFunc(
+		func(ws *Websocket) error {
+			if interfaceUsed == nil {
+				return fmt.Errorf("%w: nil InterfaceUsedProvider", ErrMisconfiguredWS)
+			}
+
+			ws.interfaceUsed = interfaceUsed
 			return nil
 		})
 }
