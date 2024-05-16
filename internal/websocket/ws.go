@@ -247,7 +247,11 @@ func (ws *Websocket) run(ctx context.Context) {
 			// Store the connection so writing can take place.
 			ws.m.Lock()
 			ws.conn = conn
-			ws.conn.SetPingListener((func(context.Context, []byte) {
+			ws.conn.SetPingListener((func(ctx context.Context, b []byte) {
+				if ctx.Err() != nil {
+					return
+				}
+
 				ws.heartbeatListeners.Visit(func(l event.HeartbeatListener) {
 					l.OnHeartbeat(event.Heartbeat{
 						At:   ws.nowFunc(),
@@ -256,6 +260,10 @@ func (ws *Websocket) run(ctx context.Context) {
 				})
 			}))
 			ws.conn.SetPongListener(func(ctx context.Context, b []byte) {
+				if ctx.Err() != nil {
+					return
+				}
+
 				ws.heartbeatListeners.Visit(func(l event.HeartbeatListener) {
 					l.OnHeartbeat(event.Heartbeat{
 						At:   ws.nowFunc(),
@@ -346,6 +354,7 @@ func (ws *Websocket) dial(ctx context.Context, mode ipMode) (*nhws.Conn, *http.R
 	}
 
 	conn.SetReadLimit(ws.maxMessageBytes)
+	conn.SetPingTimeout(ws.pingTimeout)
 	return conn, resp, nil
 }
 
