@@ -13,6 +13,7 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/goschtalt/goschtalt"
 	"github.com/xmidt-org/sallust"
+	"github.com/xmidt-org/xmidt-agent/internal/adapters/libparodus"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials"
 	"github.com/xmidt-org/xmidt-agent/internal/loglevel"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
@@ -49,6 +50,7 @@ type LifeCycleIn struct {
 	LC               fx.Lifecycle
 	Shutdowner       fx.Shutdowner
 	WS               *websocket.Websocket
+	LibParodus       *libparodus.Adapter
 	QOS              *qos.Handler
 	Cred             *credentials.Credentials
 	WaitUntilFetched time.Duration `name:"wait_until_fetched"`
@@ -85,6 +87,7 @@ func xmidtAgent(args []string) (*fx.App, error) {
 			provideCredentials,
 			provideInstructions,
 			provideWS,
+			provideLibParodus,
 
 			goschtalt.UnmarshalFunc[sallust.Config]("logger", goschtalt.Optional()),
 			goschtalt.UnmarshalFunc[Identity]("identity"),
@@ -97,6 +100,7 @@ func xmidtAgent(args []string) (*fx.App, error) {
 			goschtalt.UnmarshalFunc[Pubsub]("pubsub"),
 			goschtalt.UnmarshalFunc[Metadata]("metadata"),
 			goschtalt.UnmarshalFunc[QOS]("qos"),
+			goschtalt.UnmarshalFunc[LibParodus]("lib_parodus"),
 
 			provideNetworkService,
 			provideMetadataProvider,
@@ -211,7 +215,7 @@ func provideLogger(in LoggerIn) (*zap.AtomicLevel, *zap.Logger, error) {
 	return &zcfg.Level, logger, err
 }
 
-func onStart(cred *credentials.Credentials, ws *websocket.Websocket, qos *qos.Handler, waitUntilFetched time.Duration, logger *zap.Logger) func(context.Context) error {
+func onStart(cred *credentials.Credentials, ws *websocket.Websocket, libParodus *libparodus.Adapter, qos *qos.Handler, waitUntilFetched time.Duration, logger *zap.Logger) func(context.Context) error {
 	logger = logger.Named("on_start")
 
 	return func(ctx context.Context) error {
@@ -235,13 +239,14 @@ func onStart(cred *credentials.Credentials, ws *websocket.Websocket, qos *qos.Ha
 		}
 
 		ws.Start()
+		err := libParodus.Start()
 		qos.Start()
 
-		return nil
+		return err
 	}
 }
 
-func onStop(ws *websocket.Websocket, qos *qos.Handler, shutdowner fx.Shutdowner, cancels []func(), logger *zap.Logger) func(context.Context) error {
+func onStop(ws *websocket.Websocket, libParodus *libparodus.Adapter, qos *qos.Handler, shutdowner fx.Shutdowner, cancels []func(), logger *zap.Logger) func(context.Context) error {
 	logger = logger.Named("on_stop")
 
 	return func(_ context.Context) error {
@@ -261,6 +266,7 @@ func onStop(ws *websocket.Websocket, qos *qos.Handler, shutdowner fx.Shutdowner,
 		}
 
 		ws.Stop()
+		libParodus.Stop()
 		qos.Stop()
 		for _, c := range cancels {
 			c()
@@ -274,8 +280,8 @@ func lifeCycle(in LifeCycleIn) {
 	logger := in.Logger.Named("fx_lifecycle")
 	in.LC.Append(
 		fx.Hook{
-			OnStart: onStart(in.Cred, in.WS, in.QOS, in.WaitUntilFetched, logger),
-			OnStop:  onStop(in.WS, in.QOS, in.Shutdowner, in.Cancels, logger),
+			OnStart: onStart(in.Cred, in.WS, in.LibParodus, in.QOS, in.WaitUntilFetched, logger),
+			OnStop:  onStop(in.WS, in.LibParodus, in.QOS, in.Shutdowner, in.Cancels, logger),
 		},
 	)
 }
