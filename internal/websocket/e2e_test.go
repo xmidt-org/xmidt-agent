@@ -420,7 +420,6 @@ func TestEndToEndPingTimeout(t *testing.T) {
 		}),
 		ws.WithIPv4(),
 		ws.NowFunc(time.Now),
-		ws.ConnectTimeout(30*time.Second),
 		ws.FetchURLTimeout(30*time.Second),
 		ws.MaxMessageBytes(256*1024),
 		ws.CredentialsDecorator(func(h http.Header) error {
@@ -431,6 +430,7 @@ func TestEndToEndPingTimeout(t *testing.T) {
 		}),
 		// Triggers ping timeouts
 		ws.PingTimeout(time.Nanosecond),
+		ws.HTTPClient(nil),
 	)
 	require.NoError(err)
 	require.NotNil(got)
