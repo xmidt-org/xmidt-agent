@@ -272,10 +272,11 @@ func onStop(ws *websocket.Websocket, libParodus *libparodus.Adapter, qos *qos.Ha
 	logger = logger.Named("on_stop")
 
 	return func(context.Context) (err error) {
+		// err is set during a panic recovery in order to manually trigger
+		// the shutdown of the application by sending a signal to all open Done channels
 		defer func() {
 			if r := recover(); nil != r {
 				err = ErrLifecycleStopPanic
-				// fmt.Println(string(debug.Stack()))
 				logger.Error("stacktrace from panic", zap.String("stacktrace", string(debug.Stack())), zap.Any("panic", r), zap.Error(err))
 			}
 
