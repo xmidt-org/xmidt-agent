@@ -3,17 +3,6 @@
 
 websocket:
   url_path: api/v2/device
-xmidt_credentials:
-  url: ${TOKEN_URL}
-  file_name: crt.pem
-  file_permissions: 0777
-  http_client:
-    tls:
-      insecure_skip_verify: true
-      certificates: 
-        - certificate_file: crt.pem
-          key_file:         key.pem
-      min_version: 771 # 0x0303, the TLS 1.2 version uint16
 identity:
   device_id: mac:00deadbeef00
   serial_number: 1800deadbeef
@@ -26,22 +15,33 @@ operational_state:
   boot_time: "2024-02-28T01:04:27Z"
 xmidt_service:
   url: ${MAIL}
-# Optional
+# Optional (Examples)
+# xmidt_credentials:
+#   url: ${TOKEN_URL}
+#   file_name: crt.pem
+#   file_permissions: 0777
+#   http_client:
+#     tls:
+#       insecure_skip_verify: true
+#       certificates: 
+#         - certificate_file: crt.pem
+#           key_file:         key.pem
+#       min_version: 771 # 0x0303, the TLS 1.2 version uint16
 # storage:
 #   temporary: ~/local-rdk-testing/temporary
 #   durable: ~/local-rdk-testing/durable
 # mock_tr_181:
 #   enabled: true
 #   file_path: xmidt-agent/internal/wrphandlers/mocktr181/mock_tr181.json
-externals:
-  -
-    file: /home/schmidtw/sync/work/oss/xmidt-agent/main/xmidt-agent.main/cmd/xmidt-agent/wes.txt
-    as: properties
-    remap:
-      - from: Device.X_RDK_WebPA_Server.URL
-        to: XMIDT_URL
-      - from: Device.X_RDK_WebPA_DNSText.URL
-        to: DNS_URL
-      - from: Device.X_RDK_WebPA_TokenServer.URL
-        to: TOKEN_URL
+# externals:
+#   -
+#     file: ~/local-rdk-testing/durable/external.txt
+#     as: properties
+#     remap:
+#       - from: Device.X_RDK_WebPA_Server.URL
+#         to: XMIDT_URL
+#       - from: Device.X_RDK_WebPA_DNSText.URL
+#         to: DNS_URL
+      # - from: Device.X_RDK_WebPA_TokenServer.URL
+#         to: TOKEN_URL
 
