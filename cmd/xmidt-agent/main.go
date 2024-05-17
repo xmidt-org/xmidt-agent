@@ -288,6 +288,10 @@ func onStop(ws *websocket.Websocket, qos *qos.Handler, shutdowner fx.Shutdowner,
 		ws.Stop()
 		qos.Stop()
 		for _, c := range cancels {
+			if c == nil {
+				continue
+			}
+
 			c()
 		}
 
