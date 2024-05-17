@@ -305,6 +305,18 @@ func provideConfig(cli *CLI) (*goschtalt.Config, error) {
 // -----------------------------------------------------------------------------
 
 var defaultConfig = Config{
+	Identity: Identity{
+		DeviceID:             "mac:4ca161000109",
+		SerialNumber:         "1800deadbeef",
+		HardwareModel:        "fooModel",
+		HardwareManufacturer: "barManufacturer",
+		FirmwareVersion:      "v0.0.1",
+		PartnerID:            "foobar",
+	},
+	OperationalState: OperationalState{
+		LastRebootReason: "client init reboot",
+		BootTime:         time.Now(),
+	},
 	XmidtCredentials: XmidtCredentials{
 		RefetchPercent:  90.0,
 		FileName:        "credentials.msgpack",
@@ -316,7 +328,8 @@ var defaultConfig = Config{
 				MaxIdleConns:      1,
 			},
 			TLS: &arrangetls.Config{
-				MinVersion: tls.VersionTLS13,
+				InsecureSkipVerify: true,
+				MinVersion:         tls.VersionTLS13,
 			},
 		},
 		WaitUntilFetched: 30 * time.Second,
@@ -338,6 +351,7 @@ var defaultConfig = Config{
 	},
 	Websocket: Websocket{
 		URLPath:           "/api/v2/device",
+		BackUpURL:         "http://localhost:8080",
 		FetchURLTimeout:   30 * time.Second,
 		PingInterval:      30 * time.Second,
 		PingTimeout:       90 * time.Second,
@@ -411,7 +425,7 @@ var defaultConfig = Config{
 		},
 	},
 	MockTr181: MockTr181{
-		FilePath:    "./mock_tr181.json",
+		FilePath:    "/mock_tr181.json",
 		ServiceName: "config",
 	},
 	XmidtAgentCrud: XmidtAgentCrud{
