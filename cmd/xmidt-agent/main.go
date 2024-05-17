@@ -16,6 +16,7 @@ import (
 	"github.com/xmidt-org/xmidt-agent/internal/adapters/libparodus"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials"
 	"github.com/xmidt-org/xmidt-agent/internal/loglevel"
+	"github.com/xmidt-org/xmidt-agent/internal/metadata"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/qos"
 
@@ -99,12 +100,14 @@ func xmidtAgent(args []string) (*fx.App, error) {
 			goschtalt.UnmarshalFunc[MockTr181]("mock_tr_181"),
 			goschtalt.UnmarshalFunc[Pubsub]("pubsub"),
 			goschtalt.UnmarshalFunc[Metadata]("metadata"),
+			goschtalt.UnmarshalFunc[NetworkService]("network_service"),
 			goschtalt.UnmarshalFunc[QOS]("qos"),
 			goschtalt.UnmarshalFunc[LibParodus]("lib_parodus"),
 
 			provideNetworkService,
 			provideMetadataProvider,
 			loglevel.New,
+			metadata.NewInterfaceUsedProvider,
 		),
 
 		fsProvide(),

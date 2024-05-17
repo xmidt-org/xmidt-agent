@@ -27,13 +27,14 @@ var (
 type wsIn struct {
 	fx.In
 	// Note, DeviceID is pulled from the Identity configuration
-	Identity  Identity
-	Logger    *zap.Logger
-	CLI       *CLI
-	JWTXT     *jwtxt.Instructions
-	Cred      *credentials.Credentials
-	Metadata  *metadata.MetadataProvider
-	Websocket Websocket
+	Identity      Identity
+	Logger        *zap.Logger
+	CLI           *CLI
+	JWTXT         *jwtxt.Instructions
+	Cred          *credentials.Credentials
+	Metadata      *metadata.MetadataProvider
+	InterfaceUsed *metadata.InterfaceUsedProvider
+	Websocket     Websocket
 }
 
 type wsOut struct {
@@ -58,11 +59,6 @@ func provideWS(in wsIn) (wsOut, error) {
 		fetchURLFunc = in.JWTXT.Endpoint
 	}
 
-	client, err := in.Websocket.HTTPClient.NewClient()
-	if err != nil {
-		return wsOut{}, err
-	}
-
 	var opts []websocket.Option
 	// Allow operations where no credentials are desired (in.Cred will be nil).
 	if in.Cred != nil {
@@ -80,7 +76,7 @@ func provideWS(in wsIn) (wsOut, error) {
 		websocket.PingTimeout(in.Websocket.PingTimeout),
 		websocket.SendTimeout(in.Websocket.SendTimeout),
 		websocket.KeepAliveInterval(in.Websocket.KeepAliveInterval),
-		websocket.HTTPClient(client),
+		websocket.HTTPClientWithForceSets(in.Websocket.HTTPClient),
 		websocket.MaxMessageBytes(in.Websocket.MaxMessageBytes),
 		websocket.ConveyDecorator(in.Metadata.Decorate),
 		websocket.AdditionalHeaders(in.Websocket.AdditionalHeaders),
@@ -89,6 +85,7 @@ func provideWS(in wsIn) (wsOut, error) {
 		websocket.WithIPv4(!in.Websocket.DisableV4),
 		websocket.Once(in.Websocket.Once),
 		websocket.RetryPolicy(in.Websocket.RetryPolicy),
+		websocket.InterfaceUsedProvider(in.InterfaceUsed),
 	)
 
 	// Listener options
