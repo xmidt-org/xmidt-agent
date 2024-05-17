@@ -80,12 +80,12 @@ type Conn struct {
 	closeErr   error
 	wroteClose bool
 
-	pingTimeout   time.Duration
-	pingCounter   int32
-	activePingsMu sync.Mutex
-	activePings   map[string]chan<- struct{}
-	pingListener  func(context.Context, []byte)
-	pongListener  func(context.Context, []byte)
+	pingWriteTimeout time.Duration
+	pingCounter      int32
+	activePingsMu    sync.Mutex
+	activePings      map[string]chan<- struct{}
+	pingListener     func(context.Context, []byte)
+	pongListener     func(context.Context, []byte)
 }
 
 type connConfig struct {

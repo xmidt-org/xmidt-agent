@@ -82,8 +82,8 @@ type Websocket struct {
 	FetchURLTimeout time.Duration
 	// PingInterval is the ping interval allowed for the WS connection.
 	PingInterval time.Duration
-	// PingTimeout is the ping timeout for the WS connection.
-	PingTimeout time.Duration
+	// PingWriteTimeout is the ping timeout for the WS connection.
+	PingWriteTimeout time.Duration
 	// SendTimeout is the send timeout for the WS connection.
 	SendTimeout time.Duration
 	// HTTPClient is the configuration for the HTTP client.
@@ -354,7 +354,7 @@ var defaultConfig = Config{
 		BackUpURL:         "http://localhost:8080",
 		FetchURLTimeout:   30 * time.Second,
 		PingInterval:      30 * time.Second,
-		PingTimeout:       90 * time.Second,
+		PingWriteTimeout:  90 * time.Second,
 		SendTimeout:       90 * time.Second,
 		KeepAliveInterval: 30 * time.Second,
 		HTTPClient: arrangehttp.ClientConfig{

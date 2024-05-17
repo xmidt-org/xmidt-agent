@@ -95,11 +95,11 @@ func (c *Conn) SetPongListener(f func(context.Context, []byte)) {
 	c.pongListener = f
 }
 
-// SetPingTimeout sets the maximum time allowed between PINGs for the connection
+// SetPingWriteTimeout sets the maximum time allowed between PINGs for the connection
 // before the connection is closed.
-// Nonpositive PingTimeout will default to handleControl's 5 second timeout.
-func (c *Conn) SetPingTimeout(d time.Duration) {
-	c.pingTimeout = d
+// Nonpositive PingWriteTimeout will default to handleControl's 5 second timeout.
+func (c *Conn) SetPingWriteTimeout(d time.Duration) {
+	c.pingWriteTimeout = d
 }
 
 // SetReadLimit sets the max number of bytes to read for a single message.
@@ -320,8 +320,8 @@ func (c *Conn) handleControl(ctx context.Context, h header) (err error) {
 
 	switch h.opcode {
 	case opPing:
-		if c.pingTimeout > 0 {
-			ctx, cancel = context.WithTimeout(ctx, c.pingTimeout)
+		if c.pingWriteTimeout > 0 {
+			ctx, cancel = context.WithTimeout(ctx, c.pingWriteTimeout)
 			defer cancel()
 		}
 

@@ -52,8 +52,8 @@ type Websocket struct {
 	// pingInterval is the ping interval allowed for the WS connection.
 	pingInterval time.Duration
 
-	// pingTimeout is the ping timeout for the WS connection.
-	pingTimeout time.Duration
+	// pingWriteTimeout is the ping timeout for the WS connection.
+	pingWriteTimeout time.Duration
 
 	// sendTimeout is the send timeout for the WS connection.
 	sendTimeout time.Duration
@@ -366,7 +366,7 @@ func (ws *Websocket) dial(ctx context.Context, mode ipMode) (*nhws.Conn, *http.R
 	}
 
 	conn.SetReadLimit(ws.maxMessageBytes)
-	conn.SetPingTimeout(ws.pingTimeout)
+	conn.SetPingWriteTimeout(ws.pingWriteTimeout)
 	return conn, resp, nil
 }
 
