@@ -34,18 +34,19 @@ type credsOut struct {
 	WaitUntilFetched time.Duration `name:"wait_until_fetched"`
 }
 
-func provideCredentials(in credsIn) (credsOut, error) {
+func (in credsIn) Options() ([]credentials.Option, error) {
+	logger := in.Logger.Named("credentials")
+
 	// If the URL is empty, then there is no credentials service to use.
 	if in.Creds.URL == "" {
-		return credsOut{}, nil
+		logger.Warn("no credentials service configured")
+		return nil, nil
 	}
 
 	client, err := in.Creds.HTTPClient.NewClient()
 	if err != nil {
-		return credsOut{}, err
+		return nil, err
 	}
-
-	logger := in.Logger.Named("credentials")
 
 	opts := []credentials.Option{
 		credentials.URL(in.Creds.URL),
@@ -81,6 +82,14 @@ func provideCredentials(in credsIn) (credsOut, error) {
 		)
 	}
 
+	return opts, nil
+}
+
+func provideCredentials(in credsIn) (credsOut, error) {
+	opts, err := in.Options()
+	if err != nil || opts == nil {
+		return credsOut{}, err
+	}
 	creds, err := credentials.New(opts...)
 	if err != nil {
 		return credsOut{}, err
