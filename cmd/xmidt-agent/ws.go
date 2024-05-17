@@ -58,11 +58,6 @@ func provideWS(in wsIn) (wsOut, error) {
 		fetchURLFunc = in.JWTXT.Endpoint
 	}
 
-	client, err := in.Websocket.HTTPClient.NewClient()
-	if err != nil {
-		return wsOut{}, err
-	}
-
 	var opts []websocket.Option
 	// Allow operations where no credentials are desired (in.Cred will be nil).
 	if in.Cred != nil {
@@ -80,7 +75,7 @@ func provideWS(in wsIn) (wsOut, error) {
 		websocket.PingTimeout(in.Websocket.PingTimeout),
 		websocket.SendTimeout(in.Websocket.SendTimeout),
 		websocket.KeepAliveInterval(in.Websocket.KeepAliveInterval),
-		websocket.HTTPClient(client),
+		websocket.HTTPClientWithForceSets(in.Websocket.HTTPClient),
 		websocket.MaxMessageBytes(in.Websocket.MaxMessageBytes),
 		websocket.ConveyDecorator(in.Metadata.Decorate),
 		websocket.AdditionalHeaders(in.Websocket.AdditionalHeaders),
