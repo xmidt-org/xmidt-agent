@@ -369,7 +369,7 @@ func TestEndToEndConnectionIssues(t *testing.T) {
 	assert.True(msgCnt.Load() > 0, "got message")
 }
 
-func TestEndToEndPingTimeout(t *testing.T) {
+func TestEndToEndPingWriteTimeout(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
@@ -426,7 +426,7 @@ func TestEndToEndPingTimeout(t *testing.T) {
 			return nil
 		}),
 		// Triggers ping timeouts
-		ws.PingTimeout(time.Nanosecond),
+		ws.PingWriteTimeout(time.Nanosecond),
 	)
 	require.NoError(err)
 	require.NotNil(got)

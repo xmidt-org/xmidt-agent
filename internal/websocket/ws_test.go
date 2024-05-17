@@ -135,9 +135,9 @@ func TestNew(t *testing.T) {
 			},
 			expectedErr: ErrMisconfiguredWS,
 		}, {
-			description: "negative ping timeout",
+			description: "negative ping write timeout",
 			opts: []Option{
-				PingTimeout(-1),
+				PingWriteTimeout(-1),
 			},
 			expectedErr: ErrMisconfiguredWS,
 		},

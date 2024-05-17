@@ -116,16 +116,16 @@ func PingInterval(d time.Duration) Option {
 		})
 }
 
-// PingTimeout sets the maximum time allowed between PINGs for the WS connection
+// PingWriteTimeout sets the maximum time allowed between PINGs for the WS connection
 // before the connection is closed.  If this is not set, the default is 90 seconds.
-func PingTimeout(d time.Duration) Option {
+func PingWriteTimeout(d time.Duration) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
 			if d < 0 {
-				return fmt.Errorf("%w: negative PingTimeout", ErrMisconfiguredWS)
+				return fmt.Errorf("%w: negative PingWriteTimeout", ErrMisconfiguredWS)
 			}
 
-			ws.pingTimeout = d
+			ws.pingWriteTimeout = d
 			return nil
 		})
 }
