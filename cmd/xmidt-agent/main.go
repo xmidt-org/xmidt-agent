@@ -29,6 +29,12 @@ const (
 	applicationName = "xmidt-agent"
 )
 
+var (
+	ErrLifecycleStartPanic    = errors.New("panic occured during fx's lifecycle Start")
+	ErrLifecycleStopPanic     = errors.New("panic occured during fx's lifecycle Stop")
+	ErrLifecycleShutdownPanic = errors.New("panic occured during fx's lifecycle Shutdown")
+)
+
 // These match what goreleaser provides.
 var (
 	commit  = "undefined"
@@ -60,6 +66,16 @@ type LifeCycleIn struct {
 // xmidtAgent is the main entry point for the program.  It is responsible for
 // setting up the dependency injection framework and returning the app object.
 func xmidtAgent(args []string) (*fx.App, error) {
+	app := fx.New(provideAppOptions(args))
+	if err := app.Err(); err != nil {
+		return nil, err
+	}
+
+	return app, nil
+}
+
+// provideAppOptions returns all fx options required to start the xmidt agent fx app.
+func provideAppOptions(args []string) fx.Option {
 	var (
 		gscfg *goschtalt.Config
 
@@ -70,7 +86,7 @@ func xmidtAgent(args []string) (*fx.App, error) {
 		cli *CLI
 	)
 
-	app := fx.New(
+	opts := fx.Options(
 		fx.Supply(cliArgs(args)),
 		fx.Populate(&g),
 		fx.Populate(&gscfg),
@@ -119,11 +135,7 @@ func xmidtAgent(args []string) (*fx.App, error) {
 		_ = os.WriteFile(cli.Graph, []byte(g), 0600)
 	}
 
-	if err := app.Err(); err != nil {
-		return nil, err
-	}
-
-	return app, nil
+	return opts
 }
 
 func main() {
@@ -222,11 +234,14 @@ func onStart(cred *credentials.Credentials, ws *websocket.Websocket, qos *qos.Ha
 		// err is set during a panic recovery in order to allow fx to rolling back
 		defer func() {
 			if r := recover(); nil != r {
-				logger.Error("stacktrace from panic", zap.String("stacktrace", string(debug.Stack())), zap.Any("panic", r))
-				err = errors.New("panic occured during fx lifecycle Start")
+				err = ErrLifecycleStartPanic
+				logger.Error("stacktrace from panic", zap.String("stacktrace", string(debug.Stack())), zap.Any("panic", r), zap.Error(err))
 			}
-
 		}()
+
+		if err = ctx.Err(); err != nil {
+			return err
+		}
 
 		if ws == nil {
 			logger.Debug("websocket disabled")
@@ -251,13 +266,16 @@ func onStart(cred *credentials.Credentials, ws *websocket.Websocket, qos *qos.Ha
 func onStop(ws *websocket.Websocket, qos *qos.Handler, shutdowner fx.Shutdowner, cancels []func(), logger *zap.Logger) func(context.Context) error {
 	logger = logger.Named("on_stop")
 
-	return func(_ context.Context) error {
+	return func(context.Context) (err error) {
 		defer func() {
 			if r := recover(); nil != r {
-				logger.Error("stacktrace from panic", zap.String("stacktrace", string(debug.Stack())), zap.Any("panic", r))
+				err = ErrLifecycleStopPanic
+				// fmt.Println(string(debug.Stack()))
+				logger.Error("stacktrace from panic", zap.String("stacktrace", string(debug.Stack())), zap.Any("panic", r), zap.Error(err))
 			}
 
-			if err := shutdowner.Shutdown(); err != nil {
+			if err2 := shutdowner.Shutdown(); err2 != nil {
+				err = errors.Join(err, err2, ErrLifecycleShutdownPanic)
 				logger.Error("encountered error trying to shutdown app: ", zap.Error(err))
 			}
 		}()
