@@ -369,7 +369,7 @@ var defaultConfig = Config{
 		},
 	},
 	Pubsub: Pubsub{
-		PublishTimeout: 200 * time.Millisecond,
+		PublishTimeout: 5 * time.Second,
 	},
 	Logger: sallust.Config{
 		EncoderConfig: sallust.EncoderConfig{
