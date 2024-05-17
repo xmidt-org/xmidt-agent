@@ -179,22 +179,37 @@ func SendTimeout(d time.Duration) Option {
 		})
 }
 
-// HTTPClient is the HTTP client used for connection attempts.
-func HTTPClient(client *http.Client) Option {
+// HTTPClient is the configuration for the HTTP client used for connection attempts.
+func HTTPClient(c arrangehttp.ClientConfig) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
-			var err error
-			if client == nil {
-				// Can't use http.DefaultClient since its Transport is nil.
-				client, err = arrangehttp.ClientConfig{}.NewClient()
+			if _, err := c.NewClient(); err != nil {
+				return errors.Join(err, ErrMisconfiguredWS)
 			}
 
-			if err != nil {
-				return errors.Join(ErrMisconfiguredWS, err)
+			ws.httpClientConfig = c
+
+			return nil
+		})
+}
+
+// HTTPClientWithForceSets is the configuration for the HTTP client with recommended force sets, used for connection attempts.
+func HTTPClientWithForceSets(c arrangehttp.ClientConfig) Option {
+	return optionFunc(
+		func(ws *Websocket) (err error) {
+			// Set the configuration
+			if err := HTTPClient(c).apply(ws); err != nil {
+				return err
 			}
 
-			ws.client = client
-			return err
+			// Override the following arrangehttp.ClientConfig.Transport feilds
+			// Note, arrangehttp.ClientConfig.Transport lacks the http.Transport.Proxy,
+			// instead `Proxy` will be set during Websocket.newHTTPClient()
+			ws.httpClientConfig.Transport.MaxIdleConns = 1
+			ws.httpClientConfig.Transport.MaxIdleConnsPerHost = 1
+			ws.httpClientConfig.Transport.MaxConnsPerHost = 1
+
+			return nil
 		})
 }
 
