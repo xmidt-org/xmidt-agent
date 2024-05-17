@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/eventor"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v3"
@@ -60,8 +61,8 @@ type Websocket struct {
 	// keepAliveInterval is the keep alive interval for the WS connection.
 	keepAliveInterval time.Duration
 
-	// client is the HTTP client used for connection attempts.
-	client *http.Client
+	// httpClientConfig is the configuration and factory for the HTTP client.
+	httpClientConfig arrangehttp.ClientConfig
 
 	// additionalHeaders are any additional headers for the WS connection.
 	additionalHeaders http.Header
@@ -125,7 +126,15 @@ func New(opts ...Option) (*Websocket, error) {
 	ws := Websocket{
 		credDecorator:   emptyDecorator,
 		conveyDecorator: emptyDecorator,
-		client:          &http.Client{},
+		// same default as `xmidt-agent/cmd/xmidt-agent/config.go`'s defaultConfig.Websocket.HTTPClient
+		httpClientConfig: arrangehttp.ClientConfig{
+			Timeout: 30 * time.Second,
+			Transport: arrangehttp.TransportConfig{
+				IdleConnTimeout:       10 * time.Second,
+				TLSHandshakeTimeout:   10 * time.Second,
+				ExpectContinueTimeout: 1 * time.Second,
+			},
+		},
 	}
 
 	opts = append(opts,
@@ -137,7 +146,6 @@ func New(opts ...Option) (*Websocket, error) {
 		validateConveyDecorator(),
 		validateNowFunc(),
 		validRetryPolicy(),
-		validHTTPClient(),
 	)
 
 	for _, opt := range opts {
@@ -342,11 +350,15 @@ func (ws *Websocket) dial(ctx context.Context, mode ipMode) (*nhws.Conn, *http.R
 		return nil, nil, err
 	}
 
-	ws.updateClientTransport(mode)
+	client, err := ws.newHTTPClient(mode)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	conn, resp, err := nhws.Dial(ctx, url,
 		&nhws.DialOptions{
 			HTTPHeader: ws.additionalHeaders,
-			HTTPClient: ws.client,
+			HTTPClient: client,
 		},
 	)
 	if err != nil {
@@ -359,37 +371,39 @@ func (ws *Websocket) dial(ctx context.Context, mode ipMode) (*nhws.Conn, *http.R
 }
 
 type custRT struct {
-	transport http.Transport
+	transport *http.Transport
 }
 
 func (rt *custRT) RoundTrip(r *http.Request) (*http.Response, error) {
 	return rt.transport.RoundTrip(r)
 }
 
-// updateClientTransport updates the http client's Transport and set the DialContext's
-// named network as the provided `mode`.
-func (ws *Websocket) updateClientTransport(mode ipMode) {
-	// Override client's Transport with custRT (reusing certain configurations)
-	// and update it's DialContext with the provided mode.
-	transport := ws.client.Transport.(*http.Transport)
-	ws.client.Transport = &custRT{
-		transport: http.Transport{
-			Proxy:                 http.ProxyFromEnvironment,
-			MaxIdleConns:          1,
-			MaxIdleConnsPerHost:   1,
-			MaxConnsPerHost:       1,
-			TLSHandshakeTimeout:   transport.TLSHandshakeTimeout,
-			ExpectContinueTimeout: transport.ExpectContinueTimeout,
-		},
+// newHTTPClient returns a HTTP client using the provided `mode` as its named network.
+func (ws *Websocket) newHTTPClient(mode ipMode) (*http.Client, error) {
+	config := ws.httpClientConfig
+	client, err := config.NewClient()
+	if err != nil {
+		return nil, err
 	}
+
+	// Override config.NewClient()'s Transport and update it's DialContext with the provided mode.
+	transport, err := config.Transport.NewTransport(config.TLS)
+	if err != nil {
+		return nil, err
+	}
+
+	transport.Proxy = http.ProxyFromEnvironment
 	dialer := &net.Dialer{
-		Timeout:   ws.client.Timeout,
+		Timeout:   client.Timeout,
 		KeepAlive: ws.keepAliveInterval,
 		DualStack: false,
 	}
-	ws.client.Transport.(*custRT).transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 		return dialer.DialContext(ctx, string(mode), addr)
 	}
+	client.Transport = &custRT{transport: transport}
+
+	return client, nil
 }
 
 func (ws *Websocket) nextMode(mode ipMode) ipMode {
