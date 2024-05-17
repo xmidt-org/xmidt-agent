@@ -261,7 +261,7 @@ func onStart(cred *credentials.Credentials, ws *websocket.Websocket, libParodus 
 		}
 
 		ws.Start()
-		err := libParodus.Start()
+		err = libParodus.Start()
 		qos.Start()
 
 		return err
