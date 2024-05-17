@@ -15,7 +15,10 @@
 *.out
 
 # VS Code directories
-.vscode
+*.code-workspace
+.vscode/*
+.dev/*
+__debug_bin*
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
@@ -24,12 +27,22 @@
 go.work
 
 cmd/xmidt-agent/xmidt-agent
+.release/docker/config/xmidt_agent.*
 
 internal/jwtxt/cmd/example/*
 internal/credentials/cmd/example/*
+internal/adapters/libparodus/cmd/example/example
 
 *.dot
 *.pem
-*.yml
+xmidt-agent.yml
+xmidt-agent.yaml
+xmidt_agent.yml
+xmidt_agent.yaml
 
 .storage
+
+dist/*
+
+cmd/xmidt-agent/dist/*
+lint.sh

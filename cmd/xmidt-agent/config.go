@@ -4,26 +4,106 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io/fs"
+	"net/http"
 	"os"
 	"time"
 
 	"github.com/goschtalt/goschtalt"
+	_ "github.com/goschtalt/goschtalt/pkg/typical"
+	_ "github.com/goschtalt/properties-decoder"
+	_ "github.com/goschtalt/yaml-decoder"
+	_ "github.com/goschtalt/yaml-encoder"
 	"github.com/xmidt-org/arrange/arrangehttp"
+	"github.com/xmidt-org/arrange/arrangetls"
+	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/xmidt-agent/internal/configuration"
+	"github.com/xmidt-org/xmidt-agent/internal/net"
+	"go.uber.org/zap/zapcore"
 	"gopkg.in/dealancer/validate.v2"
 )
 
 // Config is the configuration for the xmidt-agent.
 type Config struct {
+	Pubsub           Pubsub
+	Websocket        Websocket
+	LibParodus       LibParodus
 	Identity         Identity
 	OperationalState OperationalState
 	XmidtCredentials XmidtCredentials
 	XmidtService     XmidtService
 	Logger           sallust.Config
 	Storage          Storage
+	MockTr181        MockTr181
+	QOS              QOS
+	Externals        []configuration.External
+	XmidtAgentCrud   XmidtAgentCrud
+	Metadata         Metadata
+	NetworkService   NetworkService
+}
+
+type LibParodus struct {
+	// ParodusServiceURL is the service url used by libparodus
+	ParodusServiceURL string
+	// KeepAliveInterval is the keep alive interval for libparodus.
+	KeepAliveInterval time.Duration
+	// ReceiveTimeout is the Receive timeout for libparodus.
+	ReceiveTimeout time.Duration
+	// SendTimeout is the send timeout for libparodus.
+	SendTimeout time.Duration
+}
+
+type QOS struct {
+	// MaxQueueBytes is the allowable max size of the qos' priority queue, based on the sum of all queued wrp message's payload.
+	MaxQueueBytes int64
+	// MaxMessageBytes is the largest allowable wrp message payload.
+	MaxMessageBytes int
+}
+
+type Pubsub struct {
+	// PublishTimeout sets the timeout for publishing a message
+	PublishTimeout time.Duration
+}
+
+type Websocket struct {
+	// Disable determines whether or not to disable xmidt-agent's websocket
+	Disable bool
+	// URLPath is the device registration url path
+	URLPath string
+	// BackUpURL is the back up XMiDT service endpoint in case `XmidtCredentials.URL` fails.
+	BackUpURL string
+	// AdditionalHeaders are any additional headers for the WS connection.
+	AdditionalHeaders http.Header
+	// FetchURLTimeout is the timeout for the fetching the WS url. If this is not set, the default is 30 seconds.
+	FetchURLTimeout time.Duration
+	// PingInterval is the ping interval allowed for the WS connection.
+	PingInterval time.Duration
+	// PingTimeout is the ping timeout for the WS connection.
+	PingTimeout time.Duration
+	// SendTimeout is the send timeout for the WS connection.
+	SendTimeout time.Duration
+	// HTTPClient is the configuration for the HTTP client.
+	HTTPClient arrangehttp.ClientConfig
+	// KeepAliveInterval is the keep alive interval for the WS connection.
+	KeepAliveInterval time.Duration
+	// MaxMessageBytes is the largest allowable message to send or receive.
+	MaxMessageBytes int64
+	// (optional) DisableV4 determines whether or not to allow IPv4 for the WS connection.
+	// If this is not set, the default is false (IPv4 is enabled).
+	// Either V4 or V6 can be disabled, but not both.
+	DisableV4 bool
+	// (optional) DisableV6 determines whether or not to allow IPv6 for the WS connection.
+	// If this is not set, the default is false (IPv6 is enabled).
+	// Either V4 or V6 can be disabled, but not both.
+	DisableV6 bool
+	// RetryPolicy sets the retry policy factory used for delaying between retry attempts for reconnection.
+	RetryPolicy retry.Config
+	// Once sets whether or not to only attempt to connect once.
+	Once bool
 }
 
 // Identity contains the information that identifies the device.
@@ -81,6 +161,9 @@ type XmidtCredentials struct {
 	// FilePermissions is the permissions to use when creating the credentials
 	// file.
 	FilePermissions fs.FileMode
+
+	// WaitUntilFetched is the time the xmidt-agent blocks on startup until an attempt to fetch the credentials has been made.
+	WaitUntilFetched time.Duration
 }
 
 // XmidtService contains the configuration for the XMiDT service endpoint.
@@ -118,6 +201,10 @@ type JwtTxtRedirector struct {
 	PEMFiles []string
 }
 
+type XmidtAgentCrud struct {
+	ServiceName string
+}
+
 // Backoff defines the parameters that limit the retry backoff algorithm.
 // The retries are a geometric progression.
 // 1, 3, 7, 15, 31 ... n = (2n+1)
@@ -129,6 +216,21 @@ type Backoff struct {
 type Storage struct {
 	Temporary string
 	Durable   string
+}
+
+type MockTr181 struct {
+	FilePath    string
+	Enabled     bool
+	ServiceName string
+}
+
+type Metadata struct {
+	Fields []string
+}
+
+type NetworkService struct {
+	// list of allowed network interfaces to connect to xmidt in priority order, first is highest
+	AllowedInterfaces map[string]net.AllowedInterface
 }
 
 // Collect and process the configuration files and env vars and
@@ -149,6 +251,16 @@ func provideConfig(cli *CLI) (*goschtalt.Config, error) {
 			goschtalt.AsDefault()),
 	)
 	if err != nil {
+		return nil, err
+	}
+
+	// Externals are a list of individually processed external configuration
+	// files.  Each external configuration file is processed and the resulting
+	// map is used to populate the configuration.
+	//
+	// This is done after the initial configuration has been calculated because
+	// the external configurations are listed in the configuration.
+	if err = configuration.Apply(gs, "externals", false); err != nil {
 		return nil, err
 	}
 
@@ -193,12 +305,40 @@ func provideConfig(cli *CLI) (*goschtalt.Config, error) {
 // -----------------------------------------------------------------------------
 
 var defaultConfig = Config{
+	Identity: Identity{
+		DeviceID:             "mac:4ca161000109",
+		SerialNumber:         "1800deadbeef",
+		HardwareModel:        "fooModel",
+		HardwareManufacturer: "barManufacturer",
+		FirmwareVersion:      "v0.0.1",
+		PartnerID:            "foobar",
+	},
+	OperationalState: OperationalState{
+		LastRebootReason: "client init reboot",
+		BootTime:         time.Now(),
+	},
 	XmidtCredentials: XmidtCredentials{
 		RefetchPercent:  90.0,
 		FileName:        "credentials.msgpack",
 		FilePermissions: fs.FileMode(0600),
+		HTTPClient: arrangehttp.ClientConfig{
+			Timeout: 20 * time.Second,
+			Transport: arrangehttp.TransportConfig{
+				DisableKeepAlives: true,
+				MaxIdleConns:      1,
+			},
+			TLS: &arrangetls.Config{
+				InsecureSkipVerify: true,
+				MinVersion:         tls.VersionTLS13,
+			},
+		},
+		WaitUntilFetched: 30 * time.Second,
 	},
 	XmidtService: XmidtService{
+		Backoff: Backoff{
+			MinDelay: 7 * time.Second,
+			MaxDelay: 10 * time.Minute,
+		},
 		JwtTxtRedirector: JwtTxtRedirector{
 			Timeout: 10 * time.Second,
 			AllowedAlgorithms: []string{
@@ -208,5 +348,97 @@ var defaultConfig = Config{
 				"RS256", "RS384", "RS512",
 			},
 		},
+	},
+	Websocket: Websocket{
+		URLPath:           "/api/v2/device",
+		BackUpURL:         "http://localhost:8080",
+		FetchURLTimeout:   30 * time.Second,
+		PingInterval:      30 * time.Second,
+		PingTimeout:       90 * time.Second,
+		SendTimeout:       90 * time.Second,
+		KeepAliveInterval: 30 * time.Second,
+		HTTPClient: arrangehttp.ClientConfig{
+			Timeout: 30 * time.Second,
+			Transport: arrangehttp.TransportConfig{
+				IdleConnTimeout:       10 * time.Second,
+				TLSHandshakeTimeout:   10 * time.Second,
+				ExpectContinueTimeout: 1 * time.Second,
+			},
+		},
+		MaxMessageBytes: 256 * 1024,
+		/*
+			This retry policy gives us a very good approximation of the prior
+			policy.  The important things about this policy are:
+
+			1. The backoff increases up to the max.
+			2. There is jitter that spreads the load so windows do not overlap.
+
+			iteration | parodus   | this implementation
+			----------+-----------+----------------
+			0         | 0-1s      |   0.666 -  1.333
+			1         | 1s-3s     |   1.333 -  2.666
+			2         | 3s-7s     |   2.666 -  5.333
+			3         | 7s-15s    |   5.333 -  10.666
+			4         | 15s-31s   |  10.666 -  21.333
+			5         | 31s-63s   |  21.333 -  42.666
+			6         | 63s-127s  |  42.666 -  85.333
+			7         | 127s-255s |  85.333 - 170.666
+			8         | 255s-511s | 170.666 - 341.333
+			9         | 255s-511s |           341.333
+			n         | 255s-511s |           341.333
+		*/
+		RetryPolicy: retry.Config{
+			Interval:    time.Second,
+			Multiplier:  2.0,
+			Jitter:      1.0 / 3.0,
+			MaxInterval: 341*time.Second + 333*time.Millisecond,
+		},
+	},
+	LibParodus: LibParodus{
+		ParodusServiceURL: "tcp://127.0.0.1:6666",
+		KeepAliveInterval: 30 * time.Second,
+		ReceiveTimeout:    1 * time.Second,
+		SendTimeout:       1 * time.Second,
+	},
+	Pubsub: Pubsub{
+		PublishTimeout: 5 * time.Second,
+	},
+	Logger: sallust.Config{
+		EncoderConfig: sallust.EncoderConfig{
+			TimeKey:        "T",
+			LevelKey:       "L",
+			NameKey:        "N",
+			CallerKey:      "C",
+			FunctionKey:    zapcore.OmitKey,
+			MessageKey:     "M",
+			StacktraceKey:  "S",
+			LineEnding:     zapcore.DefaultLineEnding,
+			EncodeLevel:    "capital",
+			EncodeTime:     "RFC3339Nano",
+			EncodeDuration: "string",
+			EncodeCaller:   "short",
+		},
+		Rotation: &sallust.Rotation{
+			MaxSize:    1,  // 1MB max/file
+			MaxAge:     30, // 30 days max
+			MaxBackups: 10, // max 10 files
+		},
+	},
+	MockTr181: MockTr181{
+		FilePath:    "/mock_tr181.json",
+		ServiceName: "config",
+	},
+	XmidtAgentCrud: XmidtAgentCrud{
+		ServiceName: "xmidt_agent",
+	},
+	QOS: QOS{
+		MaxQueueBytes:   1 * 1024 * 1024, // 1MB max/queue,
+		MaxMessageBytes: 256 * 1024,      // 256 KB
+	},
+	Metadata: Metadata{
+		Fields: []string{"fw-name", "hw-model", "hw-manufacturer", "hw-serial-number", "hw-last-reboot-reason", "webpa-protocol", "boot-time", "boot-time-retry-wait", "webpa-interface-used", "interfaces-available"},
+	},
+	NetworkService: NetworkService{
+		AllowedInterfaces: map[string]net.AllowedInterface{"erouter0": {Priority: 1, Enabled: true}, "eroutev0": {Priority: 2, Enabled: true}, "br-home": {Priority: 3, Enabled: true}, "brrwan": {Priority: 4, Enabled: true}, "vdsl0": {Priority: 5, Enabled: true}, "wwan0": {Priority: 6, Enabled: true}, "wlan0": {Priority: 7, Enabled: true}, "eth0": {Priority: 8, Enabled: true}, "qmapmux0.127": {Priority: 9, Enabled: true}, "cm0": {Priority: 10, Enabled: true}},
 	},
 }

@@ -4,7 +4,11 @@
 package pubsub
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 )
 
 type optionFunc func(*PubSub) error
@@ -30,7 +34,7 @@ func Normify(opts ...wrp.NormifierOption) Option {
 // WithEgressHandler is an option that adds a handler for egress messages.
 // If the optional cancel parameter is provided, it will be set to a function
 // that can be used to cancel the subscription.
-func WithEgressHandler(handler Handler, cancel ...*CancelFunc) Option {
+func WithEgressHandler(handler wrpkit.Handler, cancel ...*CancelFunc) Option {
 	return optionFunc(func(ps *PubSub) error {
 		c, err := ps.SubscribeEgress(handler)
 		if err != nil {
@@ -47,7 +51,7 @@ func WithEgressHandler(handler Handler, cancel ...*CancelFunc) Option {
 // WithServiceHandler is an option that adds a handler for service messages.
 // If the optional cancel parameter is provided, it will be set to a function
 // that can be used to cancel the subscription.
-func WithServiceHandler(service string, handler Handler, cancel ...*CancelFunc) Option {
+func WithServiceHandler(service string, handler wrpkit.Handler, cancel ...*CancelFunc) Option {
 	return optionFunc(func(ps *PubSub) error {
 		c, err := ps.SubscribeService(service, handler)
 		if err != nil {
@@ -64,7 +68,7 @@ func WithServiceHandler(service string, handler Handler, cancel ...*CancelFunc) 
 // WithEventHandler is an option that adds a handler for event messages.
 // If the optional cancel parameter is provided, it will be set to a function
 // that can be used to cancel the subscription.
-func WithEventHandler(event string, handler Handler, cancel ...*CancelFunc) Option {
+func WithEventHandler(event string, handler wrpkit.Handler, cancel ...*CancelFunc) Option {
 	return optionFunc(func(ps *PubSub) error {
 		c, err := ps.SubscribeEvent(event, handler)
 		if err != nil {
@@ -74,6 +78,18 @@ func WithEventHandler(event string, handler Handler, cancel ...*CancelFunc) Opti
 			*cancel[0] = c
 		}
 
+		return nil
+	})
+}
+
+// WithPublishTimeout is an option that sets the timeout for publishing a message.
+// If the timeout is exceeded, the publish will fail.
+func WithPublishTimeout(timeout time.Duration) Option {
+	return optionFunc(func(ps *PubSub) error {
+		if timeout < 0 {
+			return fmt.Errorf("%w: timeout must be zero or larger", ErrInvalidInput)
+		}
+		ps.publishTimeout = timeout
 		return nil
 	})
 }

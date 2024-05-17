@@ -11,11 +11,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/eventor"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/xmidt-agent/internal/metadata"
+	nhws "github.com/xmidt-org/xmidt-agent/internal/nhooyr.io/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
-	nhws "nhooyr.io/websocket"
 )
 
 var (
@@ -23,6 +25,13 @@ var (
 	ErrClosed          = errors.New("websocket closed")
 	ErrInvalidMsgType  = errors.New("invalid message type")
 )
+
+// Egress interface is the egress route used to handle wrp messages that
+// targets something other than this device
+type Egress interface {
+	// HandleWrp is called whenever a message targets something other than this device.
+	HandleWrp(m wrp.Message) error
+}
 
 type Websocket struct {
 	// id is the device ID for the WS connection.
@@ -37,26 +46,23 @@ type Websocket struct {
 	// credDecorator is the credentials decorator for the WS connection.
 	credDecorator func(http.Header) error
 
+	// credDecorator is the credentials decorator for the WS connection.
+	conveyDecorator func(http.Header) error
+
 	// pingInterval is the ping interval allowed for the WS connection.
 	pingInterval time.Duration
 
 	// pingTimeout is the ping timeout for the WS connection.
 	pingTimeout time.Duration
 
-	// connectTimeout is the connect timeout for the WS connection.
-	connectTimeout time.Duration
+	// sendTimeout is the send timeout for the WS connection.
+	sendTimeout time.Duration
 
 	// keepAliveInterval is the keep alive interval for the WS connection.
 	keepAliveInterval time.Duration
 
-	// idleConnTimeout is the idle connection timeout for the WS connection.
-	idleConnTimeout time.Duration
-
-	// tlsHandshakeTimeout is the TLS handshake timeout for the WS connection.
-	tlsHandshakeTimeout time.Duration
-
-	// expectContinueTimeout is the expect continue timeout for the WS connection.
-	expectContinueTimeout time.Duration
+	// httpClientConfig is the configuration and factory for the HTTP client.
+	httpClientConfig arrangehttp.ClientConfig
 
 	// additionalHeaders are any additional headers for the WS connection.
 	additionalHeaders http.Header
@@ -96,6 +102,8 @@ type Websocket struct {
 	shutdown context.CancelFunc
 
 	conn *nhws.Conn
+
+	interfaceUsed *metadata.InterfaceUsedProvider
 }
 
 // Option is a functional option type for WS.
@@ -109,62 +117,35 @@ func (f optionFunc) apply(c *Websocket) error {
 	return f(c)
 }
 
+func emptyDecorator(http.Header) error {
+	return nil
+}
+
 // New creates a new WS connection with the given options.
 func New(opts ...Option) (*Websocket, error) {
-	var ws Websocket
-
-	defaults := []Option{
-		NowFunc(time.Now),
-		FetchURLTimeout(30 * time.Second),
-		PingInterval(30 * time.Second),
-		PingTimeout(90 * time.Second),
-		ConnectTimeout(30 * time.Second),
-		KeepAliveInterval(30 * time.Second),
-		IdleConnTimeout(10 * time.Second),
-		TLSHandshakeTimeout(10 * time.Second),
-		ExpectContinueTimeout(1 * time.Second),
-		MaxMessageBytes(256 * 1024),
-		WithIPv4(),
-		WithIPv6(),
-		Once(false),
-
-		/*
-			This retry policy gives us a very good approximation of the prior
-			policy.  The important things about this policy are:
-
-			1. The backoff increases up to the max.
-			2. There is jitter that spreads the load so windows do not overlap.
-
-			iteration | parodus   | this implementation
-			----------+-----------+----------------
-			0         | 0-1s      |   0.666 -  1.333
-			1         | 1s-3s     |   1.333 -  2.666
-			2         | 3s-7s     |   2.666 -  5.333
-			3         | 7s-15s    |   5.333 -  10.666
-			4         | 15s-31s   |  10.666 -  21.333
-			5         | 31s-63s   |  21.333 -  42.666
-			6         | 63s-127s  |  42.666 -  85.333
-			7         | 127s-255s |  85.333 - 170.666
-			8         | 255s-511s | 170.666 - 341.333
-			9         | 255s-511s |           341.333
-			n         | 255s-511s |           341.333
-		*/
-		RetryPolicy(&retry.Config{
-			Interval:    time.Second,
-			Multiplier:  2.0,
-			Jitter:      1.0 / 3.0,
-			MaxInterval: 341*time.Second + 333*time.Millisecond,
-		}),
-		WithIPv4(),
-		WithIPv6(),
+	ws := Websocket{
+		credDecorator:   emptyDecorator,
+		conveyDecorator: emptyDecorator,
+		// same default as `xmidt-agent/cmd/xmidt-agent/config.go`'s defaultConfig.Websocket.HTTPClient
+		httpClientConfig: arrangehttp.ClientConfig{
+			Timeout: 30 * time.Second,
+			Transport: arrangehttp.TransportConfig{
+				IdleConnTimeout:       10 * time.Second,
+				TLSHandshakeTimeout:   10 * time.Second,
+				ExpectContinueTimeout: 1 * time.Second,
+			},
+		},
 	}
-
-	opts = append(defaults, opts...)
 
 	opts = append(opts,
 		validateDeviceID(),
 		validateURL(),
 		validateIPMode(),
+		validateFetchURL(),
+		validateCredentialsDecorator(),
+		validateConveyDecorator(),
+		validateNowFunc(),
+		validRetryPolicy(),
 	)
 
 	for _, opt := range opts {
@@ -197,6 +178,10 @@ func (ws *Websocket) Start() {
 // Stop stops the websocket connection.
 func (ws *Websocket) Stop() {
 	ws.m.Lock()
+	if ws.conn != nil {
+		ws.conn.Close(nhws.StatusNormalClosure, "")
+	}
+
 	shutdown := ws.shutdown
 	ws.m.Unlock()
 
@@ -207,10 +192,22 @@ func (ws *Websocket) Stop() {
 	ws.wg.Wait()
 }
 
+func (ws *Websocket) HandleWrp(m wrp.Message) error {
+	return ws.Send(context.Background(), m)
+}
+
+// AddMessageListener adds a message listener to the WS connection.
+// The listener will be called for every message received from the WS.
+func (ws *Websocket) AddMessageListener(listener event.MsgListener) event.CancelFunc {
+	return event.CancelFunc(ws.msgListeners.Add(listener))
+}
+
 // Send sends the provided WRP message through the existing websocket.  This
 // call synchronously blocks until the write is complete.
 func (ws *Websocket) Send(ctx context.Context, msg wrp.Message) error {
 	err := ErrClosed
+	ctx, cancel := context.WithTimeout(ctx, ws.sendTimeout)
+	defer cancel()
 
 	ws.m.Lock()
 	if ws.conn != nil {
@@ -239,6 +236,11 @@ func (ws *Websocket) run(ctx context.Context) {
 			Mode:    mode.ToEvent(),
 		}
 
+		// If auth fails, then continue with no credentials.
+		ws.credDecorator(ws.additionalHeaders)
+
+		ws.conveyDecorator(ws.additionalHeaders)
+
 		conn, _, dialErr := ws.dial(ctx, mode) //nolint:bodyclose
 		cEvent.At = ws.nowFunc()
 
@@ -253,12 +255,36 @@ func (ws *Websocket) run(ctx context.Context) {
 			// Store the connection so writing can take place.
 			ws.m.Lock()
 			ws.conn = conn
+			ws.conn.SetPingListener((func(ctx context.Context, b []byte) {
+				if ctx.Err() != nil {
+					return
+				}
+
+				ws.heartbeatListeners.Visit(func(l event.HeartbeatListener) {
+					l.OnHeartbeat(event.Heartbeat{
+						At:   ws.nowFunc(),
+						Type: event.PING,
+					})
+				})
+			}))
+			ws.conn.SetPongListener(func(ctx context.Context, b []byte) {
+				if ctx.Err() != nil {
+					return
+				}
+
+				ws.heartbeatListeners.Visit(func(l event.HeartbeatListener) {
+					l.OnHeartbeat(event.Heartbeat{
+						At:   ws.nowFunc(),
+						Type: event.PONG,
+					})
+				})
+			})
 			ws.m.Unlock()
 
 			// Read loop
 			for {
 				var msg wrp.Message
-				typ, reader, err := conn.Reader(ctx)
+				typ, reader, err := ws.conn.Reader(ctx)
 				if err == nil {
 					if typ != nhws.MessageBinary {
 						err = ErrInvalidMsgType
@@ -324,13 +350,15 @@ func (ws *Websocket) dial(ctx context.Context, mode ipMode) (*nhws.Conn, *http.R
 		return nil, nil, err
 	}
 
+	client, err := ws.newHTTPClient(mode)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	conn, resp, err := nhws.Dial(ctx, url,
 		&nhws.DialOptions{
 			HTTPHeader: ws.additionalHeaders,
-			HTTPClient: &http.Client{
-				Transport: ws.getRT(mode),
-				Timeout:   ws.connectTimeout,
-			},
+			HTTPClient: client,
 		},
 	)
 	if err != nil {
@@ -338,39 +366,44 @@ func (ws *Websocket) dial(ctx context.Context, mode ipMode) (*nhws.Conn, *http.R
 	}
 
 	conn.SetReadLimit(ws.maxMessageBytes)
-	return conn, resp, err
+	conn.SetPingTimeout(ws.pingTimeout)
+	return conn, resp, nil
 }
 
 type custRT struct {
-	transport http.Transport
+	transport *http.Transport
 }
 
 func (rt *custRT) RoundTrip(r *http.Request) (*http.Response, error) {
 	return rt.transport.RoundTrip(r)
 }
 
-// getRT returns a custom RoundTripper for the WS connection.
-func (ws *Websocket) getRT(mode ipMode) *custRT {
+// newHTTPClient returns a HTTP client using the provided `mode` as its named network.
+func (ws *Websocket) newHTTPClient(mode ipMode) (*http.Client, error) {
+	config := ws.httpClientConfig
+	client, err := config.NewClient()
+	if err != nil {
+		return nil, err
+	}
+
+	// Override config.NewClient()'s Transport and update it's DialContext with the provided mode.
+	transport, err := config.Transport.NewTransport(config.TLS)
+	if err != nil {
+		return nil, err
+	}
+
+	transport.Proxy = http.ProxyFromEnvironment
 	dialer := &net.Dialer{
-		Timeout:   ws.connectTimeout,
+		Timeout:   client.Timeout,
 		KeepAlive: ws.keepAliveInterval,
 		DualStack: false,
 	}
-
-	return &custRT{
-		transport: http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return dialer.DialContext(ctx, string(mode), addr)
-			},
-			MaxIdleConns:          1,
-			MaxIdleConnsPerHost:   1,
-			MaxConnsPerHost:       1,
-			IdleConnTimeout:       ws.idleConnTimeout,
-			TLSHandshakeTimeout:   ws.tlsHandshakeTimeout,
-			ExpectContinueTimeout: ws.expectContinueTimeout,
-		},
+	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		return dialer.DialContext(ctx, string(mode), addr)
 	}
+	client.Transport = &custRT{transport: transport}
+
+	return client, nil
 }
 
 func (ws *Websocket) nextMode(mode ipMode) ipMode {

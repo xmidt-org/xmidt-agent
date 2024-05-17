@@ -5,26 +5,35 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"runtime/debug"
+	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/goschtalt/goschtalt"
-	_ "github.com/goschtalt/goschtalt/pkg/typical"
-	_ "github.com/goschtalt/yaml-decoder"
-	_ "github.com/goschtalt/yaml-encoder"
 	"github.com/xmidt-org/sallust"
+	"github.com/xmidt-org/xmidt-agent/internal/adapters/libparodus"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials"
-	"github.com/xmidt-org/xmidt-agent/internal/jwtxt"
+	"github.com/xmidt-org/xmidt-agent/internal/loglevel"
+	"github.com/xmidt-org/xmidt-agent/internal/metadata"
+	"github.com/xmidt-org/xmidt-agent/internal/websocket"
+	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/qos"
 
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 const (
 	applicationName = "xmidt-agent"
+)
+
+var (
+	ErrLifecycleStartPanic    = errors.New("panic occured during fx's lifecycle Start")
+	ErrLifecycleStopPanic     = errors.New("panic occured during fx's lifecycle Stop")
+	ErrLifecycleShutdownPanic = errors.New("panic occured during fx's lifecycle Shutdown")
 )
 
 // These match what goreleaser provides.
@@ -43,9 +52,32 @@ type CLI struct {
 	Files []string `optional:"" short:"f" help:"Specific configuration files or directories."`
 }
 
+type LifeCycleIn struct {
+	fx.In
+	Logger           *zap.Logger
+	LC               fx.Lifecycle
+	Shutdowner       fx.Shutdowner
+	WS               *websocket.Websocket
+	LibParodus       *libparodus.Adapter
+	QOS              *qos.Handler
+	Cred             *credentials.Credentials
+	WaitUntilFetched time.Duration `name:"wait_until_fetched"`
+	Cancels          []func()      `group:"cancels"`
+}
+
 // xmidtAgent is the main entry point for the program.  It is responsible for
 // setting up the dependency injection framework and returning the app object.
 func xmidtAgent(args []string) (*fx.App, error) {
+	app := fx.New(provideAppOptions(args))
+	if err := app.Err(); err != nil {
+		return nil, err
+	}
+
+	return app, nil
+}
+
+// provideAppOptions returns all fx options required to start the xmidt agent fx app.
+func provideAppOptions(args []string) fx.Option {
 	var (
 		gscfg *goschtalt.Config
 
@@ -56,7 +88,7 @@ func xmidtAgent(args []string) (*fx.App, error) {
 		cli *CLI
 	)
 
-	app := fx.New(
+	opts := fx.Options(
 		fx.Supply(cliArgs(args)),
 		fx.Populate(&g),
 		fx.Populate(&gscfg),
@@ -72,6 +104,8 @@ func xmidtAgent(args []string) (*fx.App, error) {
 			provideConfig,
 			provideCredentials,
 			provideInstructions,
+			provideWS,
+			provideLibParodus,
 
 			goschtalt.UnmarshalFunc[sallust.Config]("logger", goschtalt.Optional()),
 			goschtalt.UnmarshalFunc[Identity]("identity"),
@@ -79,23 +113,25 @@ func xmidtAgent(args []string) (*fx.App, error) {
 			goschtalt.UnmarshalFunc[XmidtCredentials]("xmidt_credentials"),
 			goschtalt.UnmarshalFunc[XmidtService]("xmidt_service"),
 			goschtalt.UnmarshalFunc[Storage]("storage"),
+			goschtalt.UnmarshalFunc[Websocket]("websocket"),
+			goschtalt.UnmarshalFunc[MockTr181]("mock_tr_181"),
+			goschtalt.UnmarshalFunc[Pubsub]("pubsub"),
+			goschtalt.UnmarshalFunc[Metadata]("metadata"),
+			goschtalt.UnmarshalFunc[NetworkService]("network_service"),
+			goschtalt.UnmarshalFunc[QOS]("qos"),
+			goschtalt.UnmarshalFunc[LibParodus]("lib_parodus"),
+
+			provideNetworkService,
+			provideMetadataProvider,
+			loglevel.New,
+			metadata.NewInterfaceUsedProvider,
 		),
 
 		fsProvide(),
+		provideWRPHandlers(),
 
 		fx.Invoke(
-			// TODO: Remove this.
-			// For now require the credentials to be fetched this way.  Later
-			// Other services will depend on this.
-			func(*credentials.Credentials) {},
-
-			// TODO: Remove this, too.
-			func(i *jwtxt.Instructions) {
-				if i != nil {
-					s, _ := i.Endpoint(context.Background())
-					fmt.Println(s)
-				}
-			},
+			lifeCycle,
 		),
 	)
 
@@ -103,11 +139,7 @@ func xmidtAgent(args []string) (*fx.App, error) {
 		_ = os.WriteFile(cli.Graph, []byte(g), 0600)
 	}
 
-	if err := app.Err(); err != nil {
-		return nil, err
-	}
-
-	return app, nil
+	return opts
 }
 
 func main() {
@@ -170,29 +202,116 @@ func provideCLIWithOpts(args cliArgs, testOpts bool) (*CLI, error) {
 	return &cli, nil
 }
 
+type LoggerIn struct {
+	fx.In
+	CLI *CLI
+	Cfg sallust.Config
+}
+
 // Create the logger and configure it based on if the program is in
 // debug mode or normal mode.
-func provideLogger(cli *CLI, cfg sallust.Config) (*zap.Logger, error) {
-	if cli.Dev {
-		cfg.Level = "DEBUG"
-		cfg.Development = true
-		cfg.Encoding = "console"
-		cfg.EncoderConfig = sallust.EncoderConfig{
-			TimeKey:        "T",
-			LevelKey:       "L",
-			NameKey:        "N",
-			CallerKey:      "C",
-			FunctionKey:    zapcore.OmitKey,
-			MessageKey:     "M",
-			StacktraceKey:  "S",
-			LineEnding:     zapcore.DefaultLineEnding,
-			EncodeLevel:    "capitalColor",
-			EncodeTime:     "RFC3339",
-			EncodeDuration: "string",
-			EncodeCaller:   "short",
-		}
-		cfg.OutputPaths = []string{"stderr"}
-		cfg.ErrorOutputPaths = []string{"stderr"}
+func provideLogger(in LoggerIn) (*zap.AtomicLevel, *zap.Logger, error) {
+	if in.CLI.Dev {
+		in.Cfg.EncoderConfig.EncodeLevel = "capitalColor"
+		in.Cfg.EncoderConfig.EncodeTime = "RFC3339"
+		in.Cfg.Level = "DEBUG"
+		in.Cfg.Development = true
+		in.Cfg.Encoding = "console"
+		in.Cfg.OutputPaths = append(in.Cfg.OutputPaths, "stderr")
+		in.Cfg.ErrorOutputPaths = append(in.Cfg.ErrorOutputPaths, "stderr")
 	}
-	return cfg.Build()
+
+	zcfg, err := in.Cfg.NewZapConfig()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	logger, err := in.Cfg.Build()
+
+	return &zcfg.Level, logger, err
+}
+
+func onStart(cred *credentials.Credentials, ws *websocket.Websocket, libParodus *libparodus.Adapter, qos *qos.Handler, waitUntilFetched time.Duration, logger *zap.Logger) func(context.Context) error {
+	logger = logger.Named("on_start")
+
+	return func(ctx context.Context) (err error) {
+		// err is set during a panic recovery in order to allow fx to rolling back
+		defer func() {
+			if r := recover(); nil != r {
+				err = ErrLifecycleStartPanic
+				logger.Error("stacktrace from panic", zap.String("stacktrace", string(debug.Stack())), zap.Any("panic", r), zap.Error(err))
+			}
+		}()
+
+		if err = ctx.Err(); err != nil {
+			return err
+		}
+
+		if ws == nil {
+			logger.Debug("websocket disabled")
+			return err
+		}
+
+		// Allow operations where no credentials are desired (cred will be nil).
+		if cred != nil {
+			ctx, cancel := context.WithTimeout(ctx, waitUntilFetched)
+			defer cancel()
+			// blocks until an attempt to fetch the credentials has been made or the context is canceled
+			cred.WaitUntilFetched(ctx)
+		}
+
+		ws.Start()
+		err = libParodus.Start()
+		qos.Start()
+
+		return err
+	}
+}
+
+func onStop(ws *websocket.Websocket, libParodus *libparodus.Adapter, qos *qos.Handler, shutdowner fx.Shutdowner, cancels []func(), logger *zap.Logger) func(context.Context) error {
+	logger = logger.Named("on_stop")
+
+	return func(context.Context) (err error) {
+		// err is set during a panic recovery in order to manually trigger
+		// the shutdown of the application by sending a signal to all open Done channels
+		defer func() {
+			if r := recover(); nil != r {
+				err = ErrLifecycleStopPanic
+				logger.Error("stacktrace from panic", zap.String("stacktrace", string(debug.Stack())), zap.Any("panic", r), zap.Error(err))
+			}
+
+			if err2 := shutdowner.Shutdown(); err2 != nil {
+				err = errors.Join(err, err2, ErrLifecycleShutdownPanic)
+				logger.Error("encountered error trying to shutdown app: ", zap.Error(err))
+			}
+		}()
+
+		if ws == nil {
+			logger.Debug("websocket disabled")
+			return nil
+		}
+
+		ws.Stop()
+		libParodus.Stop()
+		qos.Stop()
+		for _, c := range cancels {
+			if c == nil {
+				continue
+			}
+
+			c()
+		}
+
+		return nil
+	}
+}
+
+func lifeCycle(in LifeCycleIn) {
+	logger := in.Logger.Named("fx_lifecycle")
+	in.LC.Append(
+		fx.Hook{
+			OnStart: onStart(in.Cred, in.WS, in.LibParodus, in.QOS, in.WaitUntilFetched, logger),
+			OnStop:  onStop(in.WS, in.LibParodus, in.QOS, in.Shutdowner, in.Cancels, logger),
+		},
+	)
 }

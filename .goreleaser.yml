@@ -1,0 +1,108 @@
+# SPDX-FileCopyrightText: 2024 Comcast Cable Communications Management, LLC
+# SPDX-License-Identifier: Apache-2.0
+---
+project_name: xmidt-agent
+
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+    - '^test:'
+    - '^chore'
+    - 'merge conflict'
+    - Merge pull request
+    - Merge remote-tracking branch
+    - Merge branch
+    - go mod tidy
+  groups:
+    - title: 'Dependency Updates'
+      regexp: '^.*?(feat|fix)\(deps\)!?:.+$'
+      order: 300
+    - title: 'New Features'
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 100
+    - title: 'Bug Fixes'
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 200
+    - title: 'Documentation Updates'
+      regexp: ^.*?doc(\([[:word:]]+\))??!?:.+$
+      order: 400
+    - title: Other Work
+      order: 9999
+
+sboms:
+  - id: archive
+    artifacts: archive
+  - id: source
+    artifacts: source
+
+builds:
+  -
+    main:  './cmd/xmidt-agent'
+    env:
+      - CGO_ENABLED=0
+      - GO111MODULE=on
+    goos:
+      - linux
+    goarch:
+      - "386"
+      - amd64
+      - arm
+      - arm64
+      - mips
+      - mips64
+      - mips64le
+      - mipsle
+    goarm:
+      - "5"
+      - "6"
+      - "7"
+    ldflags:
+      - -s -w
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - format: tar.gz
+    wrap_in_directory: true
+    format_overrides:
+      - goos: windows
+        format: zip
+    name_template: '{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+
+source:
+  enabled: true
+  name_template: '{{ .ProjectName }}_{{ .Version }}_src'
+  format: 'tar.gz'
+
+checksum:
+  name_template: '{{.ProjectName}}-{{.Version}}-checksums.txt'
+  algorithm: sha512
+
+release:
+  extra_files:
+    - glob: ./.extra_files/**
+
+dockers:
+  - use: buildx
+    goos: linux
+    goarch: amd64
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.url=https://github.com/xmidt-org/xmidt-agent"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.source=https://github.com/xmidt-org/xmidt-agent"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+    image_templates:
+      - ghcr.io/xmidt-org/xmidt-agent:{{ .Tag }}-amd64
+      - ghcr.io/xmidt-org/xmidt-agent:v{{ .Major }}-amd64
+      - ghcr.io/xmidt-org/xmidt-agent:v{{ .Major }}.{{ .Minor }}-amd64
+      - ghcr.io/xmidt-org/xmidt-agent:latest-amd64
+    dockerfile: 'Dockerfile'
+    extra_files:
+      - .release/docker
+      - LICENSE
+      - NOTICE

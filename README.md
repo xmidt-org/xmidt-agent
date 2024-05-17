@@ -18,3 +18,17 @@ By participating, you agree to this Code.
 
 Refer to [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## Run xmidt-agent simulator as a docker container
+1. build xmidt-agent for alpine
+    ```cd cmd/xmidt-agent```
+    ```env GOOS=linux GOARCH=arm64 go build .```
+    ```mv xmidt-agent ../../```
+2. from the root directory, build the docker container
+    ```docker build -t xmdit-agent .```
+3. run the container 
+    ```docker run xmdit-agent --dev```
+4. Note that you will see a connection error unless a websocket server is running at the default url specified by Websocket->BackupUrl in cmd/xmdit-agent/config.go. 
+5. To override the default configuration, update the below config file OR bind a config file to target "/etc/xmidt-agent/xmidt-agent.yaml":
+```.release/docker/config/config.yml```
+6. If using TLS, the Dockerfile expects the certificate and key file to be in a root directory called "certs".  Otherwise bind the directory at runtime. 
+

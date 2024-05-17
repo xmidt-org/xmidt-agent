@@ -5,7 +5,9 @@ package websocket_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -17,12 +19,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/xmidt-agent/internal/nhooyr.io/websocket"
 	ws "github.com/xmidt-org/xmidt-agent/internal/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
-	"nhooyr.io/websocket"
 )
 
 func TestEndToEnd(t *testing.T) {
+	var finished bool
+
 	assert := assert.New(t)
 	require := require.New(t)
 
@@ -44,6 +48,13 @@ func TestEndToEnd(t *testing.T) {
 				require.NoError(err)
 
 				mt, got, err := c.Read(ctx)
+				// server will halt until the websocket closes resulting in a EOF
+				var closeErr websocket.CloseError
+				if finished && errors.As(err, &closeErr) {
+					assert.Equal(closeErr.Code, websocket.StatusNormalClosure)
+					return
+				}
+
 				require.NoError(err)
 				require.Equal(websocket.MessageBinary, mt)
 				require.NotEmpty(got)
@@ -79,6 +90,23 @@ func TestEndToEnd(t *testing.T) {
 				func(event.Disconnect) {
 					disconnectCnt.Add(1)
 				})),
+		ws.RetryPolicy(&retry.Config{
+			Interval:    time.Second,
+			Multiplier:  2.0,
+			Jitter:      1.0 / 3.0,
+			MaxInterval: 341*time.Second + 333*time.Millisecond,
+		}),
+		ws.WithIPv4(),
+		ws.NowFunc(time.Now),
+		ws.SendTimeout(90*time.Second),
+		ws.FetchURLTimeout(30*time.Second),
+		ws.MaxMessageBytes(256*1024),
+		ws.CredentialsDecorator(func(h http.Header) error {
+			return nil
+		}),
+		ws.ConveyDecorator(func(h http.Header) error {
+			return nil
+		}),
 	)
 	require.NoError(err)
 	require.NotNil(got)
@@ -122,6 +150,7 @@ func TestEndToEnd(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	time.Sleep(10 * time.Millisecond)
+	finished = true
 	got.Stop()
 }
 
@@ -188,6 +217,22 @@ func TestEndToEndBadData(t *testing.T) {
 						func(event.Disconnect) {
 							disconnectCnt.Add(1)
 						})),
+				ws.RetryPolicy(&retry.Config{
+					Interval:       50 * time.Millisecond,
+					Multiplier:     2.0,
+					MaxElapsedTime: 300 * time.Millisecond,
+				}),
+				ws.WithIPv4(),
+				ws.NowFunc(time.Now),
+				ws.SendTimeout(90*time.Second),
+				ws.FetchURLTimeout(30*time.Second),
+				ws.MaxMessageBytes(256*1024),
+				ws.CredentialsDecorator(func(h http.Header) error {
+					return nil
+				}),
+				ws.ConveyDecorator(func(h http.Header) error {
+					return nil
+				}),
 			)
 			require.NoError(err)
 			require.NotNil(got)
@@ -253,11 +298,6 @@ func TestEndToEndConnectionIssues(t *testing.T) {
 			return s.URL, nil
 		}),
 		ws.DeviceID("mac:112233445566"),
-		ws.RetryPolicy(&retry.Config{
-			Interval:       50 * time.Millisecond,
-			Multiplier:     2.0,
-			MaxElapsedTime: 300 * time.Millisecond,
-		}),
 		ws.AddMessageListener(
 			event.MsgListenerFunc(
 				func(m wrp.Message) {
@@ -273,6 +313,22 @@ func TestEndToEndConnectionIssues(t *testing.T) {
 				func(event.Disconnect) {
 					disconnectCnt.Add(1)
 				})),
+		ws.RetryPolicy(&retry.Config{
+			Interval:       50 * time.Millisecond,
+			Multiplier:     2.0,
+			MaxElapsedTime: 300 * time.Millisecond,
+		}),
+		ws.WithIPv4(),
+		ws.NowFunc(time.Now),
+		ws.SendTimeout(90*time.Second),
+		ws.FetchURLTimeout(30*time.Second),
+		ws.MaxMessageBytes(256*1024),
+		ws.CredentialsDecorator(func(h http.Header) error {
+			return nil
+		}),
+		ws.ConveyDecorator(func(h http.Header) error {
+			return nil
+		}),
 	)
 	require.NoError(err)
 	require.NotNil(got)
@@ -311,4 +367,86 @@ func TestEndToEndConnectionIssues(t *testing.T) {
 
 	assert.True(started)
 	assert.True(msgCnt.Load() > 0, "got message")
+}
+
+func TestEndToEndPingTimeout(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	s := httptest.NewServer(
+		http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				c, err := websocket.Accept(w, r, nil)
+				require.NoError(err)
+				defer c.CloseNow()
+
+				assert.Error(c.Ping(context.Background()))
+			}))
+	defer s.Close()
+
+	var (
+		connectCnt, disconnectCnt, heartbeatCnt atomic.Int64
+		got                                     *ws.Websocket
+		err                                     error
+		disconnectErrs                          []error
+	)
+	got, err = ws.New(
+		ws.URL(s.URL),
+		ws.DeviceID("mac:112233445566"),
+		ws.AddHeartbeatListener(
+			event.HeartbeatListenerFunc(
+				func(event.Heartbeat) {
+					heartbeatCnt.Add(1)
+				})),
+		ws.AddConnectListener(
+			event.ConnectListenerFunc(
+				func(event.Connect) {
+					connectCnt.Add(1)
+				})),
+		ws.AddDisconnectListener(
+			event.DisconnectListenerFunc(
+				func(e event.Disconnect) {
+					disconnectErrs = append(disconnectErrs, e.Err)
+					disconnectCnt.Add(1)
+				})),
+		ws.RetryPolicy(&retry.Config{
+			Interval:    time.Second,
+			Multiplier:  2.0,
+			Jitter:      1.0 / 3.0,
+			MaxInterval: 341*time.Second + 333*time.Millisecond,
+		}),
+		ws.WithIPv4(),
+		ws.NowFunc(time.Now),
+		ws.FetchURLTimeout(30*time.Second),
+		ws.MaxMessageBytes(256*1024),
+		ws.CredentialsDecorator(func(h http.Header) error {
+			return nil
+		}),
+		ws.ConveyDecorator(func(h http.Header) error {
+			return nil
+		}),
+		// Triggers ping timeouts
+		ws.PingTimeout(time.Nanosecond),
+	)
+	require.NoError(err)
+	require.NotNil(got)
+
+	got.Start()
+	time.Sleep(500 * time.Millisecond)
+	got.Stop()
+	// heartbeatCnt should be zero due ping timeouts
+	assert.Equal(int64(0), heartbeatCnt.Load())
+	assert.Greater(connectCnt.Load(), int64(0))
+	assert.Greater(disconnectCnt.Load(), int64(0))
+	assert.NotEmpty(disconnectErrs)
+	// disconnectErrs should only contain context.DeadlineExceeded errors
+	for _, err := range disconnectErrs {
+		if errors.Is(err, net.ErrClosed) {
+			// net.ErrClosed may occur during tests, don't count them
+			continue
+		}
+
+		assert.ErrorIs(err, context.DeadlineExceeded)
+	}
+
 }

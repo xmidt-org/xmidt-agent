@@ -5,12 +5,15 @@ package websocket
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/xmidt-agent/internal/metadata"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
 )
 
@@ -18,10 +21,15 @@ import (
 func DeviceID(id wrp.DeviceID) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
+			if id == "" {
+				return fmt.Errorf("%w: empty DeviceID", ErrMisconfiguredWS)
+			}
+
 			ws.id = id
 			if ws.additionalHeaders == nil {
 				ws.additionalHeaders = http.Header{}
 			}
+
 			ws.additionalHeaders.Set("X-Webpa-Device-Name", string(id))
 			return nil
 		})
@@ -31,6 +39,10 @@ func DeviceID(id wrp.DeviceID) Option {
 func URL(url string) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
+			if url == "" {
+				return fmt.Errorf("%w: empty URL", ErrMisconfiguredWS)
+			}
+
 			ws.urlFetcher = func(context.Context) (string, error) {
 				return url, nil
 			}
@@ -42,6 +54,10 @@ func URL(url string) Option {
 func FetchURL(f func(context.Context) (string, error)) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
+			if f == nil {
+				return fmt.Errorf("%w: nil FetchURL", ErrMisconfiguredWS)
+			}
+
 			ws.urlFetcher = f
 			return nil
 		})
@@ -55,6 +71,7 @@ func FetchURLTimeout(d time.Duration) Option {
 			if d < 0 {
 				return fmt.Errorf("%w: negative FetchURLTimeout", ErrMisconfiguredWS)
 			}
+
 			ws.urlFetchingTimeout = d
 			return nil
 		})
@@ -64,7 +81,23 @@ func FetchURLTimeout(d time.Duration) Option {
 func CredentialsDecorator(f func(http.Header) error) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
+			if f == nil {
+				return fmt.Errorf("%w: nil CredentialsDecorator", ErrMisconfiguredWS)
+			}
+
 			ws.credDecorator = f
+			return nil
+		})
+}
+
+func ConveyDecorator(f func(http.Header) error) Option {
+	return optionFunc(
+		func(ws *Websocket) error {
+			if f == nil {
+				return fmt.Errorf("%w: nil ConveyDecorator", ErrMisconfiguredWS)
+			}
+
+			ws.conveyDecorator = f
 			return nil
 		})
 }
@@ -74,6 +107,10 @@ func CredentialsDecorator(f func(http.Header) error) Option {
 func PingInterval(d time.Duration) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
+			if d < 0 {
+				return fmt.Errorf("%w: negative PingInterval", ErrMisconfiguredWS)
+			}
+
 			ws.pingInterval = d
 			return nil
 		})
@@ -84,6 +121,10 @@ func PingInterval(d time.Duration) Option {
 func PingTimeout(d time.Duration) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
+			if d < 0 {
+				return fmt.Errorf("%w: negative PingTimeout", ErrMisconfiguredWS)
+			}
+
 			ws.pingTimeout = d
 			return nil
 		})
@@ -94,37 +135,11 @@ func PingTimeout(d time.Duration) Option {
 func KeepAliveInterval(d time.Duration) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
+			if d < 0 {
+				return fmt.Errorf("%w: negative KeepAliveInterval", ErrMisconfiguredWS)
+			}
+
 			ws.keepAliveInterval = d
-			return nil
-		})
-}
-
-// TLSHandshakeTimeout sets the TLS handshake timeout for the WS connection.
-// If this is not set, the default is 10 seconds.
-func TLSHandshakeTimeout(d time.Duration) Option {
-	return optionFunc(
-		func(ws *Websocket) error {
-			ws.tlsHandshakeTimeout = d
-			return nil
-		})
-}
-
-// IdleConnTimeout sets the idle connection timeout for the WS connection.
-// If this is not set, the default is 10 seconds.
-func IdleConnTimeout(d time.Duration) Option {
-	return optionFunc(
-		func(ws *Websocket) error {
-			ws.idleConnTimeout = d
-			return nil
-		})
-}
-
-// ExpectContinueTimeout sets the expect continue timeout for the WS connection.
-// If this is not set, the default is 1 second.
-func ExpectContinueTimeout(d time.Duration) Option {
-	return optionFunc(
-		func(ws *Websocket) error {
-			ws.expectContinueTimeout = d
 			return nil
 		})
 }
@@ -151,15 +166,49 @@ func WithIPv6(with ...bool) Option {
 		})
 }
 
-// ConnectTimeout sets the timeout for the WS connection.  If this is not set,
-// the default is 30 seconds.
-func ConnectTimeout(d time.Duration) Option {
+// SendTimeout sets the send timeout for the WS connection.
+func SendTimeout(d time.Duration) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
 			if d < 0 {
-				return fmt.Errorf("%w: negative ConnectTimeout", ErrMisconfiguredWS)
+				return fmt.Errorf("%w: negative SendTimeout", ErrMisconfiguredWS)
 			}
-			ws.connectTimeout = d
+
+			ws.sendTimeout = d
+			return nil
+		})
+}
+
+// HTTPClient is the configuration for the HTTP client used for connection attempts.
+func HTTPClient(c arrangehttp.ClientConfig) Option {
+	return optionFunc(
+		func(ws *Websocket) error {
+			if _, err := c.NewClient(); err != nil {
+				return errors.Join(err, ErrMisconfiguredWS)
+			}
+
+			ws.httpClientConfig = c
+
+			return nil
+		})
+}
+
+// HTTPClientWithForceSets is the configuration for the HTTP client with recommended force sets, used for connection attempts.
+func HTTPClientWithForceSets(c arrangehttp.ClientConfig) Option {
+	return optionFunc(
+		func(ws *Websocket) (err error) {
+			// Set the configuration
+			if err := HTTPClient(c).apply(ws); err != nil {
+				return err
+			}
+
+			// Override the following arrangehttp.ClientConfig.Transport feilds
+			// Note, arrangehttp.ClientConfig.Transport lacks the http.Transport.Proxy,
+			// instead `Proxy` will be set during Websocket.newHTTPClient()
+			ws.httpClientConfig.Transport.MaxIdleConns = 1
+			ws.httpClientConfig.Transport.MaxIdleConnsPerHost = 1
+			ws.httpClientConfig.Transport.MaxConnsPerHost = 1
+
 			return nil
 		})
 }
@@ -173,6 +222,7 @@ func AdditionalHeaders(headers http.Header) Option {
 					ws.additionalHeaders.Add(k, value)
 				}
 			}
+
 			return nil
 		})
 }
@@ -194,6 +244,7 @@ func NowFunc(f func() time.Time) Option {
 			if f == nil {
 				return fmt.Errorf("%w: nil NowFunc", ErrMisconfiguredWS)
 			}
+
 			ws.nowFunc = f
 			return nil
 		})
@@ -204,6 +255,10 @@ func NowFunc(f func() time.Time) Option {
 func RetryPolicy(pf retry.PolicyFactory) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
+			if pf == nil {
+				return fmt.Errorf("%w: nil RetryPolicy", ErrMisconfiguredWS)
+			}
+
 			ws.retryPolicyFactory = pf
 			return nil
 		})
@@ -213,6 +268,10 @@ func RetryPolicy(pf retry.PolicyFactory) Option {
 func MaxMessageBytes(bytes int64) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
+			if bytes < 0 {
+				return fmt.Errorf("%w: negative MaxMessageBytes", ErrMisconfiguredWS)
+			}
+
 			ws.maxMessageBytes = bytes
 			return nil
 		})
@@ -259,6 +318,18 @@ func AddHeartbeatListener(listener event.HeartbeatListener, cancel ...*event.Can
 			var ignored event.CancelFunc
 			cancel = append(cancel, &ignored)
 			*cancel[0] = event.CancelFunc(ws.heartbeatListeners.Add(listener))
+			return nil
+		})
+}
+
+func InterfaceUsedProvider(interfaceUsed *metadata.InterfaceUsedProvider) Option {
+	return optionFunc(
+		func(ws *Websocket) error {
+			if interfaceUsed == nil {
+				return fmt.Errorf("%w: nil InterfaceUsedProvider", ErrMisconfiguredWS)
+			}
+
+			ws.interfaceUsed = interfaceUsed
 			return nil
 		})
 }

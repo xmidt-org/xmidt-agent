@@ -28,6 +28,12 @@ type credsIn struct {
 	Logger  *zap.Logger
 }
 
+type credsOut struct {
+	fx.Out
+	Creds            *credentials.Credentials
+	WaitUntilFetched time.Duration `name:"wait_until_fetched"`
+}
+
 func (in credsIn) Options() ([]credentials.Option, error) {
 	logger := in.Logger.Named("credentials")
 
@@ -57,7 +63,7 @@ func (in credsIn) Options() ([]credentials.Option, error) {
 		credentials.RefetchPercent(in.Creds.RefetchPercent),
 		credentials.AddFetchListener(event.FetchListenerFunc(
 			func(e event.Fetch) {
-				logger.Info("fetch",
+				logger.Debug("fetch",
 					zap.String("origin", e.Origin),
 					zap.Time("at", e.At),
 					zap.Duration("duration", e.Duration),
@@ -79,14 +85,14 @@ func (in credsIn) Options() ([]credentials.Option, error) {
 	return opts, nil
 }
 
-func provideCredentials(in credsIn) (*credentials.Credentials, error) {
+func provideCredentials(in credsIn) (credsOut, error) {
 	opts, err := in.Options()
 	if err != nil || opts == nil {
-		return nil, err
+		return credsOut{}, err
 	}
 	creds, err := credentials.New(opts...)
 	if err != nil {
-		return nil, err
+		return credsOut{}, err
 	}
 
 	in.LC.Append(fx.Hook{
@@ -100,5 +106,8 @@ func provideCredentials(in credsIn) (*credentials.Credentials, error) {
 		},
 	})
 
-	return creds, nil
+	return credsOut{
+		Creds:            creds,
+		WaitUntilFetched: in.Creds.WaitUntilFetched,
+	}, err
 }

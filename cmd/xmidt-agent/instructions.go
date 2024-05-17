@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/jwtxt"
 	"github.com/xmidt-org/xmidt-agent/internal/jwtxt/event"
 	"go.uber.org/fx"
@@ -20,13 +21,19 @@ type instructionsIn struct {
 	ID      Identity
 	Logger  *zap.Logger
 }
+type instructionsOut struct {
+	fx.Out
+	JWTXT     *jwtxt.Instructions
+	DeviceID  wrp.DeviceID
+	PartnerID string
+}
 
-func provideInstructions(in instructionsIn) (*jwtxt.Instructions, error) {
+func provideInstructions(in instructionsIn) (instructionsOut, error) {
 	// If no PEMs are provided then the jwtxt can't be used because it won't
 	// have any keys to use.
 	if in.Service.URL == "" ||
 		(in.Service.JwtTxtRedirector.PEMFiles == nil && in.Service.JwtTxtRedirector.PEMs == nil) {
-		return nil, nil
+		return instructionsOut{}, nil
 	}
 
 	logger := in.Logger.Named("jwtxt")
@@ -38,7 +45,7 @@ func provideInstructions(in instructionsIn) (*jwtxt.Instructions, error) {
 		jwtxt.Timeout(in.Service.JwtTxtRedirector.Timeout),
 		jwtxt.WithFetchListener(event.FetchListenerFunc(
 			func(fe event.Fetch) {
-				logger.Info("fetch",
+				logger.Debug("fetch",
 					zap.String("fqdn", fe.FQDN),
 					zap.String("server", fe.Server),
 					zap.Bool("found", fe.Found),
@@ -61,12 +68,12 @@ func provideInstructions(in instructionsIn) (*jwtxt.Instructions, error) {
 			block, rest := pem.Decode([]byte(item))
 
 			if block == nil || strings.TrimSpace(string(rest)) != "" {
-				return nil, jwtxt.ErrInvalidInput
+				return instructionsOut{}, jwtxt.ErrInvalidInput
 			}
 
 			buf := pem.EncodeToMemory(block)
 			if buf == nil {
-				return nil, jwtxt.ErrInvalidInput
+				return instructionsOut{}, jwtxt.ErrInvalidInput
 			}
 
 			pems = append(pems, buf)
@@ -78,11 +85,16 @@ func provideInstructions(in instructionsIn) (*jwtxt.Instructions, error) {
 		for _, pemFile := range in.Service.JwtTxtRedirector.PEMFiles {
 			data, err := os.ReadFile(pemFile)
 			if err != nil {
-				return nil, err
+				return instructionsOut{}, err
 			}
 			opts = append(opts, jwtxt.WithPEMs(data))
 		}
 	}
 
-	return jwtxt.New(opts...)
+	jwtxt, err := jwtxt.New(opts...)
+
+	return instructionsOut{
+		JWTXT:     jwtxt,
+		DeviceID:  in.ID.DeviceID,
+		PartnerID: in.ID.PartnerID}, err
 }
