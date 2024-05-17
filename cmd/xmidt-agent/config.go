@@ -31,6 +31,7 @@ import (
 type Config struct {
 	Pubsub           Pubsub
 	Websocket        Websocket
+	LibParodus       LibParodus
 	Identity         Identity
 	OperationalState OperationalState
 	XmidtCredentials XmidtCredentials
@@ -43,6 +44,17 @@ type Config struct {
 	XmidtAgentCrud   XmidtAgentCrud
 	Metadata         Metadata
 	NetworkService   NetworkService
+}
+
+type LibParodus struct {
+	// ParodusServiceURL is the service url used by libparodus
+	ParodusServiceURL string
+	// KeepAliveInterval is the keep alive interval for libparodus.
+	KeepAliveInterval time.Duration
+	// ReceiveTimeout is the Receive timeout for libparodus.
+	ReceiveTimeout time.Duration
+	// SendTimeout is the send timeout for libparodus.
+	SendTimeout time.Duration
 }
 
 type QOS struct {
@@ -367,6 +379,12 @@ var defaultConfig = Config{
 			Jitter:      1.0 / 3.0,
 			MaxInterval: 341*time.Second + 333*time.Millisecond,
 		},
+	},
+	LibParodus: LibParodus{
+		ParodusServiceURL: "tcp://127.0.0.1:6666",
+		KeepAliveInterval: 30 * time.Second,
+		ReceiveTimeout:    1 * time.Second,
+		SendTimeout:       1 * time.Second,
 	},
 	Pubsub: Pubsub{
 		PublishTimeout: 5 * time.Second,

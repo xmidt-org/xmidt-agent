@@ -58,12 +58,6 @@ var _ Option = optionFunc(nil)
 
 // New creates a new Service with the given options.
 func New(url string, pubsub *pubsub.PubSub, opts ...Option) (*Adapter, error) {
-	defaults := []Option{
-		KeepaliveInterval(30 * time.Second),
-		ReceiveTimeout(1 * time.Second),
-		SendTimeout(1 * time.Second),
-	}
-
 	required := []Option{
 		validatePubSub(),
 		validateParodusServiceURL(),
@@ -76,7 +70,6 @@ func New(url string, pubsub *pubsub.PubSub, opts ...Option) (*Adapter, error) {
 		subServices:       make(map[string]*external),
 	}
 
-	opts = append(defaults, opts...)
 	opts = append(opts, required...)
 
 	for _, o := range opts {
