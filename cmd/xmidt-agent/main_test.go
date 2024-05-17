@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -14,6 +15,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/xmidt-org/sallust"
+	"github.com/xmidt-org/xmidt-agent/internal/websocket"
+	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/qos"
+	"go.uber.org/fx"
 )
 
 func Test_provideCLI(t *testing.T) {
@@ -133,6 +137,93 @@ func Test_xmidtAgent(t *testing.T) {
 			defer cancel()
 			err = app.Stop(stopCtx)
 			require.NoError(err)
+		})
+	}
+}
+
+type badShutdown struct{}
+
+func (*badShutdown) Shutdown(...fx.ShutdownOption) error {
+	return errors.New("random shutdown error")
+}
+
+func Test_xmidtAgent_lifecycle(t *testing.T) {
+	tests := []struct {
+		description      string
+		lifeCycleOptions fx.Option
+		expectedErrs     []error
+	}{
+		// success cases
+		{
+			description: "panic in fx's Start triggered a successful rollback",
+			lifeCycleOptions: fx.Invoke(
+				func(LC fx.Lifecycle, ws *websocket.Websocket) {
+					var qos *qos.Handler
+					LC.Append(
+						fx.Hook{
+							// `qos` will trigger the panic during fx's Start,
+							// triggering the rollback
+							OnStart: onStart(nil, ws, qos, 0, sallust.Default()),
+						},
+					)
+				},
+			),
+			expectedErrs: []error{ErrLifecycleStartPanic},
+		},
+		{
+			description: "panic in fx's Stop triggered a successful manual shutdown",
+			lifeCycleOptions: fx.Invoke(
+				func(LC fx.Lifecycle, shutdowner fx.Shutdowner) {
+					var qos *qos.Handler
+					LC.Append(
+						fx.Hook{
+							// `qos` will trigger the panic during fx's Stop, manually triggering
+							// the shutdown of the application by sending a signal to all open Done channels
+							OnStop: onStop(&websocket.Websocket{}, qos, shutdowner, nil, sallust.Default()),
+						},
+					)
+				},
+			),
+			expectedErrs: []error{ErrLifecycleStopPanic},
+		},
+		// fail cases
+		{
+			description: "shutdown triggered and failed",
+			lifeCycleOptions: fx.Invoke(
+				func(LC fx.Lifecycle) {
+					var qos *qos.Handler
+					LC.Append(
+						fx.Hook{
+							// qos` will  trigger the panic during fx's Stop, manually triggering
+							// the shutdown of the application by sending a signal to all open Done channels
+							// &badShutdown{} will trigger the panic during fx's Stop, manually triggering
+							// the shutdown of the application by sending a signal to all open Done channels
+							OnStop: onStop(&websocket.Websocket{}, qos, &badShutdown{}, nil, sallust.Default()),
+						},
+					)
+				},
+			),
+			expectedErrs: []error{ErrLifecycleStopPanic, ErrLifecycleShutdownPanic},
+		},
+	}
+	args := []string{"-f", "xmidt_agent.yaml"}
+	for _, tc := range tests {
+		t.Run(tc.description, func(t *testing.T) {
+			assert := assert.New(t)
+			app := fx.New(provideAppOptions(args), tc.lifeCycleOptions)
+
+			// only run the program for	a few seconds to make sure it starts
+			startCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			errs := app.Start(startCtx)
+			time.Sleep(time.Millisecond)
+
+			stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			errs = errors.Join(errs, app.Stop(stopCtx))
+			for _, err := range tc.expectedErrs {
+				assert.ErrorIs(errs, err)
+			}
 		})
 	}
 }
