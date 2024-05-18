@@ -60,6 +60,9 @@ const (
 	// In non Wasm Go, the returned error will indicate whether there was
 	// a TLS handshake failure.
 	StatusTLSHandshake StatusCode = 1015
+
+	// Custom & private codes.
+	StatusInactivityTimeout StatusCode = 4000
 )
 
 // CloseError is returned when the connection is closed with a status and reason.

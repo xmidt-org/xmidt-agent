@@ -49,8 +49,8 @@ type Websocket struct {
 	// credDecorator is the credentials decorator for the WS connection.
 	conveyDecorator func(http.Header) error
 
-	// pingInterval is the ping interval allowed for the WS connection.
-	pingInterval time.Duration
+	// inactivityTimeout is the inactivity timeout for the WS connection.
+	inactivityTimeout time.Duration
 
 	// pingWriteTimeout is the ping timeout for the WS connection.
 	pingWriteTimeout time.Duration
@@ -179,7 +179,7 @@ func (ws *Websocket) Start() {
 func (ws *Websocket) Stop() {
 	ws.m.Lock()
 	if ws.conn != nil {
-		ws.conn.Close(nhws.StatusNormalClosure, "")
+		_ = ws.conn.Close(nhws.StatusNormalClosure, "")
 	}
 
 	shutdown := ws.shutdown
@@ -360,6 +360,7 @@ func (ws *Websocket) dial(ctx context.Context, mode ipMode) (*nhws.Conn, *http.R
 			HTTPHeader: ws.additionalHeaders,
 			HTTPClient: client,
 		},
+		nhws.InactivityTimeout(ws.inactivityTimeout),
 	)
 	if err != nil {
 		return nil, resp, err

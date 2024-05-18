@@ -131,7 +131,7 @@ func TestNew(t *testing.T) {
 		}, {
 			description: "negative ping interval",
 			opts: []Option{
-				PingInterval(-1),
+				InactivityTimeout(-1),
 			},
 			expectedErr: ErrMisconfiguredWS,
 		}, {

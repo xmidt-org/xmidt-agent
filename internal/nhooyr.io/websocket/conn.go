@@ -46,6 +46,9 @@ const (
 //
 // This applies to context expirations as well unfortunately.
 // See https://github.com/nhooyr/websocket/issues/242#issuecomment-633182220
+//
+// Connection closures due to inactivity timeouts (no reads & writes) will close
+// with the StatusCode `StatusInactivityTimeout = 4000`and the opcode `opClose = 8“.
 type Conn struct {
 	noCopy noCopy
 
@@ -80,12 +83,13 @@ type Conn struct {
 	closeErr   error
 	wroteClose bool
 
-	pingWriteTimeout time.Duration
-	pingCounter      int32
-	activePingsMu    sync.Mutex
-	activePings      map[string]chan<- struct{}
-	pingListener     func(context.Context, []byte)
-	pongListener     func(context.Context, []byte)
+	inactivityTimeout time.Duration
+	pingWriteTimeout  time.Duration
+	pingCounter       int32
+	activePingsMu     sync.Mutex
+	activePings       map[string]chan<- struct{}
+	pingListener      func(context.Context, []byte)
+	pongListener      func(context.Context, []byte)
 }
 
 type connConfig struct {
@@ -97,9 +101,11 @@ type connConfig struct {
 
 	br *bufio.Reader
 	bw *bufio.Writer
+
+	inactivityTimeout time.Duration
 }
 
-func newConn(cfg connConfig) *Conn {
+func newConn(cfg connConfig, opts ...ConnOption) *Conn {
 	c := &Conn{
 		subprotocol:    cfg.subprotocol,
 		rwc:            cfg.rwc,
@@ -109,6 +115,8 @@ func newConn(cfg connConfig) *Conn {
 
 		br: cfg.br,
 		bw: cfg.bw,
+
+		inactivityTimeout: cfg.inactivityTimeout,
 
 		readTimeout:  make(chan context.Context),
 		writeTimeout: make(chan context.Context),
@@ -140,6 +148,12 @@ func newConn(cfg connConfig) *Conn {
 	runtime.SetFinalizer(c, func(c *Conn) {
 		c.close(errors.New("connection garbage collected"))
 	})
+
+	for _, opt := range opts {
+		if opt != nil {
+			opt.apply(c)
+		}
+	}
 
 	c.wg.Add(1)
 	go func() {
@@ -185,6 +199,10 @@ func (c *Conn) close(err error) {
 }
 
 func (c *Conn) timeoutLoop() {
+	// `activityProbe`` is used to monitor reads and writes activity until the connection is closed.
+	activityProbe := c.monitorConnectionActivity()
+	defer close(activityProbe)
+
 	readCtx := context.Background()
 	writeCtx := context.Background()
 
@@ -194,7 +212,11 @@ func (c *Conn) timeoutLoop() {
 			return
 
 		case writeCtx = <-c.writeTimeout:
+			// Note, all writes will enqueue their context in `c.writeTimeout`
+			activityProbe <- struct{}{}
 		case readCtx = <-c.readTimeout:
+			// Note, all reads will enqueue their context in `c.readTimeout`
+			activityProbe <- struct{}{}
 
 		case <-readCtx.Done():
 			c.setCloseErr(fmt.Errorf("read timed out: %w", readCtx.Err()))
@@ -208,6 +230,58 @@ func (c *Conn) timeoutLoop() {
 			return
 		}
 	}
+}
+
+// monitorConnectionActivity monitors whether the connection is active by probing reads & writes. If the
+// connection is inactivity and `inactivityTimeout` is triggered, then the connection will be
+// closed with the StatusCode `StatusInactivityTimeout  = 4000`and the opcode `opClose = 8“.
+func (c *Conn) monitorConnectionActivity() (activityProbe chan struct{}) {
+	// `activityProbe` probes for connection activity.
+	activityProbe = make(chan struct{})
+	// done signals to stop monitoring for activity since this connection is actively closing.
+	done := make(chan struct{})
+
+	c.wg.Add(1)
+	go func() {
+		defer c.wg.Done()
+
+		// Actively monitor `activityProbe` for any connection activity (reads & writes).
+		for {
+			inactivityTimeout := time.After(1 * time.Minute)
+			if c.inactivityTimeout > 0 {
+				inactivityTimeout = time.After(c.inactivityTimeout)
+			}
+
+			select {
+			// When `activityProbe` is closed, then the connection has successfully closed
+			// and no additional activity is expected, close `activity`.
+			case _, ok := <-activityProbe:
+				// Connection activity has been observed, reset the `inactivityTimeout` timer.
+				// Continue ingesting activity until `c.closed` is closed.
+				if !ok {
+					// Connection has fully closed, stop monitoring for activity.
+					return
+				}
+			case <-done:
+				// After the first `inactivityTimeout` is triggered, `inactivityTimeout`
+				// is no longer listened to since this connection is actively closing.
+			case <-inactivityTimeout:
+				// No connection activity was observed, triggering `inactivityTimeout`.
+				// Start closing this connection.
+				close(done)
+				// We do this after in case there was an error writing the close frame.
+				c.setCloseErr(errors.New("inactivity timed out"))
+				c.wg.Add(1)
+				// Close connection.
+				go func() {
+					defer c.wg.Done()
+					c.writeError(StatusInactivityTimeout, errors.New("inactivity timed out"))
+				}()
+			}
+		}
+	}()
+
+	return activityProbe
 }
 
 func (c *Conn) flate() bool {

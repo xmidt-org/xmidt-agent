@@ -450,3 +450,56 @@ func TestEndToEndPingWriteTimeout(t *testing.T) {
 	}
 
 }
+
+func TestEndToEndInactivityTimeout(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	s := httptest.NewServer(
+		http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				c, err := websocket.Accept(w, r, nil)
+				require.NoError(err)
+				defer c.CloseNow()
+
+				ctx, cancel := context.WithTimeout(r.Context(), 100*time.Millisecond)
+				defer cancel()
+				mt, got, err := c.Read(ctx)
+
+				var closeErr websocket.CloseError
+				assert.ErrorAs(err, &closeErr)
+				assert.Equal(websocket.StatusInactivityTimeout, closeErr.Code)
+				assert.Equal(websocket.MessageType(0), mt)
+				assert.Nil(got)
+			}))
+	defer s.Close()
+
+	got, err := ws.New(
+		ws.URL(s.URL),
+		ws.DeviceID("mac:112233445566"),
+		ws.RetryPolicy(&retry.Config{
+			Interval:    time.Second,
+			Multiplier:  2.0,
+			Jitter:      1.0 / 3.0,
+			MaxInterval: 341*time.Second + 333*time.Millisecond,
+		}),
+		ws.WithIPv4(),
+		ws.NowFunc(time.Now),
+		ws.FetchURLTimeout(30*time.Second),
+		ws.MaxMessageBytes(256*1024),
+		ws.CredentialsDecorator(func(h http.Header) error {
+			return nil
+		}),
+		ws.ConveyDecorator(func(h http.Header) error {
+			return nil
+		}),
+		// Triggers inactivity timeouts
+		ws.InactivityTimeout(10*time.Millisecond),
+	)
+	require.NoError(err)
+	require.NotNil(got)
+
+	got.Start()
+	time.Sleep(400 * time.Millisecond)
+	got.Stop()
+}
