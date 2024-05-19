@@ -232,7 +232,7 @@ func (c *Conn) timeoutLoop() {
 	}
 }
 
-// monitorConnectionActivity monitors whether the connection is active by probing reads & writes. If the
+// monitorConnectionActivity determines whether the connection is active by monitoring for reads & writes activity. If the
 // connection is inactivity and `inactivityTimeout` is triggered, then the connection will be
 // closed with the StatusCode `StatusInactivityTimeout  = 4000`and the opcode `opClose = 8“.
 func (c *Conn) monitorConnectionActivity() (activityProbe chan struct{}) {
