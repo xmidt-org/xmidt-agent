@@ -53,9 +53,6 @@ type Websocket struct {
 	// Defaults to 1 minute.
 	inactivityTimeout time.Duration
 
-	// activity is used to monitor reads and writes activity until the connection is closed.
-	activity chan struct{}
-
 	// pingWriteTimeout is the ping timeout for the WS connection.
 	pingWriteTimeout time.Duration
 
@@ -128,8 +125,9 @@ func emptyDecorator(http.Header) error {
 // New creates a new WS connection with the given options.
 func New(opts ...Option) (*Websocket, error) {
 	ws := Websocket{
-		credDecorator:   emptyDecorator,
-		conveyDecorator: emptyDecorator,
+		inactivityTimeout: time.Minute,
+		credDecorator:     emptyDecorator,
+		conveyDecorator:   emptyDecorator,
 		// same default as `xmidt-agent/cmd/xmidt-agent/config.go`'s defaultConfig.Websocket.HTTPClient
 		httpClientConfig: arrangehttp.ClientConfig{
 			Timeout: 30 * time.Second,
@@ -175,7 +173,6 @@ func (ws *Websocket) Start() {
 
 	var ctx context.Context
 	ctx, ws.shutdown = context.WithCancel(context.Background())
-	ws.activity = ws.monitorConnectionActivity()
 
 	go ws.run(ctx)
 }
@@ -183,7 +180,6 @@ func (ws *Websocket) Start() {
 // Stop stops the websocket connection.
 func (ws *Websocket) Stop() {
 	ws.m.Lock()
-	// ws.conn could be nil if an inactivity timeout occurred.
 	if ws.conn != nil {
 		_ = ws.conn.Close(nhws.StatusNormalClosure, "")
 	}
@@ -220,8 +216,6 @@ func (ws *Websocket) Send(ctx context.Context, msg wrp.Message) error {
 		err = ws.conn.Write(ctx, nhws.MessageBinary, wrp.MustEncode(&msg, wrp.Msgpack))
 	}
 	ws.m.Unlock()
-	// Record write activity.
-	ws.activity <- struct{}{}
 
 	return err
 }
@@ -229,14 +223,12 @@ func (ws *Websocket) Send(ctx context.Context, msg wrp.Message) error {
 func (ws *Websocket) run(ctx context.Context) {
 	ws.wg.Add(1)
 	defer ws.wg.Done()
-	// Closing ws.activity after we.run() returns insures that conenction activity is not blocked
-	// while the conenction is actively closing.
-	defer close(ws.activity)
 
 	decoder := wrp.NewDecoder(nil, wrp.Msgpack)
 	mode := ws.nextMode(ipv4)
 
 	policy := ws.retryPolicyFactory.NewPolicy(ctx)
+	inactivityTimeout := time.After(ws.inactivityTimeout)
 
 	for {
 		var next time.Duration
@@ -278,8 +270,7 @@ func (ws *Websocket) run(ctx context.Context) {
 					})
 				})
 
-				// Record ping activity.
-				ws.activity <- struct{}{}
+				inactivityTimeout = time.After(ws.inactivityTimeout)
 			}))
 			ws.conn.SetPongListener(func(ctx context.Context, b []byte) {
 				if ctx.Err() != nil {
@@ -292,27 +283,27 @@ func (ws *Websocket) run(ctx context.Context) {
 						Type: event.PONG,
 					})
 				})
-
-				// Record pong activity.
-				ws.activity <- struct{}{}
 			})
 			ws.m.Unlock()
 
 			// Read loop
 			for {
-				ws.m.Lock()
-				conn = ws.conn
-				ws.m.Unlock()
-
-				// Connection may have already been closed, i.e ws.conn is nil
-				if conn == nil {
-					break
+				var msg wrp.Message
+				ctx, cancel := context.WithTimeout(ctx, ws.inactivityTimeout)
+				typ, reader, err := ws.conn.Reader(ctx)
+				if errors.Is(err, context.DeadlineExceeded) {
+					select {
+					case <-inactivityTimeout:
+						// inactivityTimeout occurred, continue with ws.read()'s error handling (connection will be closed).
+					default:
+						// Ping was received during ws.conn.Reader(), i.e.: inactivityTimeout was reset.
+						// Reset inactivityTimeout again for the next ws.conn.Reader().
+						inactivityTimeout = time.After(ws.inactivityTimeout)
+						cancel()
+						continue
+					}
 				}
 
-				var msg wrp.Message
-				typ, reader, err := conn.Reader(ctx)
-				// Record read activity.
-				ws.activity <- struct{}{}
 				if err == nil {
 					if typ != nhws.MessageBinary {
 						err = ErrInvalidMsgType
@@ -322,6 +313,8 @@ func (ws *Websocket) run(ctx context.Context) {
 					}
 				}
 
+				// Cancel ws.conn.Reader()'s context after wrp decoding.
+				cancel()
 				if err != nil {
 					ws.m.Lock()
 					ws.conn = nil
@@ -368,62 +361,6 @@ func (ws *Websocket) run(ctx context.Context) {
 			return
 		}
 	}
-}
-
-// monitorConnectionActivity determines whether the connection is active by monitoring for reads & writes activity. If the
-// connection is inactivity and `inactivityTimeout` is triggered, then the connection will be
-// closed with the StatusCode `nhws.StatusPolicyViolation = 1008`and the opcode `nhws.opClose = 8“.
-func (ws *Websocket) monitorConnectionActivity() (activity chan struct{}) {
-	// `activity` probes for connection activity.
-	activity = make(chan struct{})
-
-	ws.wg.Add(1)
-	go func() {
-		defer ws.wg.Done()
-		// Actively monitor `activity` for any connection activity (reads & writes).
-		for {
-			inactivityTimeout := time.After(time.Minute)
-			if ws.inactivityTimeout > 0 {
-				inactivityTimeout = time.After(ws.inactivityTimeout)
-			}
-
-			select {
-			// When `activity` is closed, then the connection has successfully closed
-			// and no additional activity is expected.
-			case _, ok := <-activity:
-				// Connection activity has been observed, reset the `inactivityTimeout` timer.
-				// Continue ingesting activity until `c.closed` is closed.
-				if !ok {
-					// Connection has fully closed, stop monitoring for activity.
-					return
-				}
-			case <-inactivityTimeout:
-				// No connection activity was observed, triggering `inactivityTimeout`.
-				// Start closing this connection.
-
-				// Insure the current websocket connection can't be used.
-				ws.m.Lock()
-				conn := ws.conn
-				ws.conn = nil
-				ws.m.Unlock()
-
-				// Close connection.
-				ws.wg.Add(1)
-				go func() {
-					defer ws.wg.Done()
-					if conn == nil {
-						// Connection is activily closing if not already closed and
-						// a new connection hasn't been created yet.
-						return
-					}
-
-					_ = conn.Close(nhws.StatusPolicyViolation, "inactivity timed out")
-				}()
-			}
-		}
-	}()
-
-	return activity
 }
 
 func (ws *Websocket) dial(ctx context.Context, mode ipMode) (*nhws.Conn, *http.Response, error) {

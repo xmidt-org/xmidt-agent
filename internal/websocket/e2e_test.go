@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -466,9 +467,7 @@ func TestEndToEndInactivityTimeout(t *testing.T) {
 				defer cancel()
 				mt, got, err := c.Read(ctx)
 
-				var closeErr websocket.CloseError
-				assert.ErrorAs(err, &closeErr)
-				assert.Equal(websocket.StatusPolicyViolation, closeErr.Code)
+				assert.ErrorIs(err, io.EOF)
 				assert.Equal(websocket.MessageType(0), mt)
 				assert.Nil(got)
 			}))
