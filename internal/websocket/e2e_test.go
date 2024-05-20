@@ -468,7 +468,7 @@ func TestEndToEndInactivityTimeout(t *testing.T) {
 
 				var closeErr websocket.CloseError
 				assert.ErrorAs(err, &closeErr)
-				assert.Equal(websocket.StatusInactivityTimeout, closeErr.Code)
+				assert.Equal(websocket.StatusPolicyViolation, closeErr.Code)
 				assert.Equal(websocket.MessageType(0), mt)
 				assert.Nil(got)
 			}))
