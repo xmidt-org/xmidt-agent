@@ -5,10 +5,8 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
-	"runtime/debug"
 	"time"
 
 	"github.com/alecthomas/kong"
@@ -28,12 +26,6 @@ import (
 
 const (
 	applicationName = "xmidt-agent"
-)
-
-var (
-	ErrLifecycleStartPanic    = errors.New("panic occured during fx's lifecycle Start")
-	ErrLifecycleStopPanic     = errors.New("panic occured during fx's lifecycle Stop")
-	ErrLifecycleShutdownPanic = errors.New("panic occured during fx's lifecycle Shutdown")
 )
 
 // These match what goreleaser provides.
@@ -235,14 +227,6 @@ func onStart(cred *credentials.Credentials, ws *websocket.Websocket, libParodus 
 	logger = logger.Named("on_start")
 
 	return func(ctx context.Context) (err error) {
-		// err is set during a panic recovery in order to allow fx to rolling back
-		defer func() {
-			if r := recover(); nil != r {
-				err = ErrLifecycleStartPanic
-				logger.Error("stacktrace from panic", zap.String("stacktrace", string(debug.Stack())), zap.Any("panic", r), zap.Error(err))
-			}
-		}()
-
 		if err = ctx.Err(); err != nil {
 			return err
 		}
@@ -272,19 +256,6 @@ func onStop(ws *websocket.Websocket, libParodus *libparodus.Adapter, qos *qos.Ha
 	logger = logger.Named("on_stop")
 
 	return func(context.Context) (err error) {
-		defer func() {
-			if r := recover(); nil != r {
-				err = ErrLifecycleStopPanic
-				// fmt.Println(string(debug.Stack()))
-				logger.Error("stacktrace from panic", zap.String("stacktrace", string(debug.Stack())), zap.Any("panic", r), zap.Error(err))
-			}
-
-			if err2 := shutdowner.Shutdown(); err2 != nil {
-				err = errors.Join(err, err2, ErrLifecycleShutdownPanic)
-				logger.Error("encountered error trying to shutdown app: ", zap.Error(err))
-			}
-		}()
-
 		if ws == nil {
 			logger.Debug("websocket disabled")
 			return nil

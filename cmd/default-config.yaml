@@ -7,6 +7,7 @@ xmidt_credentials:
   file_name: "credentials.msgpack"
   file_permissions: 0600
   refetch_percent:  90.0
+  wait_until_fetched: 30s
   http_client:
     timeout: 20s
     transport:
@@ -14,10 +15,10 @@ xmidt_credentials:
       max_idle_conns: 1
     tls:
       insecure_skip_verify: true
+      min_version: 771 # 0x0303, the TLS 1.2 version uint16
       # certificates: 
       #   - certificate_file: certs/cert.pem
       #     key_file:         certs/key.pem
-      # min_version: 771 # 0x0303, the TLS 1.2 version uint16
 identity:
   device_id: "mac:4ca161000109"
   serial_number: 1800deadbeef
@@ -51,17 +52,16 @@ websocket:
     # used if xmidt_service section is empty or xmdit_service connection fails
 		back_up_url:        "http://localhost:8080" 
 		fetch_url_timeout:  30s
-		PingInterval:      30s
-		PingTimeout:       90s
-		SendTimeout:       90s
-		KeepAliveInterval: 30s
+		ping_interval:      30s
+		ping_write_timeout:       90s
+		send_timeout:       90s
+		keep_alive_interval: 30s
 		http_client:
 			timeout: 30s
 			transport: 
 				idle_conn_timeout:       10s
 				tls_handshake_timeout:   10s
 				expect_continue_timeout: 1s
-
 		max_message_bytes: 262144 # 256 * 1024
     #
     #	This retry policy gives us a very good approximation of the prior

@@ -86,8 +86,8 @@ type Websocket struct {
 	FetchURLTimeout time.Duration
 	// PingInterval is the ping interval allowed for the WS connection.
 	PingInterval time.Duration
-	// PingTimeout is the ping timeout for the WS connection.
-	PingTimeout time.Duration
+	// PingWriteTimeout is the ping timeout for the WS connection.
+	PingWriteTimeout time.Duration
 	// SendTimeout is the send timeout for the WS connection.
 	SendTimeout time.Duration
 	// HTTPClient is the configuration for the HTTP client.
@@ -313,7 +313,6 @@ func provideConfig(cli *CLI) (*goschtalt.Config, error) {
 // Keep the default configuration at the bottom of the file so it is easy to
 // see what the default configuration is.
 // -----------------------------------------------------------------------------
-
 
 // var defaultConfig = Config{
 // 	Identity: Identity{
