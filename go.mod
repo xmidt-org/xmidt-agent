@@ -27,6 +27,7 @@ require (
 require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/go-yaml/yaml v2.1.0+incompatible
 	github.com/gorilla/websocket v1.5.1 // indirect
 	github.com/goschtalt/approx v1.0.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
