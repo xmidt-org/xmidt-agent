@@ -26,10 +26,11 @@ identity:
   hardware_manufacturer: barManufacturer
   firmware_version: "v0.0.1"
   partner_id: foobar
-# xmidt_service:
-#   backoff:
-#       max_delay: 600s
-#       min_delay: 7s
+xmidt_service:
+  url: "https://localhost:8080"
+  backoff:
+      max_delay: 600s
+      min_delay: 7s
 #   # config for an optional server that will redirect the device to a websocket server
 #   jwt_txt_redirector:
 #       allowed_algorithms: ["RS256","EdDSA","ES256", "ES384", "ES512","PS256", "PS384", "PS512","RS256", "RS384", "RS512",]
@@ -46,7 +47,6 @@ identity:
 #         qwIDAQAB
 #         -----END PUBLIC KEY-----
 #       timeout: 10s
-#   url: "https://localhost:8080"
 websocket:
   url_path:           "/api/v2/device"
   # used if xmidt_service section is empty or xmdit_service connection fails
