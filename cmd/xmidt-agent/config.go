@@ -4,13 +4,12 @@
 package main
 
 import (
-	"embed"
+	_ "embed"
 	"fmt"
 	"io/fs"
 	"net/http"
 	"os"
 	"time"
-	"github.com/go-yaml/yaml"
 
 	"github.com/goschtalt/goschtalt"
 	_ "github.com/goschtalt/goschtalt/pkg/typical"
@@ -18,18 +17,16 @@ import (
 	_ "github.com/goschtalt/yaml-decoder"
 	_ "github.com/goschtalt/yaml-encoder"
 	"github.com/xmidt-org/arrange/arrangehttp"
-	//"github.com/xmidt-org/arrange/arrangetls"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/configuration"
 	"github.com/xmidt-org/xmidt-agent/internal/net"
-	//"go.uber.org/zap/zapcore"
 	"gopkg.in/dealancer/validate.v2"
 )
 
 //go:embed default-config.yaml
-var defaultConfigFile []byte 
+var defaultConfigFile []byte
 
 // Config is the configuration for the xmidt-agent.
 type Config struct {
@@ -240,11 +237,6 @@ type NetworkService struct {
 // Collect and process the configuration files and env vars and
 // produce a configuration object.
 func provideConfig(cli *CLI) (*goschtalt.Config, error) {
-	var defaultConfig = new(Config)
-	err := yaml.Unmarshal(defaultConfigFile, defaultConfig)
-	if (err != nil) {
-		return nil, err
-	}
 
 	gs, err := goschtalt.New(
 		goschtalt.StdCfgLayout(applicationName, cli.Files...),
@@ -254,11 +246,13 @@ func provideConfig(cli *CLI) (*goschtalt.Config, error) {
 				goschtalt.ValidatorFunc(validate.Validate),
 			),
 		),
+		// Seed the program with the default, built-in configuration
+		goschtalt.AddBuffer("build-in.yaml", defaultConfigFile, goschtalt.AsDefault()),
 
 		// Seed the program with the default, built-in configuration.
 		// Mark this as a default so it is ordered correctly.
-		goschtalt.AddValue("built-in", goschtalt.Root, defaultConfig,
-			goschtalt.AsDefault()),
+		// goschtalt.AddValue("built-in.yaml", goschtalt.Root, defaultConfig,
+		// 	goschtalt.AsDefault()),
 	)
 	if err != nil {
 		return nil, err
