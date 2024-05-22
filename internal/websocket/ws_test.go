@@ -6,7 +6,9 @@ package websocket
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -15,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/xmidt-agent/internal/nhooyr.io/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
 )
 
@@ -422,4 +425,56 @@ func TestLimit(t *testing.T) {
 
 func Test_emptyDecorator(t *testing.T) {
 	assert.NoError(t, emptyDecorator(http.Header{}))
+}
+
+func Test_CancelCtx(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	s := httptest.NewServer(
+		http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				c, err := websocket.Accept(w, r, nil)
+				require.NoError(err)
+				defer c.CloseNow()
+
+				mt, got, err := c.Read(context.Background())
+
+				assert.ErrorIs(err, io.EOF)
+				assert.Equal(websocket.MessageType(0), mt)
+				assert.Nil(got)
+			}))
+	defer s.Close()
+
+	got, err := New(
+		URL(s.URL),
+		DeviceID("mac:112233445566"),
+		RetryPolicy(&retry.Config{
+			Interval:    time.Second,
+			Multiplier:  2.0,
+			Jitter:      1.0 / 3.0,
+			MaxInterval: 341*time.Second + 333*time.Millisecond,
+		}),
+		WithIPv4(),
+		NowFunc(time.Now),
+		FetchURLTimeout(30*time.Second),
+		MaxMessageBytes(256*1024),
+		CredentialsDecorator(func(h http.Header) error {
+			return nil
+		}),
+		ConveyDecorator(func(h http.Header) error {
+			return nil
+		}),
+		// Triggers inactivity timeouts
+		InactivityTimeout(time.Hour),
+	)
+	require.NoError(err)
+	require.NotNil(got)
+
+	got.Start()
+	time.Sleep(500 * time.Millisecond)
+	got.shutdown()
+	time.Sleep(500 * time.Millisecond)
+	got.Stop()
+
 }

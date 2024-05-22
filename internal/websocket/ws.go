@@ -302,6 +302,10 @@ func (ws *Websocket) run(ctx context.Context) {
 						cancel()
 						continue
 					}
+				} else if errors.Is(err, context.Canceled) {
+					// Parent context has been cancelled.
+					cancel()
+					break
 				}
 
 				if err == nil {
