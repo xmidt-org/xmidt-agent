@@ -303,7 +303,7 @@ func (ws *Websocket) run(ctx context.Context) {
 						continue
 					}
 				} else if errors.Is(err, context.Canceled) {
-					// Parent context has been cancelled.
+					// Parent context has been canceled.
 					cancel()
 					break
 				}
