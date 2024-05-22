@@ -102,16 +102,15 @@ func ConveyDecorator(f func(http.Header) error) Option {
 		})
 }
 
-// PingInterval sets the time expected between PINGs for the WS connection.
-// If this is not set, the default is 30 seconds.
-func PingInterval(d time.Duration) Option {
+// InactivityTimeout sets inactivity timeout for the WS connection.
+func InactivityTimeout(d time.Duration) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
 			if d < 0 {
-				return fmt.Errorf("%w: negative PingInterval", ErrMisconfiguredWS)
+				return fmt.Errorf("%w: negative InactivityTimeout", ErrMisconfiguredWS)
 			}
 
-			ws.pingInterval = d
+			ws.inactivityTimeout = d
 			return nil
 		})
 }
