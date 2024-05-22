@@ -502,3 +502,54 @@ func TestEndToEndInactivityTimeout(t *testing.T) {
 	time.Sleep(400 * time.Millisecond)
 	got.Stop()
 }
+
+func TestEndToEndCancelCtx(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	s := httptest.NewServer(
+		http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				c, err := websocket.Accept(w, r, nil)
+				require.NoError(err)
+				defer c.CloseNow()
+
+				mt, got, err := c.Read(context.Background())
+
+				var errActual websocket.CloseError
+				assert.ErrorAs(err, &errActual)
+				assert.Equal(websocket.StatusNormalClosure, errActual.Code)
+				assert.Equal(websocket.MessageType(0), mt)
+				assert.Nil(got)
+			}))
+	defer s.Close()
+
+	got, err := ws.New(
+		ws.URL(s.URL),
+		ws.DeviceID("mac:112233445566"),
+		ws.RetryPolicy(&retry.Config{
+			Interval:    time.Second,
+			Multiplier:  2.0,
+			Jitter:      1.0 / 3.0,
+			MaxInterval: 341*time.Second + 333*time.Millisecond,
+		}),
+		ws.WithIPv4(),
+		ws.NowFunc(time.Now),
+		ws.FetchURLTimeout(30*time.Second),
+		ws.MaxMessageBytes(256*1024),
+		ws.CredentialsDecorator(func(h http.Header) error {
+			return nil
+		}),
+		ws.ConveyDecorator(func(h http.Header) error {
+			return nil
+		}),
+		// Triggers inactivity timeouts
+		ws.InactivityTimeout(time.Hour),
+	)
+	require.NoError(err)
+	require.NotNil(got)
+
+	got.Start()
+	time.Sleep(400 * time.Millisecond)
+	got.Stop()
+}
