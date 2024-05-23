@@ -248,7 +248,6 @@ func provideConfig(cli *CLI) (*goschtalt.Config, error) {
 		),
 		// Seed the program with the default, built-in configuration
 		goschtalt.AddBuffer("!built-in.yaml", defaultConfigFile, goschtalt.AsDefault()),
-
 	)
 	if err != nil {
 		return nil, err
