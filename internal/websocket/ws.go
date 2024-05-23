@@ -49,8 +49,9 @@ type Websocket struct {
 	// credDecorator is the credentials decorator for the WS connection.
 	conveyDecorator func(http.Header) error
 
-	// pingInterval is the ping interval allowed for the WS connection.
-	pingInterval time.Duration
+	// inactivityTimeout is the inactivity timeout for the WS connection.
+	// Defaults to 1 minute.
+	inactivityTimeout time.Duration
 
 	// pingWriteTimeout is the ping timeout for the WS connection.
 	pingWriteTimeout time.Duration
@@ -124,8 +125,9 @@ func emptyDecorator(http.Header) error {
 // New creates a new WS connection with the given options.
 func New(opts ...Option) (*Websocket, error) {
 	ws := Websocket{
-		credDecorator:   emptyDecorator,
-		conveyDecorator: emptyDecorator,
+		inactivityTimeout: time.Minute,
+		credDecorator:     emptyDecorator,
+		conveyDecorator:   emptyDecorator,
 		// same default as `xmidt-agent/cmd/xmidt-agent/config.go`'s defaultConfig.Websocket.HTTPClient
 		httpClientConfig: arrangehttp.ClientConfig{
 			Timeout: 30 * time.Second,
@@ -179,7 +181,7 @@ func (ws *Websocket) Start() {
 func (ws *Websocket) Stop() {
 	ws.m.Lock()
 	if ws.conn != nil {
-		ws.conn.Close(nhws.StatusNormalClosure, "")
+		_ = ws.conn.Close(nhws.StatusNormalClosure, "")
 	}
 
 	shutdown := ws.shutdown
@@ -226,6 +228,7 @@ func (ws *Websocket) run(ctx context.Context) {
 	mode := ws.nextMode(ipv4)
 
 	policy := ws.retryPolicyFactory.NewPolicy(ctx)
+	inactivityTimeout := time.After(ws.inactivityTimeout)
 
 	for {
 		var next time.Duration
@@ -266,6 +269,8 @@ func (ws *Websocket) run(ctx context.Context) {
 						Type: event.PING,
 					})
 				})
+
+				inactivityTimeout = time.After(ws.inactivityTimeout)
 			}))
 			ws.conn.SetPongListener(func(ctx context.Context, b []byte) {
 				if ctx.Err() != nil {
@@ -284,7 +289,25 @@ func (ws *Websocket) run(ctx context.Context) {
 			// Read loop
 			for {
 				var msg wrp.Message
+				ctx, cancel := context.WithTimeout(ctx, ws.inactivityTimeout)
 				typ, reader, err := ws.conn.Reader(ctx)
+				if errors.Is(err, context.DeadlineExceeded) {
+					select {
+					case <-inactivityTimeout:
+						// inactivityTimeout occurred, continue with ws.read()'s error handling (connection will be closed).
+					default:
+						// Ping was received during ws.conn.Reader(), i.e.: inactivityTimeout was reset.
+						// Reset inactivityTimeout again for the next ws.conn.Reader().
+						inactivityTimeout = time.After(ws.inactivityTimeout)
+						cancel()
+						continue
+					}
+				} else if errors.Is(err, context.Canceled) {
+					// Parent context has been canceled.
+					cancel()
+					break
+				}
+
 				if err == nil {
 					if typ != nhws.MessageBinary {
 						err = ErrInvalidMsgType
@@ -294,6 +317,8 @@ func (ws *Websocket) run(ctx context.Context) {
 					}
 				}
 
+				// Cancel ws.conn.Reader()'s context after wrp decoding.
+				cancel()
 				if err != nil {
 					ws.m.Lock()
 					ws.conn = nil

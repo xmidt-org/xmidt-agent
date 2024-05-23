@@ -71,7 +71,7 @@ func provideWS(in wsIn) (wsOut, error) {
 		websocket.FetchURL(
 			fetchURL(in.Websocket.URLPath, in.Websocket.BackUpURL,
 				fetchURLFunc)),
-		websocket.PingInterval(in.Websocket.PingInterval),
+		websocket.InactivityTimeout(in.Websocket.InactivityTimeout),
 		websocket.PingWriteTimeout(in.Websocket.PingWriteTimeout),
 		websocket.SendTimeout(in.Websocket.SendTimeout),
 		websocket.KeepAliveInterval(in.Websocket.KeepAliveInterval),
