@@ -116,10 +116,10 @@ logger:
     MaxBackups: 10 # max 10 files
 operational_state:
   last_reboot_reason: sleepy
-  boot_time: "2024-02-28T01:04:27Z"
+  boot_time: "1970-01-01T00:00:00Z"
 storage:
-  temporary: "~/local-rdk-testing/temporary"
-  durable: "~/local-rdk-testing/durable"
+  # temporary: "~/local-rdk-testing/temporary"
+  # durable: "~/local-rdk-testing/durable"
 mock_tr_181:
   enabled: true
   file_path: "mock_tr181.json"
@@ -127,7 +127,7 @@ mock_tr_181:
 xmidt_agent_crud:
   service_name: xmidt_agent
 qos: 
-  max_queue_bytes:  1000000 # 1 * 1024 * 1024 // 1MB max/queue,
+  max_queue_bytes:  1048576  # 1 * 1024 * 1024 // 1MB max/queue,
   max_message_bytes: 262144 # 256 * 1024      // 256 KB
 metadata:
   fields:
@@ -141,6 +141,7 @@ metadata:
     - boot-time-retry-wait
     - webpa-interface-used
     - interfaces-available
+# lowest priority wins for network interfaces
 network_service:
   allowed_interfaces:
     eth0:
