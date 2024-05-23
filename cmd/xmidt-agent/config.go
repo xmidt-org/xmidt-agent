@@ -81,8 +81,8 @@ type Websocket struct {
 	AdditionalHeaders http.Header
 	// FetchURLTimeout is the timeout for the fetching the WS url. If this is not set, the default is 30 seconds.
 	FetchURLTimeout time.Duration
-	// PingInterval is the ping interval allowed for the WS connection.
-	PingInterval time.Duration
+	// InactivityTimeout is the inactivity timeout for the WS connection.
+	InactivityTimeout time.Duration
 	// PingWriteTimeout is the ping timeout for the WS connection.
 	PingWriteTimeout time.Duration
 	// SendTimeout is the send timeout for the WS connection.
