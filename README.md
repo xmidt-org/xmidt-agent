@@ -30,5 +30,5 @@ Refer to [CONTRIBUTING.md](CONTRIBUTING.md).
 5. Note that you will see a connection error unless a websocket server is running at the default url specified by websocket -> back_up_url in cmd/xmidt-agent/default-config.yaml.
 6. To override the default configuration, update the below config file OR bind a config file to target "/etc/xmidt-agent/xmidt-agent.yaml" at runtime:
 ```.release/docker/config/config.yml```
-7. If using TLS, the Dockerfile expects the certificate and key file to be in a root directory called "certs" at build time.  Otherwise bind the directory at runtime. 
+7. If using TLS, the Dockerfile expects the certificate and key files to be ".release/docker/certs" at build time.  Otherwise bind the directory at runtime. 
 
