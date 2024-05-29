@@ -62,6 +62,9 @@ type QOS struct {
 	MaxQueueBytes int64
 	// MaxMessageBytes is the largest allowable wrp message payload.
 	MaxMessageBytes int
+	// PrioritizeOldest determines whether to prioritize the oldest message during a QualityOfService tie breaker,
+	// with the default being to prioritize the newest messages.
+	PrioritizeOldest bool
 }
 
 type Pubsub struct {

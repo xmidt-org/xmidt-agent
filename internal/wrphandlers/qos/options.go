@@ -45,3 +45,14 @@ func MaxMessageBytes(s int) Option {
 			return nil
 		})
 }
+
+// PrioritizeOldest determines whether to prioritize the oldest message during a QualityOfService tie breaker,
+// with the default being to prioritize the newest messages.
+func PrioritizeOldest(b bool) Option {
+	return optionFunc(
+		func(h *Handler) error {
+			h.prioritizeOldest = b
+
+			return nil
+		})
+}

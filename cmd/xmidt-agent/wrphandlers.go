@@ -74,6 +74,7 @@ func provideQOSHandler(in qosIn) (*qos.Handler, error) {
 		in.WS,
 		qos.MaxQueueBytes(in.QOS.MaxQueueBytes),
 		qos.MaxMessageBytes(in.QOS.MaxMessageBytes),
+		qos.PrioritizeOldest(in.QOS.PrioritizeOldest),
 	)
 }
 
