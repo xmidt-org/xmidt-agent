@@ -26,4 +26,5 @@ jobs:
       release-main-package: ./cmd/xmidt-agent
       release-custom-file:  true
       release-docker:       true
+      yaml-lint-skip:       false
     secrets: inherit

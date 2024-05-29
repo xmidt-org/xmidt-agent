@@ -12,7 +12,7 @@ xmidt_credentials:
   http_client:
     tls:
       insecure_skip_verify: true
-      certificates: 
+      certificates:
         - certificate_file: certs/cert.pem
           key_file:         certs/key.pem
       min_version: 771 # 0x0303, the TLS 1.2 version uint16
@@ -24,25 +24,25 @@ identity:
   firmware_version: v0.0.1
   partner_id: foobar
 xmidt_service:
-    backoff:
-        max_delay: 600s
-        min_delay: 7s
-    # config for an optional server that will redirect the device to a websocket server
-    jwt_txt_redirector:
-        allowed_algorithms: ["RS256"]
-        pems:
-        - |
-          -----BEGIN PUBLIC KEY-----
-          MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkZeQUMqDkMu/dQgTcycJ
-          /rrgqfKQkoYFTMO7GnK87/OWiftHmtDJYPgktlcHheOPfkGln5ay1WJSitmtWNaH
-          +RvBFK/ZsXpIuGm7R6wdSc7e6g9fTaSAfNX/+a8VxHUo58AinXxcq4LnHbuaGjEz
-          jw77TLuZGyUuHiany8O8tc+DbnYKvRquScsccI6z/QwZKFtXUjJZ91hJ97zC8o7N
-          Ae7n/Jg+Bs0uz9c1/bf/Jqbu6OidFbCr2FN42UupuAZ8DiPp2fWD5Q9qmp1ADk+V
-          +TeZPxTCq/WB4dzSCd5v/FvFmO8tH6Ptkltij4pke7Dsi80TVRlcMDXAWxSFXOQV
-          qwIDAQAB
-          -----END PUBLIC KEY-----
-        timeout: 10s
-    url: https://localhost:8080
+  backoff:
+    max_delay: 600s
+    min_delay: 7s
+  # config for an optional server that will redirect the device to a websocket server
+  jwt_txt_redirector:
+    allowed_algorithms: ["RS256"]
+    pems:
+      - |
+        -----BEGIN PUBLIC KEY-----
+        MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkZeQUMqDkMu/dQgTcycJ
+        /rrgqfKQkoYFTMO7GnK87/OWiftHmtDJYPgktlcHheOPfkGln5ay1WJSitmtWNaH
+        +RvBFK/ZsXpIuGm7R6wdSc7e6g9fTaSAfNX/+a8VxHUo58AinXxcq4LnHbuaGjEz
+        jw77TLuZGyUuHiany8O8tc+DbnYKvRquScsccI6z/QwZKFtXUjJZ91hJ97zC8o7N
+        Ae7n/Jg+Bs0uz9c1/bf/Jqbu6OidFbCr2FN42UupuAZ8DiPp2fWD5Q9qmp1ADk+V
+        +TeZPxTCq/WB4dzSCd5v/FvFmO8tH6Ptkltij4pke7Dsi80TVRlcMDXAWxSFXOQV
+        qwIDAQAB
+        -----END PUBLIC KEY-----
+    timeout: 10s
+  url: https://localhost:8080
 operational_state:
   last_reboot_reason: sleepy
   boot_time: "2024-02-28T01:04:27Z"
