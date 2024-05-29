@@ -4,7 +4,7 @@
 package main
 
 import (
-	"crypto/tls"
+	_ "embed"
 	"fmt"
 	"io/fs"
 	"net/http"
@@ -17,15 +17,16 @@ import (
 	_ "github.com/goschtalt/yaml-decoder"
 	_ "github.com/goschtalt/yaml-encoder"
 	"github.com/xmidt-org/arrange/arrangehttp"
-	"github.com/xmidt-org/arrange/arrangetls"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/configuration"
 	"github.com/xmidt-org/xmidt-agent/internal/net"
-	"go.uber.org/zap/zapcore"
 	"gopkg.in/dealancer/validate.v2"
 )
+
+//go:embed default-config.yaml
+var defaultConfigFile []byte
 
 // Config is the configuration for the xmidt-agent.
 type Config struct {
@@ -239,6 +240,7 @@ type NetworkService struct {
 // Collect and process the configuration files and env vars and
 // produce a configuration object.
 func provideConfig(cli *CLI) (*goschtalt.Config, error) {
+
 	gs, err := goschtalt.New(
 		goschtalt.StdCfgLayout(applicationName, cli.Files...),
 		goschtalt.ConfigIs("two_words"),
@@ -247,11 +249,8 @@ func provideConfig(cli *CLI) (*goschtalt.Config, error) {
 				goschtalt.ValidatorFunc(validate.Validate),
 			),
 		),
-
-		// Seed the program with the default, built-in configuration.
-		// Mark this as a default so it is ordered correctly.
-		goschtalt.AddValue("built-in", goschtalt.Root, defaultConfig,
-			goschtalt.AsDefault()),
+		// Seed the program with the default, built-in configuration
+		goschtalt.AddBuffer("!built-in.yaml", defaultConfigFile, goschtalt.AsDefault()),
 	)
 	if err != nil {
 		return nil, err
@@ -300,148 +299,4 @@ func provideConfig(cli *CLI) (*goschtalt.Config, error) {
 	}
 
 	return gs, nil
-}
-
-// -----------------------------------------------------------------------------
-// Keep the default configuration at the bottom of the file so it is easy to
-// see what the default configuration is.
-// -----------------------------------------------------------------------------
-
-var defaultConfig = Config{
-	Identity: Identity{
-		DeviceID:             "mac:4ca161000109",
-		SerialNumber:         "1800deadbeef",
-		HardwareModel:        "fooModel",
-		HardwareManufacturer: "barManufacturer",
-		FirmwareVersion:      "v0.0.1",
-		PartnerID:            "foobar",
-	},
-	OperationalState: OperationalState{
-		LastRebootReason: "client init reboot",
-		BootTime:         time.Now(),
-	},
-	XmidtCredentials: XmidtCredentials{
-		RefetchPercent:  90.0,
-		FileName:        "credentials.msgpack",
-		FilePermissions: fs.FileMode(0600),
-		HTTPClient: arrangehttp.ClientConfig{
-			Timeout: 20 * time.Second,
-			Transport: arrangehttp.TransportConfig{
-				DisableKeepAlives: true,
-				MaxIdleConns:      1,
-			},
-			TLS: &arrangetls.Config{
-				InsecureSkipVerify: true,
-				MinVersion:         tls.VersionTLS13,
-			},
-		},
-		WaitUntilFetched: 30 * time.Second,
-	},
-	XmidtService: XmidtService{
-		Backoff: Backoff{
-			MinDelay: 7 * time.Second,
-			MaxDelay: 10 * time.Minute,
-		},
-		JwtTxtRedirector: JwtTxtRedirector{
-			Timeout: 10 * time.Second,
-			AllowedAlgorithms: []string{
-				"EdDSA",
-				"ES256", "ES384", "ES512",
-				"PS256", "PS384", "PS512",
-				"RS256", "RS384", "RS512",
-			},
-		},
-	},
-	Websocket: Websocket{
-		URLPath:           "/api/v2/device",
-		BackUpURL:         "http://localhost:8080",
-		FetchURLTimeout:   30 * time.Second,
-		InactivityTimeout: 1 * time.Minute,
-		PingWriteTimeout:  90 * time.Second,
-		SendTimeout:       90 * time.Second,
-		KeepAliveInterval: 30 * time.Second,
-		HTTPClient: arrangehttp.ClientConfig{
-			Timeout: 30 * time.Second,
-			Transport: arrangehttp.TransportConfig{
-				IdleConnTimeout:       10 * time.Second,
-				TLSHandshakeTimeout:   10 * time.Second,
-				ExpectContinueTimeout: 1 * time.Second,
-			},
-		},
-		MaxMessageBytes: 256 * 1024,
-		/*
-			This retry policy gives us a very good approximation of the prior
-			policy.  The important things about this policy are:
-
-			1. The backoff increases up to the max.
-			2. There is jitter that spreads the load so windows do not overlap.
-
-			iteration | parodus   | this implementation
-			----------+-----------+----------------
-			0         | 0-1s      |   0.666 -  1.333
-			1         | 1s-3s     |   1.333 -  2.666
-			2         | 3s-7s     |   2.666 -  5.333
-			3         | 7s-15s    |   5.333 -  10.666
-			4         | 15s-31s   |  10.666 -  21.333
-			5         | 31s-63s   |  21.333 -  42.666
-			6         | 63s-127s  |  42.666 -  85.333
-			7         | 127s-255s |  85.333 - 170.666
-			8         | 255s-511s | 170.666 - 341.333
-			9         | 255s-511s |           341.333
-			n         | 255s-511s |           341.333
-		*/
-		RetryPolicy: retry.Config{
-			Interval:    time.Second,
-			Multiplier:  2.0,
-			Jitter:      1.0 / 3.0,
-			MaxInterval: 341*time.Second + 333*time.Millisecond,
-		},
-	},
-	LibParodus: LibParodus{
-		ParodusServiceURL: "tcp://127.0.0.1:6666",
-		KeepAliveInterval: 30 * time.Second,
-		ReceiveTimeout:    1 * time.Second,
-		SendTimeout:       1 * time.Second,
-	},
-	Pubsub: Pubsub{
-		PublishTimeout: 5 * time.Second,
-	},
-	Logger: sallust.Config{
-		EncoderConfig: sallust.EncoderConfig{
-			TimeKey:        "T",
-			LevelKey:       "L",
-			NameKey:        "N",
-			CallerKey:      "C",
-			FunctionKey:    zapcore.OmitKey,
-			MessageKey:     "M",
-			StacktraceKey:  "S",
-			LineEnding:     zapcore.DefaultLineEnding,
-			EncodeLevel:    "capital",
-			EncodeTime:     "RFC3339Nano",
-			EncodeDuration: "string",
-			EncodeCaller:   "short",
-		},
-		Rotation: &sallust.Rotation{
-			MaxSize:    1,  // 1MB max/file
-			MaxAge:     30, // 30 days max
-			MaxBackups: 10, // max 10 files
-		},
-	},
-	MockTr181: MockTr181{
-		FilePath:    "/mock_tr181.json",
-		ServiceName: "config",
-	},
-	XmidtAgentCrud: XmidtAgentCrud{
-		ServiceName: "xmidt_agent",
-	},
-	QOS: QOS{
-		MaxQueueBytes:   1 * 1024 * 1024, // 1MB max/queue,
-		MaxMessageBytes: 256 * 1024,      // 256 KB
-	},
-	Metadata: Metadata{
-		Fields: []string{"fw-name", "hw-model", "hw-manufacturer", "hw-serial-number", "hw-last-reboot-reason", "webpa-protocol", "boot-time", "boot-time-retry-wait", "webpa-interface-used", "interfaces-available"},
-	},
-	NetworkService: NetworkService{
-		AllowedInterfaces: map[string]net.AllowedInterface{"erouter0": {Priority: 1, Enabled: true}, "eroutev0": {Priority: 2, Enabled: true}, "br-home": {Priority: 3, Enabled: true}, "brrwan": {Priority: 4, Enabled: true}, "vdsl0": {Priority: 5, Enabled: true}, "wwan0": {Priority: 6, Enabled: true}, "wlan0": {Priority: 7, Enabled: true}, "eth0": {Priority: 8, Enabled: true}, "qmapmux0.127": {Priority: 9, Enabled: true}, "cm0": {Priority: 10, Enabled: true}},
-	},
 }
