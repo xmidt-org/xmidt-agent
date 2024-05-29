@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
 # SPDX-License-Identifier: Apache-2.0
-
+---
 websocket:
   url_path: api/v2/device
 identity:
@@ -23,7 +23,7 @@ xmidt_service:
 #   http_client:
 #     tls:
 #       insecure_skip_verify: true
-#       certificates: 
+#       certificates:
 #         - certificate_file: crt.pem
 #           key_file:         key.pem
 #       min_version: 771 # 0x0303, the TLS 1.2 version uint16
@@ -42,6 +42,5 @@ xmidt_service:
 #         to: XMIDT_URL
 #       - from: Device.X_RDK_WebPA_DNSText.URL
 #         to: DNS_URL
-      # - from: Device.X_RDK_WebPA_TokenServer.URL
+#       - from: Device.X_RDK_WebPA_TokenServer.URL
 #         to: TOKEN_URL
-
