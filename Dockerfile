@@ -30,9 +30,6 @@ RUN     mkdir /etc/xmidt-agent/
 COPY .release/docker/config/config.yml  /etc/xmidt-agent/xmidt-agent.yaml
 COPY .release/docker/mock_tr181.json /
 
-RUN mkdir /certs
-COPY certs/*.pem /certs
-
 USER root
 
 EXPOSE 6666
