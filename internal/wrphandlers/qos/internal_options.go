@@ -29,3 +29,14 @@ func validatePriority() Option {
 			return nil
 		})
 }
+
+func validateTieBreaker() Option {
+	return optionFunc(
+		func(h *Handler) error {
+			if h.tieBreaker == nil {
+				return errors.Join(fmt.Errorf("%w: nil tiebreak", ErrPriorityTypeInvalid), ErrMisconfiguredQOS)
+			}
+
+			return nil
+		})
+}

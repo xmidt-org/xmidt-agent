@@ -4,6 +4,7 @@
 package qos
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -51,6 +52,18 @@ func MaxMessageBytes(s int) Option {
 func Priority(p PriorityType) Option {
 	return optionFunc(
 		func(h *Handler) error {
+			// Determine what will be used as a QualityOfService tie breaker.
+			switch p {
+			case NewestType:
+				// Prioritize the newest messages.
+				h.tieBreaker = PriorityNewestMsg
+			case OldestType:
+				// Prioritize the oldest messages.
+				h.tieBreaker = PriorityOldestMsg
+			default:
+				return errors.Join(fmt.Errorf("%w: %s", ErrPriorityTypeInvalid, h.priority), ErrMisconfiguredQOS)
+			}
+
 			h.priority = p
 
 			return nil

@@ -7,6 +7,9 @@ import (
 )
 
 func TestHandler_PriorityType(t *testing.T) {
+	unknown := PriorityType(-10)
+	assert.New(t).Equal("unknown", unknown.String())
+
 	tests := []struct {
 		description   string
 		config        string

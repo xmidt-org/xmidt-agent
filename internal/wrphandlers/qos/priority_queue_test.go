@@ -52,17 +52,17 @@ func testEnqueueDequeueAgePriority(t *testing.T) {
 	}
 	tests := []struct {
 		description string
-		priority    PriorityType
+		tieBreaker  tieBreaker
 		expectedMsg wrp.Message
 	}{
 		{
 			description: "drop incoming low priority messages while prioritizing older messages",
-			priority:    OldestType,
+			tieBreaker:  PriorityOldestMsg,
 			expectedMsg: smallLowQOSMsgOldest,
 		},
 		{
 			description: "drop incoming low priority messages while prioritizing newer messages",
-			priority:    NewestType,
+			tieBreaker:  PriorityNewestMsg,
 			expectedMsg: smallLowQOSMsgNewest,
 		},
 	}
@@ -74,7 +74,7 @@ func testEnqueueDequeueAgePriority(t *testing.T) {
 			pq := priorityQueue{
 				maxQueueBytes:   int64(len(smallLowQOSMsgOldest.Payload)),
 				maxMessageBytes: len(smallLowQOSMsgOldest.Payload),
-				priority:        tc.priority,
+				tieBreaker:      tc.tieBreaker,
 			}
 			for _, msg := range messages {
 				pq.Enqueue(msg)
@@ -203,7 +203,7 @@ func testEnqueueDequeue(t *testing.T) {
 			pq := priorityQueue{
 				maxQueueBytes:   int64(tc.maxQueueBytes),
 				maxMessageBytes: tc.maxMessageBytes,
-				priority:        NewestType,
+				tieBreaker:      PriorityNewestMsg,
 			}
 			for _, msg := range tc.messages {
 				pq.Enqueue(msg)
@@ -231,7 +231,7 @@ func testSize(t *testing.T) {
 		Destination: "mac:00deadbeef00/config",
 		Payload:     []byte("{\"command\":\"GET\",\"names\":[\"NoSuchParameter\"]}"),
 	}
-	pq := priorityQueue{priority: NewestType}
+	pq := priorityQueue{tieBreaker: PriorityNewestMsg}
 
 	assert.Equal(int64(0), pq.sizeBytes)
 	pq.Push(msg)
@@ -254,7 +254,7 @@ func testLen(t *testing.T) {
 			timestamp: time.Now(),
 		},
 	},
-		priority: NewestType,
+		tieBreaker: PriorityNewestMsg,
 	}
 
 	assert.Equal(len(pq.queue), pq.Len())
@@ -285,34 +285,22 @@ func testLess(t *testing.T) {
 	tests := []struct {
 		description string
 		priority    PriorityType
-		panic       bool
+		tieBreaker  tieBreaker
 	}{
 		{
 			description: "less",
 			priority:    NewestType,
+			tieBreaker:  PriorityNewestMsg,
 		},
 		{
 			description: "tie breaker prioritizing newer messages",
 			priority:    NewestType,
+			tieBreaker:  PriorityNewestMsg,
 		},
 		{
 			description: "tie breaker prioritizing older messages",
 			priority:    OldestType,
-		},
-		{
-			description: "panic due to a unknown priority type",
-			priority:    UnknownType,
-			panic:       true,
-		},
-		{
-			description: "panic due to a positive invalid priority type",
-			priority:    lastType + 1,
-			panic:       true,
-		},
-		{
-			description: "panic due to a negative invalid priority type",
-			priority:    -1,
-			panic:       true,
+			tieBreaker:  PriorityOldestMsg,
 		},
 	}
 	for _, tc := range tests {
@@ -320,14 +308,8 @@ func testLess(t *testing.T) {
 			assert := assert.New(t)
 
 			pq := priorityQueue{
-				queue:    []item{oldestMsg, newestMsg, tieBreakerMsg},
-				priority: tc.priority,
-			}
-			if tc.panic {
-				assert.Panics(func() {
-					_ = pq.Less(0, 1)
-				})
-				return
+				queue:      []item{oldestMsg, newestMsg, tieBreakerMsg},
+				tieBreaker: tc.tieBreaker,
 			}
 
 			// wrp.QOSCriticalValue > wrp.QOSLowValue
@@ -374,7 +356,7 @@ func testSwap(t *testing.T) {
 			timestamp: time.Now(),
 		},
 	},
-		priority: NewestType,
+		tieBreaker: PriorityNewestMsg,
 	}
 
 	pq.Swap(0, 2)
@@ -397,7 +379,7 @@ func testPush(t *testing.T) {
 			Destination: "mac:00deadbeef02/config",
 		},
 	}
-	pq := priorityQueue{priority: NewestType}
+	pq := priorityQueue{tieBreaker: PriorityNewestMsg}
 	for _, msg := range messages {
 		pq.Push(msg)
 		assert.Equal(msg, pq.queue[pq.Len()-1].msg)
@@ -453,7 +435,7 @@ func testPop(t *testing.T) {
 			assert := assert.New(t)
 			require := require.New(t)
 
-			pq := priorityQueue{queue: tc.items, priority: NewestType}
+			pq := priorityQueue{queue: tc.items, tieBreaker: PriorityNewestMsg}
 			// no sorting is applied, Pop will pop the last message from priorityQueue's queue
 			switch msg := pq.Pop().(type) {
 			case nil:

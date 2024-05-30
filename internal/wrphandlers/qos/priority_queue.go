@@ -19,9 +19,8 @@ var ErrMaxMessageBytes = errors.New("wrp message payload exceeds maxMessageBytes
 type priorityQueue struct {
 	// queue for wrp messages, ingested by serviceQOS
 	queue []item
-	// Priority determines what is used [newest, oldest message] for QualityOfService tie breakers,
-	// with the default being to prioritize the newest messages.
-	priority PriorityType
+	// tieBreaker breaks any QualityOfService ties.
+	tieBreaker tieBreaker
 	// maxQueueBytes is the allowable max size of the queue based on the sum of all queued wrp message's payloads
 	maxQueueBytes int64
 	// MaxMessageBytes is the largest allowable wrp message payload.
@@ -30,6 +29,8 @@ type priorityQueue struct {
 	// An int64 overflow is unlikely since that'll be over 9*10^18 bytes
 	sizeBytes int64
 }
+
+type tieBreaker func(i, j item) bool
 
 type item struct {
 	msg       wrp.Message
@@ -78,33 +79,15 @@ func (pq *priorityQueue) drop() {
 func (pq *priorityQueue) Len() int { return len(pq.queue) }
 
 func (pq *priorityQueue) Less(i, j int) bool {
-	iQOS := pq.queue[i].msg.QualityOfService
-	jQOS := pq.queue[j].msg.QualityOfService
-	iTimestamp := pq.queue[i].timestamp
-	jTimestamp := pq.queue[j].timestamp
-
-	// Determine what will be used as a priority tie breaker.
-	var tieBreaker bool
-	switch pt := pq.priority; pt {
-	case NewestType:
-		// Prioritize the newest messages.
-		tieBreaker = iTimestamp.After(jTimestamp)
-	case OldestType:
-		// Prioritize the oldest messages.
-		tieBreaker = iTimestamp.Before(jTimestamp)
-	default:
-		panic(errors.Join(ErrPriorityTypeInvalid, fmt.Errorf("PriorityType error: '%s' does not match any valid options: %s",
-			pt, pt.getKeys())))
-	}
+	iItem, jItem := pq.queue[i], pq.queue[j]
+	iQOS, jQOS := iItem.msg.QualityOfService, jItem.msg.QualityOfService
 
 	// Determine whether a tie breaker is required.
-	if iQOS == jQOS {
-		return tieBreaker
+	if iQOS != jQOS {
+		return iQOS > jQOS
 	}
 
-	// Prioritize messages with the highest QualityOfService.
-	return iQOS > jQOS
-
+	return pq.tieBreaker(iItem, jItem)
 }
 
 func (pq *priorityQueue) Swap(i, j int) {
@@ -130,4 +113,12 @@ func (pq *priorityQueue) Pop() any {
 	pq.queue = pq.queue[0:last]
 
 	return msg
+}
+
+func PriorityNewestMsg(i, j item) bool {
+	return i.timestamp.After(j.timestamp)
+}
+
+func PriorityOldestMsg(i, j item) bool {
+	return i.timestamp.Before(j.timestamp)
 }
