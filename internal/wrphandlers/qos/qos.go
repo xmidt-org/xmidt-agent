@@ -33,9 +33,9 @@ type Handler struct {
 	next wrpkit.Handler
 	// queue for wrp messages, ingested by serviceQOS
 	queue chan wrp.Message
-	// prioritizeOldest determines whether to prioritize the oldest message during a QualityOfService tie breaker,
+	// Priority determines what is used [newest, oldest message] for QualityOfService tie breakers,
 	// with the default being to prioritize the newest messages.
-	prioritizeOldest bool
+	priority PriorityType
 	// maxQueueBytes is the allowable max size of the qos' priority queue, based on the sum of all queued wrp message's payload.
 	maxQueueBytes int64
 	// MaxMessageBytes is the largest allowable wrp message payload.
@@ -53,10 +53,12 @@ func New(next wrpkit.Handler, opts ...Option) (*Handler, error) {
 		return nil, ErrInvalidInput
 	}
 
-	opts = append(opts, validateQueueConstraints())
+	// Add configuration validators.
+	opts = append(opts, validateQueueConstraints(), validatePriority())
 
 	h := Handler{
-		next: next,
+		next:     next,
+		priority: NewestType,
 	}
 
 	var errs error
@@ -124,9 +126,9 @@ func (h *Handler) serviceQOS(queue <-chan wrp.Message) {
 
 	// create and manage the priority queue
 	pq := priorityQueue{
-		maxQueueBytes:    h.maxQueueBytes,
-		maxMessageBytes:  h.maxMessageBytes,
-		prioritizeOldest: h.prioritizeOldest,
+		maxQueueBytes:   h.maxQueueBytes,
+		maxMessageBytes: h.maxMessageBytes,
+		priority:        h.priority,
 	}
 	for {
 		select {

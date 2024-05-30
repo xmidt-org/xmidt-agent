@@ -19,13 +19,9 @@ var ErrMaxMessageBytes = errors.New("wrp message payload exceeds maxMessageBytes
 type priorityQueue struct {
 	// queue for wrp messages, ingested by serviceQOS
 	queue []item
-	// prioritizeOldest determines whether to prioritize the oldest message during a QualityOfService tie breaker,
+	// Priority determines what is used [newest, oldest message] for QualityOfService tie breakers,
 	// with the default being to prioritize the newest messages.
-	prioritizeOldest bool
-	// prioritizeLowestQOS determines whether to prioritize messages with the lowest QualityOfService,
-	// with the default being to prioritize the highest QualityOfService messages.
-	// Only used during queue trimming.
-	prioritizeLowestQOS bool
+	priority PriorityType
 	// maxQueueBytes is the allowable max size of the queue based on the sum of all queued wrp message's payloads
 	maxQueueBytes int64
 	// MaxMessageBytes is the largest allowable wrp message payload.
@@ -64,31 +60,17 @@ func (pq *priorityQueue) Enqueue(msg wrp.Message) error {
 	return nil
 }
 
-// trim removes messages with the lowest QualityOfService (taking `prioritizeOldest` into account)
-// until the queue no longer violates `maxQueueSize“.
 func (pq *priorityQueue) trim() {
-	if pq.sizeBytes <= pq.maxQueueBytes {
-		return
-	}
-
-	// Prioritize messages with the lowest QualityOfService such that `pq.Pop()` will return said messages.
-	pq.prioritizeLowestQOS = true
-	defer func() {
-		// Re-prioritize messages with the highest QualityOfService.
-		pq.prioritizeLowestQOS = false
-		// heap.Init() is required since the prioritization was switch to messages with the highest QualityOfService.
-		// The complexity of heap.Init() is O(n) where n = h.Len().
-		heap.Init(pq)
-	}()
-
-	// heap.Init() is required since the prioritization was switch to messages with the lowest QualityOfService.
-	// The complexity of heap.Init() is O(n) where n = h.Len().
-	heap.Init(pq)
 	// trim until the queue no longer violates maxQueueBytes.
 	for pq.sizeBytes > pq.maxQueueBytes {
-		// Dequeue messages with the lowest QualityOfService.
-		pq.Dequeue()
+		// Note, priorityQueue.drop does not drop the least prioritized queued message.
+		// i.e.: a high priority queued message may be dropped instead of a lesser queued message.
+		pq.drop()
 	}
+}
+
+func (pq *priorityQueue) drop() {
+	_ = heap.Remove(pq, pq.Len()-1).(wrp.Message)
 }
 
 // heap.Interface related implementations https://pkg.go.dev/container/heap#Interface
@@ -101,18 +83,23 @@ func (pq *priorityQueue) Less(i, j int) bool {
 	iTimestamp := pq.queue[i].timestamp
 	jTimestamp := pq.queue[j].timestamp
 
+	// Determine what will be used as a priority tie breaker.
+	var tieBreaker bool
+	switch pt := pq.priority; pt {
+	case NewestType:
+		// Prioritize the newest messages.
+		tieBreaker = iTimestamp.After(jTimestamp)
+	case OldestType:
+		// Prioritize the oldest messages.
+		tieBreaker = iTimestamp.Before(jTimestamp)
+	default:
+		panic(errors.Join(ErrPriorityTypeInvalid, fmt.Errorf("PriorityType error: '%s' does not match any valid options: %s",
+			pt, pt.getKeys())))
+	}
+
 	// Determine whether a tie breaker is required.
 	if iQOS == jQOS {
-		if pq.prioritizeOldest {
-			// Prioritize the oldest messages.
-			return iTimestamp.Before(jTimestamp)
-		}
-
-		// Prioritize the newest messages.
-		return iTimestamp.After(jTimestamp)
-	} else if pq.prioritizeLowestQOS {
-		// Prioritize messages with the lowest QualityOfService.
-		return iQOS < jQOS
+		return tieBreaker
 	}
 
 	// Prioritize messages with the highest QualityOfService.

@@ -129,6 +129,7 @@ xmidt_agent_crud:
 qos:
   max_queue_bytes:  1048576  # 1 * 1024 * 1024 // 1MB max/queue,
   max_message_bytes: 262144 # 256 * 1024      // 256 KB
+  priority: newest
 metadata:
   fields:
     - fw-name
