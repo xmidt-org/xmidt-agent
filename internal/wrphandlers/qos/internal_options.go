@@ -4,6 +4,7 @@
 package qos
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -12,6 +13,28 @@ func validateQueueConstraints() Option {
 		func(h *Handler) error {
 			if int64(h.maxMessageBytes) > h.maxQueueBytes {
 				return fmt.Errorf("%w: MaxMessageBytes > MaxQueueBytes", ErrMisconfiguredQOS)
+			}
+
+			return nil
+		})
+}
+
+func validatePriority() Option {
+	return optionFunc(
+		func(h *Handler) error {
+			if h.priority <= UnknownType || h.priority >= lastType {
+				return errors.Join(fmt.Errorf("%w: %s", ErrPriorityTypeInvalid, h.priority), ErrMisconfiguredQOS)
+			}
+
+			return nil
+		})
+}
+
+func validateTieBreaker() Option {
+	return optionFunc(
+		func(h *Handler) error {
+			if h.tieBreaker == nil {
+				return errors.Join(fmt.Errorf("%w: nil tiebreak", ErrPriorityTypeInvalid), ErrMisconfiguredQOS)
 			}
 
 			return nil

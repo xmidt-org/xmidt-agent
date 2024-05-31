@@ -22,6 +22,7 @@ import (
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/configuration"
 	"github.com/xmidt-org/xmidt-agent/internal/net"
+	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/qos"
 	"gopkg.in/dealancer/validate.v2"
 )
 
@@ -63,6 +64,9 @@ type QOS struct {
 	MaxQueueBytes int64
 	// MaxMessageBytes is the largest allowable wrp message payload.
 	MaxMessageBytes int
+	// Priority determines what is used [newest, oldest message] for QualityOfService tie breakers,
+	// with the default being to prioritize the newest messages.
+	Priority qos.PriorityType
 }
 
 type Pubsub struct {
