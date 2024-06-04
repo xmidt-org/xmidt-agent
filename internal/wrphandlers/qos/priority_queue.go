@@ -21,6 +21,12 @@ type priorityQueue struct {
 	queue []item
 	// tieBreaker breaks any QualityOfService ties.
 	tieBreaker tieBreaker
+	// queueInTrimming indicates the queue is actively being trimmed, where messages with the lowest
+	// QualityOfService are prioritize and removed.
+	// Only used during `priorityQueue.trim()`.
+	queueInTrimming bool
+	// trimTieBreaker breaks any QualityOfService ties during queue trimming.
+	trimTieBreaker tieBreaker
 	// maxQueueBytes is the allowable max size of the queue based on the sum of all queued wrp message's payloads
 	maxQueueBytes int64
 	// MaxMessageBytes is the largest allowable wrp message payload.
@@ -61,17 +67,31 @@ func (pq *priorityQueue) Enqueue(msg wrp.Message) error {
 	return nil
 }
 
+// trim removes messages with the lowest QualityOfService (taking `prioritizeOldest` into account)
+// until the queue no longer violates `maxQueueSize“.
 func (pq *priorityQueue) trim() {
+	if pq.sizeBytes <= pq.maxQueueBytes {
+		return
+	}
+
+	// Prioritize messages with the lowest QualityOfService such that `pq.Pop()` will return the message with.
+	pq.queueInTrimming = true
+	defer func() {
+		// Re-prioritize messages with the highest QualityOfService.
+		pq.queueInTrimming = false
+		// heap.Init() is required since the prioritization was switch to messages with the highest QualityOfService.
+		// The complexity of heap.Init() is O(n) where n = h.Len().
+		heap.Init(pq)
+	}()
+
+	// heap.Init() is required since the prioritization was switch to messages with the lowest QualityOfService.
+	// The complexity of heap.Init() is O(n) where n = h.Len().
+	heap.Init(pq)
 	// trim until the queue no longer violates maxQueueBytes.
 	for pq.sizeBytes > pq.maxQueueBytes {
-		// Note, priorityQueue.drop does not drop the least prioritized queued message.
-		// i.e.: a high priority queued message may be dropped instead of a lesser queued message.
-		pq.drop()
+		// Dequeue messages with the lowest QualityOfService.
+		pq.Dequeue()
 	}
-}
-
-func (pq *priorityQueue) drop() {
-	_ = heap.Remove(pq, pq.Len()-1).(wrp.Message)
 }
 
 // heap.Interface related implementations https://pkg.go.dev/container/heap#Interface
@@ -84,7 +104,17 @@ func (pq *priorityQueue) Less(i, j int) bool {
 
 	// Determine whether a tie breaker is required.
 	if iQOS != jQOS {
+		if pq.queueInTrimming {
+			// Prioritize messages with the lowest QualityOfService.
+			return iQOS < jQOS
+		}
+
 		return iQOS > jQOS
+	}
+
+	if pq.queueInTrimming {
+		// Tie breaker during queue trimming.
+		return pq.trimTieBreaker(iItem, jItem)
 	}
 
 	return pq.tieBreaker(iItem, jItem)
