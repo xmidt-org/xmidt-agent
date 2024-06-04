@@ -64,9 +64,17 @@ type QOS struct {
 	MaxQueueBytes int64
 	// MaxMessageBytes is the largest allowable wrp message payload.
 	MaxMessageBytes int
-	// Priority determines what is used [newest, oldest message] for QualityOfService tie breakers,
+	// Priority determines what is used [newest, oldest message] for QualityOfService tie breakers and trimming,
 	// with the default being to prioritize the newest messages.
 	Priority qos.PriorityType
+	// LowQOSExpires determines when low qos messages are trimmed.
+	LowQOSExpires time.Duration
+	// MediumQOSExpires determines when medium qos messages are trimmed.
+	MediumQOSExpires time.Duration
+	// HighQOSExpires determines when high qos messages are trimmed.
+	HighQOSExpires time.Duration
+	// CriticalQOSExpires determines when critical qos messages are trimmed.
+	CriticalQOSExpires time.Duration
 }
 
 type Pubsub struct {

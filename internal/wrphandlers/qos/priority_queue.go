@@ -7,6 +7,7 @@ import (
 	"container/heap"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/xmidt-org/wrp-go/v3"
@@ -19,6 +20,9 @@ var ErrMaxMessageBytes = errors.New("wrp message payload exceeds maxMessageBytes
 type priorityQueue struct {
 	// queue for wrp messages, ingested by serviceQOS
 	queue []item
+	// Priority determines what is used [newest, oldest message] for QualityOfService tie breakers and trimming,
+	// with the default being to prioritize the newest messages.
+	priority PriorityType
 	// tieBreaker breaks any QualityOfService ties.
 	tieBreaker tieBreaker
 	// maxQueueBytes is the allowable max size of the queue based on the sum of all queued wrp message's payloads
@@ -28,24 +32,49 @@ type priorityQueue struct {
 	// sizeBytes is the sum of all queued wrp message's payloads.
 	// An int64 overflow is unlikely since that'll be over 9*10^18 bytes
 	sizeBytes int64
+
+	// QOS expiries.
+	// lowQOSExpires determines when low qos messages are trimmed.
+	lowQOSExpires time.Duration
+	// mediumQOSExpires determines when medium qos messages are trimmed.
+	mediumQOSExpires time.Duration
+	// highQOSExpires determines when high qos messages are trimmed.
+	highQOSExpires time.Duration
+	// criticalQOSExpires determines when critical qos messages are trimmed.
+	criticalQOSExpires time.Duration
 }
 
 type tieBreaker func(i, j item) bool
 
 type item struct {
-	msg       wrp.Message
-	timestamp time.Time
+	// msg is the message queued for delivery.
+	msg *wrp.Message
+	// expires is the time the messge is good upto before it is eligible to be trimmed.
+	expires time.Time
+	// discard determines whether a message should be discarded or not
+	discard bool
 }
 
 // Dequeue returns the next highest priority message.
 func (pq *priorityQueue) Dequeue() (wrp.Message, bool) {
-	// Required, otherwise heap.Pop will panic during an internal Swap call.
-	if pq.Len() == 0 {
-		return wrp.Message{}, false
+	var (
+		msg wrp.Message
+		ok  bool
+	)
+	for pq.Len() != 0 {
+		itm := heap.Pop(pq).(item)
+		// itm.discard will be true if `itm` has been marked to be discarded,
+		// i.e. trimmed by `pq.trim()'.
+		if itm.discard {
+			continue
+		}
+
+		msg = *itm.msg
+		ok = true
+		break
 	}
 
-	msg, ok := heap.Pop(pq).(wrp.Message)
-
+	// ok will be false if no message was found, otherwise ok will be true.
 	return msg, ok
 }
 
@@ -61,17 +90,75 @@ func (pq *priorityQueue) Enqueue(msg wrp.Message) error {
 	return nil
 }
 
+// trim removes messages with the lowest QualityOfService until the queue no longer violates `maxQueueSize“.
 func (pq *priorityQueue) trim() {
-	// trim until the queue no longer violates maxQueueBytes.
-	for pq.sizeBytes > pq.maxQueueBytes {
-		// Note, priorityQueue.drop does not drop the least prioritized queued message.
-		// i.e.: a high priority queued message may be dropped instead of a lesser queued message.
-		pq.drop()
+	// If priorityQueue.queue doesn't violates `maxQueueSize`, then return.
+	if pq.sizeBytes <= pq.maxQueueBytes {
+		return
 	}
-}
 
-func (pq *priorityQueue) drop() {
-	_ = heap.Remove(pq, pq.Len()-1).(wrp.Message)
+	itemsCache := make([]*item, len(pq.queue))
+	// Remove all expired messages before trimming unexpired lower priority messages.
+	now := time.Now()
+	iCache := 0
+	for i := range pq.queue {
+		itm := &pq.queue[i]
+		// itm has already been marked to be discarded.
+		if itm.discard {
+			continue
+		}
+		if now.After(itm.expires) {
+			// Mark itm to be discarded.
+			// `pq.Dequeue()` will fully discard itm.
+			itm.discard = true
+			pq.sizeBytes -= int64(len(itm.msg.Payload))
+			// Preemptively discard itm's payload to reduce
+			// resource usage, since itm will be discarded,
+			itm.msg.Payload = nil
+			continue
+		}
+
+		itemsCache[iCache] = itm
+		iCache += 1
+	}
+
+	// Resize itemsCache.
+	itemsCache = itemsCache[:iCache]
+	slices.SortFunc(itemsCache, func(i, j *item) int {
+		if i.msg.QualityOfService < j.msg.QualityOfService {
+			return -1
+		} else if i.msg.QualityOfService > j.msg.QualityOfService {
+			return 1
+		}
+
+		// Tiebreaker.
+		switch pq.priority {
+		case NewestType:
+			// Prioritize the newest messages.
+			return i.expires.Compare(j.expires)
+		default:
+			// Prioritize the oldest messages.
+			return j.expires.Compare(i.expires)
+		}
+	})
+
+	// Continue trimming until the pq.queue no longer violates maxQueueBytes.
+	// Remove the messages with the lowest priority.
+	for _, itm := range itemsCache {
+		// If pq.queue doesn't violates `maxQueueSize`, then return.
+		if pq.sizeBytes <= pq.maxQueueBytes {
+			break
+		}
+
+		// Mark itm to be discarded.
+		// `pq.Dequeue()` will fully discard itm.
+		itm.discard = true
+		pq.sizeBytes -= int64(len(itm.msg.Payload))
+		// Preemptively discard itm's payload to reduce
+		// resource usage, since itm will be discarded,
+		itm.msg.Payload = nil
+	}
+
 }
 
 // heap.Interface related implementations https://pkg.go.dev/container/heap#Interface
@@ -95,9 +182,25 @@ func (pq *priorityQueue) Swap(i, j int) {
 }
 
 func (pq *priorityQueue) Push(x any) {
-	item := item{msg: x.(wrp.Message), timestamp: time.Now()}
-	pq.sizeBytes += int64(len(item.msg.Payload))
-	pq.queue = append(pq.queue, item)
+	msg := x.(wrp.Message)
+	pq.sizeBytes += int64(len(msg.Payload))
+
+	var qosExpires time.Duration
+	switch msg.QualityOfService.Level() {
+	case wrp.QOSLow:
+		qosExpires = pq.lowQOSExpires
+	case wrp.QOSMedium:
+		qosExpires = pq.mediumQOSExpires
+	case wrp.QOSHigh:
+		qosExpires = pq.highQOSExpires
+	case wrp.QOSCritical:
+		qosExpires = pq.criticalQOSExpires
+	}
+
+	pq.queue = append(pq.queue, item{
+		msg:     &msg,
+		expires: time.Now().Add(qosExpires),
+		discard: false})
 }
 
 func (pq *priorityQueue) Pop() any {
@@ -106,19 +209,19 @@ func (pq *priorityQueue) Pop() any {
 		return nil
 	}
 
-	msg := pq.queue[last].msg
-	pq.sizeBytes -= int64(len(msg.Payload))
+	itm := pq.queue[last]
+	pq.sizeBytes -= int64(len(itm.msg.Payload))
 	// avoid memory leak
 	pq.queue[last] = item{}
 	pq.queue = pq.queue[0:last]
 
-	return msg
+	return itm
 }
 
 func PriorityNewestMsg(i, j item) bool {
-	return i.timestamp.After(j.timestamp)
+	return i.expires.After(j.expires)
 }
 
 func PriorityOldestMsg(i, j item) bool {
-	return i.timestamp.Before(j.timestamp)
+	return i.expires.Before(j.expires)
 }

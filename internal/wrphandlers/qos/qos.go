@@ -6,6 +6,7 @@ package qos
 import (
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
@@ -33,7 +34,7 @@ type Handler struct {
 	next wrpkit.Handler
 	// queue for wrp messages, ingested by serviceQOS
 	queue chan wrp.Message
-	// Priority determines what is used [newest, oldest message] for QualityOfService tie breakers,
+	// priority determines what is used [newest, oldest message] for QualityOfService tie breakers and trimming,
 	// with the default being to prioritize the newest messages.
 	priority PriorityType
 	// tieBreaker breaks any QualityOfService ties.
@@ -42,6 +43,16 @@ type Handler struct {
 	maxQueueBytes int64
 	// MaxMessageBytes is the largest allowable wrp message payload.
 	maxMessageBytes int
+
+	// QOS expiries.
+	// lowQOSExpires determines when low qos messages are trimmed.
+	lowQOSExpires time.Duration
+	// mediumQOSExpires determines when medium qos messages are trimmed.
+	mediumQOSExpires time.Duration
+	// highQOSExpires determines when high qos messages are trimmed.
+	highQOSExpires time.Duration
+	// criticalQOSExpires determines when critical qos messages are trimmed.
+	criticalQOSExpires time.Duration
 
 	lock sync.Mutex
 }
@@ -59,7 +70,11 @@ func New(next wrpkit.Handler, opts ...Option) (*Handler, error) {
 	opts = append(opts, validateQueueConstraints(), validatePriority(), validateTieBreaker())
 
 	h := Handler{
-		next: next,
+		next:               next,
+		lowQOSExpires:      DefaultLowQOSExpires,
+		mediumQOSExpires:   DefaultMediumQOSExpires,
+		highQOSExpires:     DefaultHighQOSExpires,
+		criticalQOSExpires: DefaultCriticalQOSExpires,
 	}
 
 	var errs error

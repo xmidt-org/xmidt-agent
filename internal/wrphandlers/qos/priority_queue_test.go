@@ -22,6 +22,7 @@ func TestPriorityQueue(t *testing.T) {
 		{"Size", testSize},
 		{"Len", testLen},
 		{"Less", testLess},
+		{"Trim", testTrim},
 		{"Swap", testSwap},
 		{"Push", testPush},
 		{"Pop", testPop},
@@ -52,17 +53,17 @@ func testEnqueueDequeueAgePriority(t *testing.T) {
 	}
 	tests := []struct {
 		description string
-		tieBreaker  tieBreaker
+		priority    PriorityType
 		expectedMsg wrp.Message
 	}{
 		{
 			description: "drop incoming low priority messages while prioritizing older messages",
-			tieBreaker:  PriorityOldestMsg,
+			priority:    OldestType,
 			expectedMsg: smallLowQOSMsgOldest,
 		},
 		{
 			description: "drop incoming low priority messages while prioritizing newer messages",
-			tieBreaker:  PriorityNewestMsg,
+			priority:    NewestType,
 			expectedMsg: smallLowQOSMsgNewest,
 		},
 	}
@@ -72,20 +73,28 @@ func testEnqueueDequeueAgePriority(t *testing.T) {
 			assert := assert.New(t)
 			require := require.New(t)
 			pq := priorityQueue{
-				maxQueueBytes:   int64(len(smallLowQOSMsgOldest.Payload)),
-				maxMessageBytes: len(smallLowQOSMsgOldest.Payload),
-				tieBreaker:      tc.tieBreaker,
+				maxQueueBytes:      int64(len(smallLowQOSMsgOldest.Payload)),
+				maxMessageBytes:    len(smallLowQOSMsgOldest.Payload),
+				lowQOSExpires:      DefaultLowQOSExpires,
+				mediumQOSExpires:   DefaultMediumQOSExpires,
+				highQOSExpires:     DefaultHighQOSExpires,
+				criticalQOSExpires: DefaultCriticalQOSExpires,
+				priority:           tc.priority,
 			}
+
+			var err error
+			pq.tieBreaker, err = priority(tc.priority)
+			require.NoError(err)
+
 			for _, msg := range messages {
 				pq.Enqueue(msg)
 			}
-
-			assert.Equal(1, pq.Len())
 
 			actualMsg, ok := pq.Dequeue()
 			require.True(ok)
 			require.NotEmpty(actualMsg)
 			assert.Equal(tc.expectedMsg, actualMsg)
+			assert.Equal(int64(0), pq.sizeBytes)
 		})
 	}
 }
@@ -93,17 +102,22 @@ func testEnqueueDequeueAgePriority(t *testing.T) {
 func testEnqueueDequeue(t *testing.T) {
 	emptyLowQOSMsg := wrp.Message{
 		Destination:      "mac:00deadbeef00/config",
-		QualityOfService: wrp.QOSLowValue,
+		QualityOfService: 10,
 	}
 	smallLowQOSMsg := wrp.Message{
 		Destination:      "mac:00deadbeef01/config",
 		Payload:          []byte("{}"),
-		QualityOfService: wrp.QOSLowValue,
+		QualityOfService: 10,
 	}
 	mediumMediumQosMsg := wrp.Message{
 		Destination:      "mac:00deadbeef02/config",
 		Payload:          []byte("{\"command\":\"GET\",\"names\":[]}"),
 		QualityOfService: wrp.QOSMediumValue,
+	}
+	mediumHighQosMsg := wrp.Message{
+		Destination:      "mac:00deadbeef02/config",
+		Payload:          []byte("{\"command\":\"GET\",\"names\":[]}"),
+		QualityOfService: wrp.QOSHighValue,
 	}
 	largeCriticalQOSMsg := wrp.Message{
 		Destination:      "mac:00deadbeef03/config",
@@ -119,11 +133,13 @@ func testEnqueueDequeue(t *testing.T) {
 		largeCriticalQOSMsg,
 		smallLowQOSMsg,
 		mediumMediumQosMsg,
+		mediumHighQosMsg,
 	}
 	dequeueSequenceTest := []wrp.Message{
 		largeCriticalQOSMsg,
 		largeCriticalQOSMsg,
 		largeCriticalQOSMsg,
+		mediumHighQosMsg,
 		mediumMediumQosMsg,
 		mediumMediumQosMsg,
 		smallLowQOSMsg,
@@ -135,6 +151,9 @@ func testEnqueueDequeue(t *testing.T) {
 	for _, msg := range enqueueSequenceTest {
 		queueSizeSequenceTest += len(msg.Payload)
 	}
+
+	// expect 1 message to be drop
+	enqueueSequenceTest = append(enqueueSequenceTest, smallLowQOSMsg)
 
 	tests := []struct {
 		description             string
@@ -174,9 +193,17 @@ func testEnqueueDequeue(t *testing.T) {
 			expectedQueueSize: 1,
 		},
 		{
+			description:             "drop incoming low priority messages",
+			messages:                []wrp.Message{largeCriticalQOSMsg, largeCriticalQOSMsg, smallLowQOSMsg, mediumMediumQosMsg},
+			maxQueueBytes:           len(largeCriticalQOSMsg.Payload) * 2,
+			maxMessageBytes:         len(largeCriticalQOSMsg.Payload),
+			expectedQueueSize:       2,
+			expectedDequeueSequence: []wrp.Message{largeCriticalQOSMsg, largeCriticalQOSMsg},
+		},
+		{
 			description:       "remove some low priority messages to fit a higher priority message",
-			messages:          []wrp.Message{mediumMediumQosMsg, mediumMediumQosMsg, mediumMediumQosMsg, largeCriticalQOSMsg},
-			maxQueueBytes:     len(mediumMediumQosMsg.Payload) * 3,
+			messages:          []wrp.Message{mediumMediumQosMsg, smallLowQOSMsg, mediumMediumQosMsg, smallLowQOSMsg, mediumMediumQosMsg, smallLowQOSMsg, largeCriticalQOSMsg, smallLowQOSMsg, mediumMediumQosMsg},
+			maxQueueBytes:     len(mediumMediumQosMsg.Payload)*2 + len(largeCriticalQOSMsg.Payload),
 			maxMessageBytes:   len(largeCriticalQOSMsg.Payload),
 			expectedQueueSize: 2,
 		},
@@ -201,15 +228,21 @@ func testEnqueueDequeue(t *testing.T) {
 			assert := assert.New(t)
 			require := require.New(t)
 			pq := priorityQueue{
-				maxQueueBytes:   int64(tc.maxQueueBytes),
-				maxMessageBytes: tc.maxMessageBytes,
-				tieBreaker:      PriorityNewestMsg,
+				maxQueueBytes:      int64(tc.maxQueueBytes),
+				maxMessageBytes:    tc.maxMessageBytes,
+				lowQOSExpires:      DefaultLowQOSExpires,
+				mediumQOSExpires:   DefaultMediumQOSExpires,
+				highQOSExpires:     DefaultHighQOSExpires,
+				criticalQOSExpires: DefaultCriticalQOSExpires,
 			}
+
+			var err error
+			pq.tieBreaker, err = priority(NewestType)
+			require.NoError(err)
+
 			for _, msg := range tc.messages {
 				pq.Enqueue(msg)
 			}
-
-			assert.Equal(tc.expectedQueueSize, pq.Len())
 
 			if len(tc.expectedDequeueSequence) == 0 {
 				return
@@ -221,96 +254,105 @@ func testEnqueueDequeue(t *testing.T) {
 				require.NotEmpty(actualMsg)
 				assert.Equal(expectedMsg, actualMsg)
 			}
+
+			assert.Equal(int64(0), pq.sizeBytes)
+
 		})
 	}
 }
 
 func testSize(t *testing.T) {
 	assert := assert.New(t)
+	require := require.New(t)
 	msg := wrp.Message{
 		Destination: "mac:00deadbeef00/config",
 		Payload:     []byte("{\"command\":\"GET\",\"names\":[\"NoSuchParameter\"]}"),
 	}
-	pq := priorityQueue{tieBreaker: PriorityNewestMsg}
+	pq := priorityQueue{}
+
+	var err error
+	pq.tieBreaker, err = priority(NewestType)
+	require.NoError(err)
 
 	assert.Equal(int64(0), pq.sizeBytes)
 	pq.Push(msg)
 	pq.Push(msg)
 	assert.Equal(int64(len(msg.Payload)*2), pq.sizeBytes)
 }
+
 func testLen(t *testing.T) {
 	assert := assert.New(t)
-	pq := priorityQueue{queue: []item{
+	require := require.New(t)
+	pq := priorityQueue{}
+	pq.queue = []item{
 		{
-			msg: wrp.Message{
-
+			msg: &wrp.Message{
 				Destination: "mac:00deadbeef00/config",
 			},
-			timestamp: time.Now(),
+			expires: time.Now(),
 		}, {
-			msg: wrp.Message{
+			msg: &wrp.Message{
 				Destination: "mac:00deadbeef01/config",
 			},
-			timestamp: time.Now(),
+			expires: time.Now(),
 		},
-	},
-		tieBreaker: PriorityNewestMsg,
 	}
 
+	var err error
+	pq.tieBreaker, err = priority(NewestType)
+	require.NoError(err)
 	assert.Equal(len(pq.queue), pq.Len())
 }
 
 func testLess(t *testing.T) {
 	oldestMsg := item{
-		msg: wrp.Message{
+		msg: &wrp.Message{
 			Destination:      "mac:00deadbeef00/config",
 			QualityOfService: wrp.QOSCriticalValue,
 		},
-		timestamp: time.Now(),
+		expires: time.Now(),
 	}
 	newestMsg := item{
-		msg: wrp.Message{
+		msg: &wrp.Message{
 			Destination:      "mac:00deadbeef01/config",
 			QualityOfService: wrp.QOSLowValue,
 		},
-		timestamp: time.Now(),
+		expires: time.Now(),
 	}
 	tieBreakerMsg := item{
-		msg: wrp.Message{
+		msg: &wrp.Message{
 			Destination:      "mac:00deadbeef02/config",
 			QualityOfService: wrp.QOSCriticalValue,
 		},
-		timestamp: time.Now(),
+		expires: time.Now(),
 	}
 	tests := []struct {
 		description string
 		priority    PriorityType
-		tieBreaker  tieBreaker
 	}{
 		{
 			description: "less",
 			priority:    NewestType,
-			tieBreaker:  PriorityNewestMsg,
 		},
 		{
 			description: "tie breaker prioritizing newer messages",
 			priority:    NewestType,
-			tieBreaker:  PriorityNewestMsg,
 		},
 		{
 			description: "tie breaker prioritizing older messages",
 			priority:    OldestType,
-			tieBreaker:  PriorityOldestMsg,
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.description, func(t *testing.T) {
 			assert := assert.New(t)
+			require := require.New(t)
+			pq := priorityQueue{}
+			pq.queue = []item{oldestMsg, newestMsg, tieBreakerMsg}
 
-			pq := priorityQueue{
-				queue:      []item{oldestMsg, newestMsg, tieBreakerMsg},
-				tieBreaker: tc.tieBreaker,
-			}
+			var err error
+			pq.tieBreaker, err = priority(tc.priority)
+			require.NoError(err)
 
 			// wrp.QOSCriticalValue > wrp.QOSLowValue
 			assert.True(pq.Less(0, 1))
@@ -332,42 +374,109 @@ func testLess(t *testing.T) {
 	}
 }
 
+func testTrim(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+	msg0 := wrp.Message{
+		Destination:      "mac:00deadbeef02/config",
+		Payload:          []byte("{\"command\":\"GET\",\"names\":[]}"),
+		QualityOfService: wrp.QOSMediumValue,
+	}
+	msg1 := wrp.Message{
+		Destination:      "mac:00deadbeef02/config",
+		Payload:          []byte("{\"command\":\"GET\",\"names\":[]}"),
+		QualityOfService: wrp.QOSHighValue,
+	}
+	msg2 := wrp.Message{
+		Destination:      "mac:00deadbeef02/config",
+		Payload:          []byte("{\"command\":\"GET\",\"names\":[]}"),
+		QualityOfService: wrp.QOSHighValue,
+	}
+	msg3 := wrp.Message{
+		Destination:      "mac:00deadbeef03/config",
+		Payload:          []byte("{\"command\":\"GET\",\"names\":[\"NoSuchParameter\"]}"),
+		QualityOfService: wrp.QOSCriticalValue,
+	}
+
+	pq := priorityQueue{
+		maxQueueBytes:   int64(len(msg0.Payload) + len(msg3.Payload)),
+		maxMessageBytes: len(msg3.Payload),
+		sizeBytes:       int64(len(msg0.Payload) + len(msg1.Payload)*2 + len(msg3.Payload)),
+		priority:        NewestType,
+	}
+	pq.queue = []item{
+		{
+			msg:     &msg0,
+			expires: time.Now().Add(DefaultCriticalQOSExpires),
+		},
+		{
+			msg:     &msg1,
+			expires: time.Now(),
+		},
+		{
+			msg:     &msg2,
+			expires: time.Now(),
+		},
+		{
+			msg:     &msg3,
+			expires: time.Now().Add(DefaultCriticalQOSExpires),
+		},
+	}
+
+	var err error
+	require.NoError(err)
+	pq.trim()
+	assert.Nil(pq.queue[1].msg.Payload)
+	assert.Nil(pq.queue[2].msg.Payload)
+	assert.NotEmpty(pq.queue[0].msg.Payload)
+	assert.NotEmpty(pq.queue[3].msg.Payload)
+	assert.Equal(pq.maxQueueBytes, pq.sizeBytes)
+	assert.Equal(*pq.queue[0].msg, msg0)
+	assert.Equal(*pq.queue[2].msg, msg1)
+	assert.Equal(*pq.queue[2].msg, msg2)
+	assert.Equal(*pq.queue[3].msg, msg3)
+}
+
 func testSwap(t *testing.T) {
 	assert := assert.New(t)
+	require := require.New(t)
 	msg0 := wrp.Message{
 		Destination: "mac:00deadbeef00/config",
 	}
 	msg2 := wrp.Message{
 		Destination: "mac:00deadbeef02/config",
 	}
-	pq := priorityQueue{queue: []item{
+	pq := priorityQueue{}
+	pq.queue = []item{
 		{
-			msg:       msg0,
-			timestamp: time.Now(),
+			msg:     &msg0,
+			expires: time.Now(),
 		},
 		{
-			msg: wrp.Message{
+			msg: &wrp.Message{
 				Destination: "mac:00deadbeef01/config",
 			},
-			timestamp: time.Now(),
+			expires: time.Now(),
 		},
 		{
-			msg:       msg2,
-			timestamp: time.Now(),
+			msg:     &msg2,
+			expires: time.Now(),
 		},
-	},
-		tieBreaker: PriorityNewestMsg,
 	}
 
+	var err error
+	pq.tieBreaker, err = priority(NewestType)
+	require.NoError(err)
 	pq.Swap(0, 2)
 	// pq.queue[0] should contain msg2
-	assert.Equal(msg2, pq.queue[0].msg)
+	assert.Equal(msg2, *pq.queue[0].msg)
 	// pq.queue[2] should contain msg0
-	assert.Equal(msg0, pq.queue[2].msg)
+	assert.Equal(msg0, *pq.queue[2].msg)
 }
 
 func testPush(t *testing.T) {
 	assert := assert.New(t)
+	require := require.New(t)
 	messages := []wrp.Message{
 		{
 			Destination: "mac:00deadbeef00/config",
@@ -379,10 +488,15 @@ func testPush(t *testing.T) {
 			Destination: "mac:00deadbeef02/config",
 		},
 	}
-	pq := priorityQueue{tieBreaker: PriorityNewestMsg}
+	pq := priorityQueue{}
+
+	var err error
+	pq.tieBreaker, err = priority(NewestType)
+	require.NoError(err)
+
 	for _, msg := range messages {
 		pq.Push(msg)
-		assert.Equal(msg, pq.queue[pq.Len()-1].msg)
+		assert.Equal(msg, *pq.queue[pq.Len()-1].msg)
 	}
 }
 
@@ -409,7 +523,7 @@ func testPop(t *testing.T) {
 			description: "single message with memory leak check",
 			items: []item{
 				{
-					msg: msg0,
+					msg: &msg0,
 				},
 			},
 			expectedMessage: msg0,
@@ -418,13 +532,13 @@ func testPop(t *testing.T) {
 			description: "multiple messages with memory leak check",
 			items: []item{
 				{
-					msg: msg0,
+					msg: &msg0,
 				},
 				{
-					msg: msg1,
+					msg: &msg1,
 				},
 				{
-					msg: msg2,
+					msg: &msg2,
 				},
 			},
 			expectedMessage: msg2,
@@ -435,18 +549,22 @@ func testPop(t *testing.T) {
 			assert := assert.New(t)
 			require := require.New(t)
 
-			pq := priorityQueue{queue: tc.items, tieBreaker: PriorityNewestMsg}
+			pq := priorityQueue{}
+			pq.queue = tc.items
+
+			var err error
+			pq.tieBreaker, err = priority(NewestType)
+			require.NoError(err)
+
 			// no sorting is applied, Pop will pop the last message from priorityQueue's queue
-			switch msg := pq.Pop().(type) {
+			switch itm := pq.Pop().(type) {
 			case nil:
 				assert.Len(tc.items, 0)
-			case wrp.Message:
-				assert.Equal(tc.expectedMessage, msg)
+			case item:
+				assert.Equal(tc.expectedMessage, *itm.msg)
 				require.NotEmpty(tc.items, "Pop() should have returned a nil instead of a wrp.Message")
 				// check for memory leak
 				assert.Empty(tc.items[len(tc.items)-1])
-				assert.Equal(wrp.Message{}, tc.items[len(tc.items)-1].msg)
-				assert.True(tc.items[len(tc.items)-1].timestamp.IsZero())
 			default:
 				require.Fail("Pop() returned an unknown type")
 			}
