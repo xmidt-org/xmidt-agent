@@ -51,21 +51,31 @@ func MaxMessageBytes(s int) Option {
 // with the default being to prioritize the newest messages.
 func Priority(p PriorityType) Option {
 	return optionFunc(
-		func(h *Handler) error {
-			// Determine what will be used as a QualityOfService tie breaker.
-			switch p {
-			case NewestType:
-				// Prioritize the newest messages.
-				h.tieBreaker = PriorityNewestMsg
-			case OldestType:
-				// Prioritize the oldest messages.
-				h.tieBreaker = PriorityOldestMsg
-			default:
-				return errors.Join(fmt.Errorf("%w: %s", ErrPriorityTypeInvalid, h.priority), ErrMisconfiguredQOS)
-			}
-
+		func(h *Handler) (err error) {
+			h.tieBreaker, h.trimTieBreaker, err = priority(p)
 			h.priority = p
 
-			return nil
+			return err
 		})
+}
+
+// priority determines which tie breakers are used during normal enqueueing and queue trimming.
+func priority(p PriorityType) (enqueueTieBreaker tieBreaker, trimTieBreaker tieBreaker, err error) {
+	// Determine what will be used as a QualityOfService tie breaker during normal enqueueing and queue trimming.
+	switch p {
+	case NewestType:
+		// Prioritize the newest messages.
+		enqueueTieBreaker = PriorityNewestMsg
+		// Remove the oldest messages during trimming.
+		trimTieBreaker = PriorityOldestMsg
+	case OldestType:
+		// Prioritize the oldest messages.
+		enqueueTieBreaker = PriorityOldestMsg
+		// Remove the newest messages during trimming.
+		trimTieBreaker = PriorityNewestMsg
+	default:
+		return nil, nil, errors.Join(fmt.Errorf("%w: %s", ErrPriorityTypeInvalid, p), ErrMisconfiguredQOS)
+	}
+
+	return enqueueTieBreaker, trimTieBreaker, nil
 }

@@ -14,72 +14,80 @@ import (
 
 var ErrMaxMessageBytes = errors.New("wrp message payload exceeds maxMessageBytes")
 
-// priorityQueue implements heap.Interface and holds wrp Message, using wrp.QOSValue as its priority.
-// https://xmidt.io/docs/wrp/basics/#qos-description-qos
-type priorityQueue struct {
-	// queue for wrp messages, ingested by serviceQOS
-	queue []item
-	// tieBreaker breaks any QualityOfService ties.
-	tieBreaker tieBreaker
-	// maxQueueBytes is the allowable max size of the queue based on the sum of all queued wrp message's payloads
-	maxQueueBytes int64
-	// MaxMessageBytes is the largest allowable wrp message payload.
-	maxMessageBytes int
-	// sizeBytes is the sum of all queued wrp message's payloads.
-	// An int64 overflow is unlikely since that'll be over 9*10^18 bytes
-	sizeBytes int64
-}
-
 type tieBreaker func(i, j item) bool
 
 type item struct {
 	msg       wrp.Message
 	timestamp time.Time
+	popped    bool
+}
+
+type PriorityQueue struct {
+	// tieBreaker breaks any QualityOfService ties.
+	tieBreaker tieBreaker
+	trimQueue  trimPriorityQueue
+	// maxQueueBytes is the allowable max size of the queue based on the sum of all queued wrp message's payloads
+	maxQueueBytes int64
+	// MaxMessageBytes is the largest allowable wrp message payload.
+	maxMessageBytes int
+	priorityQueue
 }
 
 // Dequeue returns the next highest priority message.
-func (pq *priorityQueue) Dequeue() (wrp.Message, bool) {
-	// Required, otherwise heap.Pop will panic during an internal Swap call.
-	if pq.Len() == 0 {
-		return wrp.Message{}, false
+func (pq *PriorityQueue) Dequeue() (wrp.Message, bool) {
+	var (
+		itm item
+		ok  bool
+	)
+	for pq.Len() != 0 {
+		itm = heap.Pop(pq).(item)
+		// itm.popped will be true if `itm` has already been `trimPriorityQueue.trim()',
+		// pop the next item.
+		if !itm.popped {
+			itm.popped, ok = true, true
+			break
+		}
 	}
 
-	msg, ok := heap.Pop(pq).(wrp.Message)
+	// Keeps sizeBytes in sync since both queues point to the same data.
+	pq.trimQueue.sizeBytes = pq.sizeBytes
 
-	return msg, ok
+	return itm.msg, ok
 }
 
 // Enqueue queues the given message.
-func (pq *priorityQueue) Enqueue(msg wrp.Message) error {
+func (pq *PriorityQueue) Enqueue(msg wrp.Message) error {
 	// Check whether msg violates maxMessageBytes.
 	if len(msg.Payload) > pq.maxMessageBytes {
 		return fmt.Errorf("%w: %v", ErrMaxMessageBytes, pq.maxMessageBytes)
 	}
 
-	heap.Push(pq, msg)
+	item := item{msg: msg, timestamp: time.Now()}
+	// Prioritizes messages with the highest QualityOfService.
+	heap.Push(pq, &item)
+	// Prioritizes messages with the lowest QualityOfService.
+	heap.Push(&pq.trimQueue, &item)
 	pq.trim()
 	return nil
 }
 
-func (pq *priorityQueue) trim() {
+// trim removes messages with the lowest QualityOfService until the queue no longer violates `maxQueueSize“.
+func (pq *PriorityQueue) trim() {
 	// trim until the queue no longer violates maxQueueBytes.
-	for pq.sizeBytes > pq.maxQueueBytes {
-		// Note, priorityQueue.drop does not drop the least prioritized queued message.
-		// i.e.: a high priority queued message may be dropped instead of a lesser queued message.
-		pq.drop()
+	for pq.trimQueue.sizeBytes > pq.maxQueueBytes {
+		// Remove the message with the lowest QualityOfService.
+		pq.trimQueue.trim()
 	}
+
+	// Keeps sizeBytes in sync since both queues point to the same data.
+	pq.sizeBytes = pq.trimQueue.sizeBytes
+	// Note, `PriorityQueue.Dequeue()' will eventually remove any trimmed items.
 }
 
-func (pq *priorityQueue) drop() {
-	_ = heap.Remove(pq, pq.Len()-1).(wrp.Message)
-}
+// heap.Interface related implementation https://pkg.go.dev/container/heap#Interface
 
-// heap.Interface related implementations https://pkg.go.dev/container/heap#Interface
-
-func (pq *priorityQueue) Len() int { return len(pq.queue) }
-
-func (pq *priorityQueue) Less(i, j int) bool {
-	iItem, jItem := pq.queue[i], pq.queue[j]
+func (pq *PriorityQueue) Less(i, j int) bool {
+	iItem, jItem := *pq.queue[i], *pq.queue[j]
 	iQOS, jQOS := iItem.msg.QualityOfService, jItem.msg.QualityOfService
 
 	// Determine whether a tie breaker is required.
@@ -90,12 +98,61 @@ func (pq *priorityQueue) Less(i, j int) bool {
 	return pq.tieBreaker(iItem, jItem)
 }
 
+type trimPriorityQueue struct {
+	// tieBreaker breaks any QualityOfService ties.
+	tieBreaker tieBreaker
+	priorityQueue
+}
+
+// Dequeue returns the message with the lowest QualityOfService.
+func (tpq *trimPriorityQueue) trim() {
+	for tpq.Len() != 0 {
+		itm := heap.Pop(tpq).(item)
+		// itm.popped will be true if `itm` has already been `PriorityQueue.Dequeue()',
+		// pop the next item.
+		if !itm.popped {
+			// Lowest QualityOfService meassage has been trimmed.
+			break
+		}
+	}
+}
+
+// heap.Interface related implementation https://pkg.go.dev/container/heap#Interface
+
+// Prioritize messages with the lowest QualityOfService.
+func (tpq *trimPriorityQueue) Less(i, j int) bool {
+	iItem, jItem := *tpq.queue[i], *tpq.queue[j]
+	iQOS, jQOS := iItem.msg.QualityOfService, jItem.msg.QualityOfService
+
+	// Determine whether a tie breaker is required.
+	if iQOS != jQOS {
+		// Remove messages with the lowest QualityOfService.
+		return iQOS < jQOS
+
+	}
+
+	// Tie breaker during queue trimming.
+	return tpq.tieBreaker(iItem, jItem)
+}
+
+// priorityQueue implements heap.Interface and holds wrp Message, using wrp.QOSValue as its priority.
+// https://xmidt.io/docs/wrp/basics/#qos-description-qos
+type priorityQueue struct {
+	queue []*item
+	// sizeBytes is the sum of all queued wrp message's payloads.
+	// An int64 overflow is unlikely since that'll be over 9*10^18 bytes
+	sizeBytes int64
+}
+
+// heap.Interface related implementations https://pkg.go.dev/container/heap#Interface
+func (pq *priorityQueue) Len() int { return len(pq.queue) }
+
 func (pq *priorityQueue) Swap(i, j int) {
 	pq.queue[i], pq.queue[j] = pq.queue[j], pq.queue[i]
 }
 
 func (pq *priorityQueue) Push(x any) {
-	item := item{msg: x.(wrp.Message), timestamp: time.Now()}
+	item := x.(*item)
 	pq.sizeBytes += int64(len(item.msg.Payload))
 	pq.queue = append(pq.queue, item)
 }
@@ -106,13 +163,17 @@ func (pq *priorityQueue) Pop() any {
 		return nil
 	}
 
-	msg := pq.queue[last].msg
-	pq.sizeBytes -= int64(len(msg.Payload))
-	// avoid memory leak
-	pq.queue[last] = item{}
+	itm := *pq.queue[last]
+	// `pq.queue[last].popped = true`` inform `PriorityQueue.Dequeue()' and `trimPriorityQueue.trim()'
+	// that the shared itm has been popped.
+	pq.queue[last].popped = true
+	pq.sizeBytes -= int64(len(itm.msg.Payload))
+	// avoid memory leak (recall is shared pq.queue[last].msg between two queues)
+	pq.queue[last].msg = wrp.Message{}
+	pq.queue[last] = nil
 	pq.queue = pq.queue[0:last]
 
-	return msg
+	return itm
 }
 
 func PriorityNewestMsg(i, j item) bool {
