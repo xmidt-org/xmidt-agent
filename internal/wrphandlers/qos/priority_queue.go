@@ -22,6 +22,7 @@ type item struct {
 	popped    bool
 }
 
+// Prioritize messages with the highest QualityOfService.
 type PriorityQueue struct {
 	// tieBreaker breaks any QualityOfService ties.
 	tieBreaker tieBreaker
@@ -33,7 +34,7 @@ type PriorityQueue struct {
 	priorityQueue
 }
 
-// Dequeue returns the next highest priority message.
+// Dequeue returns the message with the highest QualityOfService.
 func (pq *PriorityQueue) Dequeue() (wrp.Message, bool) {
 	var (
 		itm item
@@ -86,6 +87,7 @@ func (pq *PriorityQueue) trim() {
 
 // heap.Interface related implementation https://pkg.go.dev/container/heap#Interface
 
+// Prioritize messages with the highest QualityOfService.
 func (pq *PriorityQueue) Less(i, j int) bool {
 	iItem, jItem := *pq.queue[i], *pq.queue[j]
 	iQOS, jQOS := iItem.msg.QualityOfService, jItem.msg.QualityOfService
@@ -98,6 +100,7 @@ func (pq *PriorityQueue) Less(i, j int) bool {
 	return pq.tieBreaker(iItem, jItem)
 }
 
+// Prioritize messages with the lowest QualityOfService.
 type trimPriorityQueue struct {
 	// tieBreaker breaks any QualityOfService ties.
 	tieBreaker tieBreaker
@@ -135,7 +138,7 @@ func (tpq *trimPriorityQueue) Less(i, j int) bool {
 	return tpq.tieBreaker(iItem, jItem)
 }
 
-// priorityQueue implements heap.Interface and holds wrp Message, using wrp.QOSValue as its priority.
+// priorityQueue implements heap.Interface and holds wrp Messages, using wrp.QOSValue as its priority.
 // https://xmidt.io/docs/wrp/basics/#qos-description-qos
 type priorityQueue struct {
 	queue []*item
@@ -168,8 +171,9 @@ func (pq *priorityQueue) Pop() any {
 	// that the shared itm has been popped.
 	pq.queue[last].popped = true
 	pq.sizeBytes -= int64(len(itm.msg.Payload))
-	// avoid memory leak (recall is shared pq.queue[last].msg between two queues)
+	// Avoid memory leak (recall that the message `pq.queue[last].msg` is shared between two queues).
 	pq.queue[last].msg = wrp.Message{}
+	// Nil and resize local queue.
 	pq.queue[last] = nil
 	pq.queue = pq.queue[0:last]
 
