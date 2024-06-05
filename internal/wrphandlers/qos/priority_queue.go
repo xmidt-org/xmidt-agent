@@ -49,7 +49,7 @@ func (pq *PriorityQueue) Dequeue() (wrp.Message, bool) {
 		}
 	}
 
-	// Keeps sizeBytes in sync since both queues point to the same data.
+	// Keep sizeBytes in sync since both queues point to the same data.
 	pq.trimQueue.sizeBytes = pq.sizeBytes
 
 	return itm.msg, ok
@@ -79,7 +79,7 @@ func (pq *PriorityQueue) trim() {
 		pq.trimQueue.trim()
 	}
 
-	// Keeps sizeBytes in sync since both queues point to the same data.
+	// Keep sizeBytes in sync since both queues point to the same data.
 	pq.sizeBytes = pq.trimQueue.sizeBytes
 	// Note, `PriorityQueue.Dequeue()' will eventually remove any trimmed items.
 }
