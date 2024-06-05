@@ -22,7 +22,7 @@ type priorityQueue struct {
 	// tieBreaker breaks any QualityOfService ties.
 	tieBreaker tieBreaker
 	// queueInTrimming indicates the queue is actively being trimmed, where messages with the lowest
-	// QualityOfService are prioritize and removed.
+	// QualityOfService are removed.
 	// Only used during `priorityQueue.trim()`.
 	queueInTrimming bool
 	// trimTieBreaker breaks any QualityOfService ties during queue trimming.
@@ -67,14 +67,13 @@ func (pq *priorityQueue) Enqueue(msg wrp.Message) error {
 	return nil
 }
 
-// trim removes messages with the lowest QualityOfService (taking `prioritizeOldest` into account)
-// until the queue no longer violates `maxQueueSize“.
+// trim removes messages with the lowest QualityOfService until the queue no longer violates `maxQueueSize“.
 func (pq *priorityQueue) trim() {
 	if pq.sizeBytes <= pq.maxQueueBytes {
 		return
 	}
 
-	// Prioritize messages with the lowest QualityOfService such that `pq.Pop()` will return the message with.
+	// Remove messages with the lowest QualityOfService.
 	pq.queueInTrimming = true
 	defer func() {
 		// Re-prioritize messages with the highest QualityOfService.
@@ -105,7 +104,7 @@ func (pq *priorityQueue) Less(i, j int) bool {
 	// Determine whether a tie breaker is required.
 	if iQOS != jQOS {
 		if pq.queueInTrimming {
-			// Prioritize messages with the lowest QualityOfService.
+			// Remove messages with the lowest QualityOfService.
 			return iQOS < jQOS
 		}
 
