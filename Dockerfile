@@ -34,4 +34,4 @@ USER root
 
 EXPOSE 6666
 
-ENTRYPOINT ["/xmidt-agent"]
+ENTRYPOINT ["/xmidt-agent", "--dev"]
