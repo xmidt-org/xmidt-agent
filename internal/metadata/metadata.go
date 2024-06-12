@@ -9,9 +9,9 @@ import (
 	"net/http"
 	"strings"
 
+	"encoding/base64"
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/net"
-	b64 "encoding/base64"
 )
 
 type Option interface {
@@ -115,7 +115,7 @@ func (c *MetadataProvider) Decorate(headers http.Header) error {
 		return fmt.Errorf("error marshaling convey header: %w", err)
 	}
 
-	headers.Set(HeaderName, b64.RawStdEncoding.EncodeToString(headerBytes))
+	headers.Set(HeaderName, base64.RawStdEncoding.EncodeToString(headerBytes))
 
 	return nil
 }
