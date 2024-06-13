@@ -102,10 +102,10 @@ logger:
     level_key:       L
     name_key:        N
     caller_key:      C
-    function_key:    "zapcore.OmitKey"
+    function_key:    ""
     message_key:     M
     stacktrace_key:  S
-    line_ending:     "zapcore.DefaultLineEnding"
+    line_ending:     "\n"
     encode_level:    capital
     encode_time:     RFC3339Nano
     encode_duration: string
