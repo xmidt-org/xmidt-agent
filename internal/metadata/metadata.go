@@ -115,7 +115,7 @@ func (c *MetadataProvider) Decorate(headers http.Header) error {
 		return fmt.Errorf("error marshaling convey header: %w", err)
 	}
 
-	headers.Set(HeaderName, base64.RawStdEncoding.EncodeToString(headerBytes))
+	headers.Set(HeaderName, base64.StdEncoding.EncodeToString(headerBytes))
 
 	return nil
 }
