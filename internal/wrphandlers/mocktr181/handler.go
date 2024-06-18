@@ -71,6 +71,7 @@ type Parameter struct {
 	Value      string                 `json:"value"`
 	DataType   int                    `json:"dataType"`
 	Attributes map[string]interface{} `json:"attributes"`
+	Message    string                 `json:"message"`
 }
 
 // New creates a new instance of the Handler struct.  The parameter egress is
@@ -132,7 +133,10 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 		}
 
 	case "SET":
-		statusCode = h.set(payload.Parameters)
+		statusCode, payloadResponse, err = h.set(payload.Parameters)
+		if err != nil {
+			return err
+		}
 
 	default:
 		// currently only get and set are implemented for existing mocktr181
@@ -158,13 +162,24 @@ func (h Handler) get(names []string) (int64, []byte, error) {
 
 	for _, name := range names {
 		for _, mockParameter := range h.parameters {
-			if strings.HasPrefix(mockParameter.Name, name) {
+			if !strings.HasPrefix(mockParameter.Name, name) {
+				continue
+			}
+
+			switch mockParameter.Access {
+			case "r", "rw", "wr":
 				result.Parameters = append(result.Parameters, Parameter{
 					Name:       mockParameter.Name,
 					Value:      mockParameter.Value,
 					DataType:   mockParameter.DataType,
 					Attributes: mockParameter.Attributes,
 				})
+			default:
+				result.Parameters = append(result.Parameters, Parameter{
+					Name:    mockParameter.Name,
+					Message: "Invalid parameter name",
+				})
+				statusCode = 520
 			}
 		}
 	}
@@ -181,20 +196,44 @@ func (h Handler) get(names []string) (int64, []byte, error) {
 	return statusCode, payload, nil
 }
 
-func (h Handler) set(parameters []Parameter) int64 {
+func (h Handler) set(parameters []Parameter) (int64, []byte, error) {
+	statusCode := http.StatusAccepted
+	result := Tr181Payload{}
 	for _, parameter := range parameters {
-		for _, mockParameter := range h.parameters {
-			if strings.HasPrefix(mockParameter.Name, parameter.Name) {
-				if mockParameter.Access == "rw" {
-					mockParameter.Value = parameter.Value
-					mockParameter.DataType = parameter.DataType
-					mockParameter.Attributes = parameter.Attributes
-				}
+		for i := range h.parameters {
+			mockParameter := &h.parameters[i]
+			if mockParameter.Name != parameter.Name {
+				continue
+			}
+
+			switch mockParameter.Access {
+			case "w", "wr", "rw":
+				mockParameter.Value = parameter.Value
+				mockParameter.DataType = parameter.DataType
+				mockParameter.Attributes = parameter.Attributes
+
+				result.Parameters = append(result.Parameters, Parameter{
+					Name:       mockParameter.Name,
+					Value:      mockParameter.Value,
+					DataType:   mockParameter.DataType,
+					Attributes: mockParameter.Attributes,
+				})
+			default:
+				result.Parameters = append(result.Parameters, Parameter{
+					Name:    mockParameter.Name,
+					Message: "Parameter is not writable",
+				})
+				statusCode = 520
 			}
 		}
 	}
 
-	return http.StatusAccepted
+	payload, err := json.Marshal(result)
+	if err != nil {
+		return http.StatusInternalServerError, payload, errors.Join(ErrInvalidResponsePayload, err)
+	}
+
+	return int64(statusCode), payload, nil
 }
 
 func (h Handler) loadFile() ([]MockParameter, error) {
