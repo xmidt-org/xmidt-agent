@@ -87,11 +87,11 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 	response := msg
 	response.Destination = msg.Source
 	response.Source = h.source
-	response.ContentType = "text/plain"
-	response.Payload = []byte(fmt.Sprintf("Partner(s) '%s' not allowed.  Allowed: '%s'", got, want))
+	response.ContentType = "application/json"
 
 	code := int64(statusCode)
 	response.Status = &code
+	response.Payload = []byte(fmt.Sprintf(`{statusCode: %d, message:"Partner(s) '%s' not allowed.  Allowed: '%s'"}`, code, got, want))
 
 	sendErr := h.egress.HandleWrp(response)
 
