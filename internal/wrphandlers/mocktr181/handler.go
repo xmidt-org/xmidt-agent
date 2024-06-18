@@ -132,7 +132,10 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 		}
 
 	case "SET":
-		statusCode = h.set(payload.Parameters)
+		statusCode, payloadResponse, err = h.set(payload.Parameters)
+		if err != nil {
+			return err
+		}
 
 	default:
 		// currently only get and set are implemented for existing mocktr181
@@ -181,20 +184,34 @@ func (h Handler) get(names []string) (int64, []byte, error) {
 	return statusCode, payload, nil
 }
 
-func (h Handler) set(parameters []Parameter) int64 {
+func (h Handler) set(parameters []Parameter) (int64, []byte, error) {
+	result := Tr181Payload{}
 	for _, parameter := range parameters {
-		for _, mockParameter := range h.parameters {
+		for i := range h.parameters {
+			mockParameter := &h.parameters[i]
 			if strings.HasPrefix(mockParameter.Name, parameter.Name) {
 				if mockParameter.Access == "rw" {
 					mockParameter.Value = parameter.Value
 					mockParameter.DataType = parameter.DataType
 					mockParameter.Attributes = parameter.Attributes
+
+					result.Parameters = append(result.Parameters, Parameter{
+						Name:       mockParameter.Name,
+						Value:      mockParameter.Value,
+						DataType:   mockParameter.DataType,
+						Attributes: mockParameter.Attributes,
+					})
 				}
 			}
 		}
 	}
 
-	return http.StatusAccepted
+	payload, err := json.Marshal(result)
+	if err != nil {
+		return http.StatusInternalServerError, payload, errors.Join(ErrInvalidResponsePayload, err)
+	}
+
+	return http.StatusAccepted, payload, nil
 }
 
 func (h Handler) loadFile() ([]MockParameter, error) {
