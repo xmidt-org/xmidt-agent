@@ -70,10 +70,11 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 	response := msg
 	response.Destination = msg.Source
 	response.Source = h.source
-	response.Payload = nil
+	response.ContentType = "application/json"
 
 	code := int64(statusCode)
 	response.Status = &code
+	response.Payload = []byte(fmt.Sprintf("{statusCode: %d}", code))
 
 	sendErr := h.egress.HandleWrp(response)
 
