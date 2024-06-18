@@ -71,6 +71,7 @@ type Parameter struct {
 	Value      string                 `json:"value"`
 	DataType   int                    `json:"dataType"`
 	Attributes map[string]interface{} `json:"attributes"`
+	Message    string                 `json:"message"`
 }
 
 // New creates a new instance of the Handler struct.  The parameter egress is
@@ -185,12 +186,14 @@ func (h Handler) get(names []string) (int64, []byte, error) {
 }
 
 func (h Handler) set(parameters []Parameter) (int64, []byte, error) {
+	statusCode := http.StatusAccepted
 	result := Tr181Payload{}
 	for _, parameter := range parameters {
 		for i := range h.parameters {
 			mockParameter := &h.parameters[i]
 			if strings.HasPrefix(mockParameter.Name, parameter.Name) {
-				if mockParameter.Access == "rw" {
+				switch mockParameter.Access {
+				case "w", "wr", "rw":
 					mockParameter.Value = parameter.Value
 					mockParameter.DataType = parameter.DataType
 					mockParameter.Attributes = parameter.Attributes
@@ -201,6 +204,12 @@ func (h Handler) set(parameters []Parameter) (int64, []byte, error) {
 						DataType:   mockParameter.DataType,
 						Attributes: mockParameter.Attributes,
 					})
+				default:
+					result.Parameters = append(result.Parameters, Parameter{
+						Name:    mockParameter.Name,
+						Message: "Parameter is not writable",
+					})
+					statusCode = 520
 				}
 			}
 		}
@@ -211,7 +220,7 @@ func (h Handler) set(parameters []Parameter) (int64, []byte, error) {
 		return http.StatusInternalServerError, payload, errors.Join(ErrInvalidResponsePayload, err)
 	}
 
-	return http.StatusAccepted, payload, nil
+	return int64(statusCode), payload, nil
 }
 
 func (h Handler) loadFile() ([]MockParameter, error) {
