@@ -162,13 +162,24 @@ func (h Handler) get(names []string) (int64, []byte, error) {
 
 	for _, name := range names {
 		for _, mockParameter := range h.parameters {
-			if strings.HasPrefix(mockParameter.Name, name) {
+			if !strings.HasPrefix(mockParameter.Name, name) {
+				continue
+			}
+
+			switch mockParameter.Access {
+			case "r", "rw", "wr":
 				result.Parameters = append(result.Parameters, Parameter{
 					Name:       mockParameter.Name,
 					Value:      mockParameter.Value,
 					DataType:   mockParameter.DataType,
 					Attributes: mockParameter.Attributes,
 				})
+			default:
+				result.Parameters = append(result.Parameters, Parameter{
+					Name:    mockParameter.Name,
+					Message: "Invalid parameter name",
+				})
+				statusCode = 520
 			}
 		}
 	}
@@ -214,7 +225,6 @@ func (h Handler) set(parameters []Parameter) (int64, []byte, error) {
 				})
 				statusCode = 520
 			}
-
 		}
 	}
 
