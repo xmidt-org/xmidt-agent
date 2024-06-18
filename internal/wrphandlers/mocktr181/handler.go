@@ -191,27 +191,30 @@ func (h Handler) set(parameters []Parameter) (int64, []byte, error) {
 	for _, parameter := range parameters {
 		for i := range h.parameters {
 			mockParameter := &h.parameters[i]
-			if strings.HasPrefix(mockParameter.Name, parameter.Name) {
-				switch mockParameter.Access {
-				case "w", "wr", "rw":
-					mockParameter.Value = parameter.Value
-					mockParameter.DataType = parameter.DataType
-					mockParameter.Attributes = parameter.Attributes
-
-					result.Parameters = append(result.Parameters, Parameter{
-						Name:       mockParameter.Name,
-						Value:      mockParameter.Value,
-						DataType:   mockParameter.DataType,
-						Attributes: mockParameter.Attributes,
-					})
-				default:
-					result.Parameters = append(result.Parameters, Parameter{
-						Name:    mockParameter.Name,
-						Message: "Parameter is not writable",
-					})
-					statusCode = 520
-				}
+			if mockParameter.Name != parameter.Name {
+				continue
 			}
+
+			switch mockParameter.Access {
+			case "w", "wr", "rw":
+				mockParameter.Value = parameter.Value
+				mockParameter.DataType = parameter.DataType
+				mockParameter.Attributes = parameter.Attributes
+
+				result.Parameters = append(result.Parameters, Parameter{
+					Name:       mockParameter.Name,
+					Value:      mockParameter.Value,
+					DataType:   mockParameter.DataType,
+					Attributes: mockParameter.Attributes,
+				})
+			default:
+				result.Parameters = append(result.Parameters, Parameter{
+					Name:    mockParameter.Name,
+					Message: "Parameter is not writable",
+				})
+				statusCode = 520
+			}
+
 		}
 	}
 
