@@ -176,8 +176,7 @@ func (h Handler) get(names []string) (int64, []byte, error) {
 				})
 			default:
 				result.Parameters = append(result.Parameters, Parameter{
-					Name:    mockParameter.Name,
-					Message: "Invalid parameter name",
+					Message: fmt.Sprintf("Invalid parameter name: %s", mockParameter.Name),
 				})
 				statusCode = 520
 			}
