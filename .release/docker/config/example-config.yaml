@@ -52,3 +52,4 @@ storage:
 mock_tr_181:
   enabled: true
   file_path: /mock_tr181.json
+  service_name: "config"
