@@ -33,8 +33,8 @@ func validatePriority() Option {
 func validateTieBreaker() Option {
 	return optionFunc(
 		func(h *Handler) error {
-			if h.tieBreaker == nil {
-				return errors.Join(fmt.Errorf("%w: nil tiebreak", ErrPriorityTypeInvalid), ErrMisconfiguredQOS)
+			if h.tieBreaker == nil || h.trimTieBreaker == nil {
+				return errors.Join(fmt.Errorf("%w: nil tiebreak/trimTieBreaker", ErrPriorityTypeInvalid), ErrMisconfiguredQOS)
 			}
 
 			return nil

@@ -38,6 +38,8 @@ type Handler struct {
 	priority PriorityType
 	// tieBreaker breaks any QualityOfService ties.
 	tieBreaker tieBreaker
+	// trimTieBreaker breaks any QualityOfService ties during queue trimming.
+	trimTieBreaker tieBreaker
 	// maxQueueBytes is the allowable max size of the qos' priority queue, based on the sum of all queued wrp message's payload.
 	maxQueueBytes int64
 	// MaxMessageBytes is the largest allowable wrp message payload.
@@ -126,10 +128,11 @@ func (h *Handler) serviceQOS(queue <-chan wrp.Message) {
 	)
 
 	// create and manage the priority queue
-	pq := priorityQueue{
+	pq := PriorityQueue{
 		maxQueueBytes:   h.maxQueueBytes,
 		maxMessageBytes: h.maxMessageBytes,
 		tieBreaker:      h.tieBreaker,
+		trimQueue:       trimPriorityQueue{tieBreaker: h.trimTieBreaker},
 	}
 	for {
 		select {
