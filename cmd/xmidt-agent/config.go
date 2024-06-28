@@ -268,7 +268,7 @@ func provideConfig(cli *CLI) (*goschtalt.Config, error) {
 	}
 
 	if cli.Default != "" {
-		err := os.WriteFile("./"+cli.Default, defaultConfigFile, 0644)
+		err := os.WriteFile("./"+cli.Default, defaultConfigFile, 0644) // nolint: gosec
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(-1)
