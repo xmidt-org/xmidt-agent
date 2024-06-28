@@ -267,6 +267,15 @@ func provideConfig(cli *CLI) (*goschtalt.Config, error) {
 		return nil, err
 	}
 
+	if cli.Default != "" {
+		err := os.WriteFile("./"+cli.Default, defaultConfigFile, 0644)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(-1)
+		}
+		os.Exit(0)
+	}
+
 	if cli.Show {
 		// handleCLIShow handles the -s/--show option where the configuration is
 		// shown, then the program is exited.

@@ -38,10 +38,11 @@ var (
 
 // CLI is the structure that is used to capture the command line arguments.
 type CLI struct {
-	Dev   bool     `optional:"" short:"d" help:"Run in development mode."`
-	Show  bool     `optional:"" short:"s" help:"Show the configuration and exit."`
-	Graph string   `optional:"" short:"g" help:"Output the dependency graph to the specified file."`
-	Files []string `optional:"" short:"f" help:"Specific configuration files or directories."`
+	Dev     bool     `optional:"" short:"d" help:"Run in development mode."`
+	Show    bool     `optional:"" short:"s" help:"Show the configuration and exit."`
+	Default string   `optional:""           help:"Output the default configuration file as the specified file."`
+	Graph   string   `optional:"" short:"g" help:"Output the dependency graph to the specified file."`
+	Files   []string `optional:"" short:"f" help:"Specific configuration files or directories."`
 }
 
 type LifeCycleIn struct {
