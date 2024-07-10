@@ -167,7 +167,6 @@ func (h Handler) get(tr181 *Tr181Payload) (int64, []byte, error) {
 
 	for _, name := range tr181.Names {
 		for _, mockParameter := range h.parameters {
-			result.StatusCode = http.StatusOK
 			if !strings.HasPrefix(mockParameter.Name, name) {
 				continue
 			}
@@ -182,6 +181,7 @@ func (h Handler) get(tr181 *Tr181Payload) (int64, []byte, error) {
 					Message:    "Success",
 					Count:      1,
 				})
+				result.StatusCode = http.StatusOK
 			default:
 				result.Parameters = append(result.Parameters, Parameter{
 					Message: fmt.Sprintf("Invalid parameter name: %s", mockParameter.Name),
