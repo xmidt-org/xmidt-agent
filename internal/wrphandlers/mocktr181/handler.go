@@ -73,6 +73,7 @@ type Parameter struct {
 	DataType   int                    `json:"dataType"`
 	Attributes map[string]interface{} `json:"attributes"`
 	Message    string                 `json:"message"`
+	Count      int                    `json"parameterCount"`
 }
 
 // New creates a new instance of the Handler struct.  The parameter egress is
@@ -178,6 +179,7 @@ func (h Handler) get(tr181 *Tr181Payload) (int64, []byte, error) {
 					DataType:   mockParameter.DataType,
 					Attributes: mockParameter.Attributes,
 					Message:    "Success",
+					Count:      1,
 				})
 			default:
 				result.Parameters = append(result.Parameters, Parameter{

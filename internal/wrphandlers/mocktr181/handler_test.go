@@ -70,7 +70,7 @@ func TestHandler_HandleWrp(t *testing.T) {
 				Type:        wrp.SimpleEventMessageType,
 				Source:      "dns:tr1d1um.example.com/service/ignored",
 				Destination: "event:event_1/ignored",
-				Payload:     []byte("{\"command\":\"SET\",\"parameters\":[{\"name\":\"Device.WiFi.Radio.10000.Name\",\"dataType\":0,\"message\":\"Success\",\"value\":\"anothername\",\"attributes\":{\"notify\":0}}]}"),
+				Payload:     []byte("{\"command\":\"SET\",\"parameters\":[{\"name\":\"Device.WiFi.Radio.10000.Name\",\"dataType\":0,\"value\":\"anothername\",\"attributes\":{\"notify\":0}}]}"),
 			},
 			validate: func(a *assert.Assertions, msg wrp.Message, h *Handler) error {
 				a.Equal(int64(http.StatusAccepted), *msg.Status)
