@@ -162,11 +162,12 @@ func (h Handler) get(tr181 *Tr181Payload) (int64, []byte, error) {
 	result := Tr181Payload{
 		Command:    tr181.Command,
 		Names:      tr181.Names,
-		StatusCode: http.StatusOK,
+		StatusCode: 520,
 	}
 
 	for _, name := range tr181.Names {
 		for _, mockParameter := range h.parameters {
+			result.StatusCode = http.StatusOK
 			if !strings.HasPrefix(mockParameter.Name, name) {
 				continue
 			}
@@ -188,10 +189,6 @@ func (h Handler) get(tr181 *Tr181Payload) (int64, []byte, error) {
 				result.StatusCode = 520
 			}
 		}
-	}
-
-	if len(result.Parameters) == 0 {
-		result.StatusCode = 520
 	}
 
 	payload, err := json.Marshal(result)
