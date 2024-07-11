@@ -73,7 +73,7 @@ type Parameter struct {
 	DataType   int                    `json:"dataType"`
 	Attributes map[string]interface{} `json:"attributes"`
 	Message    string                 `json:"message"`
-	Count      int                    `json"parameterCount"`
+	Count      int                    `json:"parameterCount"`
 }
 
 // New creates a new instance of the Handler struct.  The parameter egress is
