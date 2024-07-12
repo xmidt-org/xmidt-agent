@@ -411,6 +411,15 @@ func (ws *Websocket) newHTTPClient(mode ipMode) (*http.Client, error) {
 		return nil, err
 	}
 
+	// update client redirect to send all headers on subsequent requests
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		// Copy headers from the first request to original requests
+		for key, value := range via[0].Header {
+			req.Header[key] = value
+		}
+		return nil
+	}
+
 	// Override config.NewClient()'s Transport and update it's DialContext with the provided mode.
 	transport, err := config.Transport.NewTransport(config.TLS)
 	if err != nil {
