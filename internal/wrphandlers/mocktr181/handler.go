@@ -162,18 +162,24 @@ func (h Handler) get(tr181 *Tr181Payload) (int64, []byte, error) {
 	result := Tr181Payload{
 		Command:    tr181.Command,
 		Names:      tr181.Names,
-		StatusCode: 520,
+		StatusCode: http.StatusOK,
 	}
 
+	var (
+		failedNames    []string
+		readableParams []Parameter
+	)
 	for _, name := range tr181.Names {
+		var found bool
 		for _, mockParameter := range h.parameters {
 			if !strings.HasPrefix(mockParameter.Name, name) {
 				continue
 			}
 
-			switch mockParameter.Access {
-			case "r", "rw", "wr":
-				result.Parameters = append(result.Parameters, Parameter{
+			// Check whether mockParameter is readable.
+			if strings.Contains(mockParameter.Access, "r") {
+				found = true
+				readableParams = append(readableParams, Parameter{
 					Name:       mockParameter.Name,
 					Value:      mockParameter.Value,
 					DataType:   mockParameter.DataType,
@@ -181,14 +187,33 @@ func (h Handler) get(tr181 *Tr181Payload) (int64, []byte, error) {
 					Message:    "Success",
 					Count:      1,
 				})
-				result.StatusCode = http.StatusOK
-			default:
-				result.Parameters = append(result.Parameters, Parameter{
-					Message: fmt.Sprintf("Invalid parameter name: %s", mockParameter.Name),
-				})
-				result.StatusCode = 520
+				continue
 			}
+
+			// If requested parameter is a wild card and mockParameter is not readable,
+			// then continue and don't count it as a failure.
+			if name[len(name)-1] == '.' {
+				continue
+			}
+
+			// mockParameter is not readable.
+			failedNames = append(failedNames, mockParameter.Name)
 		}
+
+		if !found {
+			// Requested parameter was not found.
+			failedNames = append(failedNames, name)
+		}
+	}
+
+	result.Parameters = readableParams
+	// Check if any parameters failed.
+	if len(failedNames) != 0 {
+		// If any names failed, then do not return any parameters that succeeded.
+		result.Parameters = []Parameter{{
+			Message: fmt.Sprintf("Invalid parameter names: %s", failedNames),
+		}}
+		result.StatusCode = 520
 	}
 
 	payload, err := json.Marshal(result)

@@ -59,7 +59,7 @@ func TestHandler_HandleWrp(t *testing.T) {
 				var result Tr181Payload
 				err := json.Unmarshal(msg.Payload, &result)
 				a.NoError(err)
-				a.Equal(0, len(result.Parameters))
+				a.Equal(1, len(result.Parameters))
 				a.True(h.Enabled())
 				return nil
 			},
