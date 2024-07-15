@@ -79,10 +79,10 @@ nfpms:
     license: Apache-2.0
     maintainer: see_maintainers_file@example.com
     description: The client agent for the Xmidt service.
-    
+
     formats:
       - ipk
-          
+
     dependencies:
       - systemd
 
