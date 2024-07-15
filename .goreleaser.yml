@@ -3,6 +3,7 @@
 ---
 project_name: xmidt-agent
 
+version: 2
 
 changelog:
   use: github
@@ -70,6 +71,33 @@ archives:
       - goos: windows
         format: zip
     name_template: '{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+
+nfpms:
+  -
+    vendor: xmidt-org
+    homepage: https://github.com/xmidt-org/xmidt-agent
+    license: Apache-2.0
+    maintainer: see_maintainers_file@example.com
+    description: The client agent for the Xmidt service.
+    
+    formats:
+      - ipk
+          
+    dependencies:
+      - systemd
+
+    contents:
+      # systemd service file
+      - src: .release/ipk/xmidt-agent.service
+        dst: /usr/lib/systemd/system/xmidt-agent.service
+
+      # base configuration file
+      - src: .release/ipk/config.yml
+        dst: /etc/xmidt-agent/01-config.yml
+
+    ipk:
+      fields:
+        Bugs: https://github.com/xmidt-org/xmidt-agent/issues
 
 source:
   enabled: true

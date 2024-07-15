@@ -1,0 +1,19 @@
+[Unit]
+Description=The client agent for the Xmidt service.
+After=network.target remote-fs.target nss-lookup.target
+
+[Service]
+User=xmidt-agent
+Group=xmidt-agent
+SyslogIdentifier=xmidt-agent
+PIDFile=/run/xmidt-agent.pid
+ExecStartPre=/usr/bin/rm -f /run/xmidt-agent.pid
+ExecStart=/usr/bin/xmidt-agent
+Type=simple
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=process
+PrivateTmp=true
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

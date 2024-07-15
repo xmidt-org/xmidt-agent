@@ -1,0 +1,5 @@
+# Put any configuration values that should always be present here.
+#
+# Note:
+#  These values should be generic and apply to all consumers (openwrt, rdk, etc)
+---
