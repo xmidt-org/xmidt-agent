@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2024 Comcast Cable Communications Management, LLC
+# SPDX-License-Identifier: Apache-2.0
+
 [Unit]
 Description=The client agent for the Xmidt service.
 After=network.target remote-fs.target nss-lookup.target
