@@ -205,6 +205,12 @@ func (h Handler) set(tr181 *Tr181Payload) (int64, []byte, error) {
 		Names:      tr181.Names,
 		StatusCode: http.StatusAccepted,
 	}
+
+	var (
+		writableParams []*MockParameter
+		failedParams   []Parameter
+	)
+	// Check for any parameters that are not writable.
 	for _, parameter := range tr181.Parameters {
 		for i := range h.parameters {
 			mockParameter := &h.parameters[i]
@@ -212,25 +218,46 @@ func (h Handler) set(tr181 *Tr181Payload) (int64, []byte, error) {
 				continue
 			}
 
-			switch mockParameter.Access {
-			case "w", "wr", "rw":
-				mockParameter.Value = parameter.Value
-				mockParameter.DataType = parameter.DataType
-				mockParameter.Attributes = parameter.Attributes
-				result.Parameters = append(result.Parameters, Parameter{
-					Name:       mockParameter.Name,
-					Value:      mockParameter.Value,
-					DataType:   mockParameter.DataType,
-					Attributes: mockParameter.Attributes,
-					Message:    "Success",
-				})
-			default:
-				result.Parameters = append(result.Parameters, Parameter{
-					Name:    mockParameter.Name,
-					Message: "Parameter is not writable",
-				})
-				result.StatusCode = 520
+			// Check whether mockParameter is writable.
+			if strings.Contains(mockParameter.Access, "w") {
+				// Add mockParameter to the list of parameters to be updated.
+				writableParams = append(writableParams, mockParameter)
+				continue
 			}
+
+			// mockParameter is not writable.
+			failedParams = append(failedParams, Parameter{
+				Name:    mockParameter.Name,
+				Message: "Parameter is not writable",
+			})
+		}
+	}
+
+	if len(failedParams) != 0 {
+		// If any parameter failed, then do not apply any changes to the parameters in writableParams.
+		writableParams = nil
+		result.Parameters = failedParams
+		result.StatusCode = 520
+	}
+
+	// If all the selected parameters are writable, then update the parameters. Otherwise, do nothing.
+	for _, parameter := range tr181.Parameters {
+		// writableParams will be nil if any parameters failed (i.e.: were not writable).
+		for _, mockParameter := range writableParams {
+			if mockParameter.Name != parameter.Name {
+				continue
+			}
+
+			mockParameter.Value = parameter.Value
+			mockParameter.DataType = parameter.DataType
+			mockParameter.Attributes = parameter.Attributes
+			result.Parameters = append(result.Parameters, Parameter{
+				Name:       mockParameter.Name,
+				Value:      mockParameter.Value,
+				DataType:   mockParameter.DataType,
+				Attributes: mockParameter.Attributes,
+				Message:    "Success",
+			})
 		}
 	}
 
