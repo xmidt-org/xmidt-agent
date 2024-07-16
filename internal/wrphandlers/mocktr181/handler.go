@@ -190,7 +190,7 @@ func (h Handler) get(tr181 *Tr181Payload) (int64, []byte, error) {
 				continue
 			}
 
-			// If requested parameter is a wild card and mockParameter is not readable,
+			// If the requested parameter is a wild card and is not readable,
 			// then continue and don't count it as a failure.
 			if name[len(name)-1] == '.' {
 				continue
