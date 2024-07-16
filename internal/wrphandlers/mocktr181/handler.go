@@ -212,6 +212,7 @@ func (h Handler) set(tr181 *Tr181Payload) (int64, []byte, error) {
 	)
 	// Check for any parameters that are not writable.
 	for _, parameter := range tr181.Parameters {
+		var found bool
 		for i := range h.parameters {
 			mockParameter := &h.parameters[i]
 			if mockParameter.Name != parameter.Name {
@@ -220,6 +221,7 @@ func (h Handler) set(tr181 *Tr181Payload) (int64, []byte, error) {
 
 			// Check whether mockParameter is writable.
 			if strings.Contains(mockParameter.Access, "w") {
+				found = true
 				// Add mockParameter to the list of parameters to be updated.
 				writableParams = append(writableParams, mockParameter)
 				continue
@@ -229,6 +231,14 @@ func (h Handler) set(tr181 *Tr181Payload) (int64, []byte, error) {
 			failedParams = append(failedParams, Parameter{
 				Name:    mockParameter.Name,
 				Message: "Parameter is not writable",
+			})
+		}
+
+		if !found {
+			// Requested parameter was not found.
+			failedParams = append(failedParams, Parameter{
+				Name:    parameter.Name,
+				Message: "Invalid parameter name",
 			})
 		}
 	}
