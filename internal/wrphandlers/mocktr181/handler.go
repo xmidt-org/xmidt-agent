@@ -233,6 +233,7 @@ func (h Handler) set(tr181 *Tr181Payload) (int64, []byte, error) {
 		}
 	}
 
+	// Check if any parameters failed.
 	if len(failedParams) != 0 {
 		// If any parameter failed, then do not apply any changes to the parameters in writableParams.
 		writableParams = nil
