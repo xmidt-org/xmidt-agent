@@ -97,9 +97,14 @@ nfpms:
       - src: .release/ipk/config.yml
         dst: /etc/xmidt-agent/01-config.yml
 
+    scripts:
+      preinstall: .release/ipk/preinstall.sh
+      postinstall: .release/ipk/postinstall.sh
+
     ipk:
       fields:
         Bugs: https://github.com/xmidt-org/xmidt-agent/issues
+
   -
     id: openwrt
     file_name_template: '{{ .PackageName }}_{{ .Version }}_openwrt_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
