@@ -173,6 +173,10 @@ func (h Handler) get(tr181 *Tr181Payload) (int64, []byte, error) {
 	for _, name := range tr181.Names {
 		var found bool
 		for _, mockParameter := range h.parameters {
+			if name == "" {
+				continue
+			}
+
 			if !strings.HasPrefix(mockParameter.Name, name) {
 				continue
 			}
