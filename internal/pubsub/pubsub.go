@@ -148,7 +148,7 @@ func (ps *PubSub) subscribe(route string, h wrpkit.Handler) (CancelFunc, error) 
 func (ps *PubSub) HandleWrp(msg wrp.Message) error {
 	normalized, dest, err := ps.normalize(&msg)
 	if err != nil {
-		return err
+		return errors.Join(err, wrpkit.ErrNotHandled)
 	}
 
 	// Unless the destination is this device, the message will be sent to the
