@@ -143,13 +143,13 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 	default:
 		// currently only get and set are implemented for existing mocktr181
 		statusCode = 520
-		payloadResponse = []byte(fmt.Sprintf(`{"message": "command %s is not support"}`, command))
+		payloadResponse = []byte(fmt.Sprintf(`{"message": "command %s is not support", "statusCode": %d}`, command, statusCode))
 	}
 
 	response := msg
 	response.Destination = msg.Source
 	response.Source = h.source
-	response.ContentType = "text/plain"
+	response.ContentType = "application/json"
 	response.Payload = payloadResponse
 
 	response.Status = &statusCode
