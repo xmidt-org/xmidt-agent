@@ -20,8 +20,6 @@ func MaxQueueBytes(s int64) Option {
 		func(h *Handler) error {
 			if s < 0 {
 				return fmt.Errorf("%w: negative MaxQueueBytes", ErrMisconfiguredQOS)
-			} else if s == 0 {
-				s = DefaultMaxQueueBytes
 			}
 
 			h.maxQueueBytes = s

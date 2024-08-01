@@ -46,6 +46,17 @@ func TestHandler_HandleWrp(t *testing.T) {
 	}{
 		// success cases
 		{
+			description:     "enqueued and delivered message prioritizing newer messages without queue size restriction",
+			maxMessageBytes: 50,
+			priority:        qos.NewestType,
+			nextCallCount:   1,
+			next: wrpkit.HandlerFunc(func(wrp.Message) error {
+				nextCallCount.Add(1)
+
+				return nil
+			}),
+		},
+		{
 			description:     "enqueued and delivered message prioritizing newer messages",
 			maxQueueBytes:   100,
 			maxMessageBytes: 50,

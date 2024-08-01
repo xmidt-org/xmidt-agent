@@ -21,7 +21,8 @@ type priorityQueue struct {
 	queue []item
 	// tieBreaker breaks any QualityOfService ties.
 	tieBreaker tieBreaker
-	// maxQueueBytes is the allowable max size of the queue based on the sum of all queued wrp message's payloads
+	// maxQueueBytes is the allowable max size of the queue based on the sum of all queued wrp message's payloads.
+	// Zero value will disable queue trimming.
 	maxQueueBytes int64
 	// MaxMessageBytes is the largest allowable wrp message payload.
 	maxMessageBytes int
@@ -63,7 +64,8 @@ func (pq *priorityQueue) Enqueue(msg wrp.Message) error {
 
 func (pq *priorityQueue) trim() {
 	// trim until the queue no longer violates maxQueueBytes.
-	for pq.sizeBytes > pq.maxQueueBytes {
+	// The zero value of `pq.maxQueueBytes` will disable queue trimming.
+	for pq.maxQueueBytes != 0 && pq.sizeBytes > pq.maxQueueBytes {
 		// Note, priorityQueue.drop does not drop the least prioritized queued message.
 		// i.e.: a high priority queued message may be dropped instead of a lesser queued message.
 		pq.drop()
