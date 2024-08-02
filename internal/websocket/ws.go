@@ -244,6 +244,7 @@ func (ws *Websocket) run(ctx context.Context) {
 		ws.conveyDecorator(ws.additionalHeaders)
 
 		conn, _, dialErr := ws.dial(ctx, mode) //nolint:bodyclose
+
 		cEvent.At = ws.nowFunc()
 
 		if dialErr == nil {
@@ -398,6 +399,7 @@ func (ws *Websocket) dial(ctx context.Context, mode ipMode) (*nhws.Conn, *http.R
 			HTTPClient: client,
 		},
 	)
+
 	if err != nil {
 		return nil, resp, err
 	}
@@ -444,9 +446,11 @@ func (ws *Websocket) newHTTPClient(mode ipMode) (*http.Client, error) {
 		KeepAlive: ws.keepAliveInterval,
 		DualStack: false,
 	}
+
 	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 		return dialer.DialContext(ctx, string(mode), addr)
 	}
+
 	client.Transport = &custRT{transport: transport}
 
 	return client, nil

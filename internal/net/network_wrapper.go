@@ -4,6 +4,7 @@
 package net
 
 import (
+	"github.com/nixigaj/go-default-route"
 	"net"
 )
 
@@ -11,6 +12,7 @@ type NetworkWrap struct{}
 
 type NetworkWrapper interface {
 	Interfaces() ([]net.Interface, error)
+	DefaultInterface() (*net.Interface, error)
 }
 
 func NewNetworkWrapper() NetworkWrapper {
@@ -19,4 +21,8 @@ func NewNetworkWrapper() NetworkWrapper {
 
 func (n *NetworkWrap) Interfaces() ([]net.Interface, error) {
 	return net.Interfaces()
+}
+
+func (n *NetworkWrap) DefaultInterface() (*net.Interface, error) {
+	return defaultroute.DefaultRouteInterface()
 }

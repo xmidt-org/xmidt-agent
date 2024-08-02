@@ -12,6 +12,7 @@ import (
 type NetworkServicer interface {
 	GetInterfaces() ([]net.Interface, error)
 	GetInterfaceNames() ([]string, error)
+	GetDefaultInterface() (*net.Interface, error)
 }
 
 type NetworkService struct {
@@ -64,6 +65,10 @@ func (ns *NetworkService) GetInterfaceNames() ([]string, error) {
 	}
 
 	return names, nil
+}
+
+func (ns *NetworkService) GetDefaultInterface() (*net.Interface, error) {
+	return ns.N.DefaultInterface()
 }
 
 func (ns *NetworkService) isAllowed(name string) bool {

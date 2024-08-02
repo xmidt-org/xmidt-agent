@@ -23,6 +23,11 @@ func (m *mockNetworkWrapper) Interfaces() ([]net.Interface, error) {
 	return args.Get(0).([]net.Interface), args.Error(1)
 }
 
+func (m *mockNetworkWrapper) DefaultInterface() (*net.Interface, error) {
+	args := m.Called()
+	return args.Get(0).(*net.Interface), args.Error(1)
+}
+
 type NetworkServiceSuite struct {
 	suite.Suite
 	networkService     NetworkServicer
@@ -106,4 +111,12 @@ func (suite *NetworkServiceSuite) TestGetInterfaceNamesError() {
 	names, err := suite.networkService.GetInterfaceNames()
 	suite.Error(err)
 	suite.Equal(0, len(names))
+}
+
+func (suite *NetworkServiceSuite) TestGetDefaulInterface() {
+	i := &net.Interface{}
+	suite.mockNetworkWrapper.On("DefaultInterface").Return(i, nil)
+	result, err := suite.networkService.GetDefaultInterface()
+	suite.NoError(err)
+	suite.Equal(i, result)
 }

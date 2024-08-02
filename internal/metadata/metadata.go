@@ -91,7 +91,11 @@ func (c *MetadataProvider) GetMetadata() map[string]interface{} {
 		case BootTimeRetryDelay:
 			header[field] = c.bootTimeRetryDelay
 		case InterfaceUsed:
-			header[field] = c.interfaceUsed.GetInterfaceUsed()
+			// for now, let's just use the default router interface from the OS.  We will eventually have websocket pass this value in
+			i, err := c.networkService.GetDefaultInterface()
+			if i != nil && err == nil {
+				header[field] = i.Name
+			}
 		case InterfacesAvailable: // what if we can't get interfaces available?
 			names, err := c.networkService.GetInterfaceNames()
 			if err != nil {

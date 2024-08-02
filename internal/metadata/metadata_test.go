@@ -4,6 +4,7 @@
 package metadata
 
 import (
+	"errors"
 	"net"
 	"net/http"
 	"testing"
@@ -28,6 +29,15 @@ func (m *mockNetworkService) GetInterfaces() ([]net.Interface, error) {
 func (m *mockNetworkService) GetInterfaceNames() ([]string, error) {
 	args := m.Called()
 	return args.Get(0).([]string), args.Error(1)
+}
+
+func (m *mockNetworkService) GetDefaultInterface() (*net.Interface, error) {
+	args := m.Called()
+	var arg0 *net.Interface = nil
+	if args.Get(0) != nil {
+		arg0 = args.Get(0).(*net.Interface)
+	}
+	return arg0, args.Error(1)
 }
 
 type ConveySuite struct {
@@ -68,6 +78,11 @@ func TestConveySuite(t *testing.T) {
 
 func (suite *ConveySuite) TestGetConveyHeader() {
 	suite.mockNetworkService.On("GetInterfaceNames").Return([]string{"erouter0", "eth0"}, nil)
+	i := &net.Interface{
+		Name: "erouter0",
+	}
+	suite.mockNetworkService.On("GetDefaultInterface").Return(i, nil)
+
 	header := suite.conveyHeaderProvider.GetMetadata()
 
 	suite.Equal("1.1", header["fw-name"])
@@ -82,7 +97,41 @@ func (suite *ConveySuite) TestGetConveyHeader() {
 	suite.Equal("erouter0", header["webpa-interface-used"])
 }
 
+func (suite *ConveySuite) TestDefaultRouteInterfaceUsedHeader() {
+	suite.mockNetworkService.On("GetInterfaceNames").Return([]string{"erouter0", "eth0"}, nil)
+	i := &net.Interface{
+		Name: "default-interface",
+	}
+
+	suite.mockNetworkService.On("GetDefaultInterface").Return(i, nil)
+	header := suite.conveyHeaderProvider.GetMetadata()
+	suite.Equal("default-interface", header["webpa-interface-used"])
+}
+
+func (suite *ConveySuite) TestDefaultRouteInterfaceUsedHeaderNil() {
+	suite.mockNetworkService.On("GetInterfaceNames").Return([]string{"erouter0", "eth0"}, nil)
+
+	suite.mockNetworkService.On("GetDefaultInterface").Return(nil, nil)
+	header := suite.conveyHeaderProvider.GetMetadata()
+	suite.Equal(nil, header["webpa-interface-used"])
+}
+
+func (suite *ConveySuite) TestDefaultRouteInterfaceUsedHeaderError() {
+	suite.mockNetworkService.On("GetInterfaceNames").Return([]string{"erouter0", "eth0"}, nil)
+
+	i := &net.Interface{
+		Name: "default-interface",
+	}
+	suite.mockNetworkService.On("GetDefaultInterface").Return(i, errors.New("some os error"))
+	header := suite.conveyHeaderProvider.GetMetadata()
+	suite.Equal(nil, header["webpa-interface-used"])
+}
+
 func (suite *ConveySuite) TestGetConveyHeaderSubsetFields() {
+	i := &net.Interface{
+		Name: "erouter0",
+	}
+	suite.mockNetworkService.On("GetDefaultInterface").Return(i, nil)
 	suite.mockNetworkService.On("GetInterfaceNames").Return([]string{"docsis"}, nil)
 	suite.conveyHeaderProvider.fields = []string{"fw-name", "hw-model"}
 
@@ -101,6 +150,10 @@ func (suite *ConveySuite) TestGetConveyHeaderSubsetFields() {
 }
 
 func (suite *ConveySuite) TestDecorate() {
+	i := &net.Interface{
+		Name: "erouter0",
+	}
+	suite.mockNetworkService.On("GetDefaultInterface").Return(i, nil)
 	suite.mockNetworkService.On("GetInterfaceNames").Return([]string{"docsis"}, nil)
 
 	req, err := http.NewRequest(http.MethodGet, "https://example.com", nil)
@@ -114,6 +167,10 @@ func (suite *ConveySuite) TestDecorate() {
 }
 
 func (suite *ConveySuite) TestDecorateMsg() {
+	i := &net.Interface{
+		Name: "erouter0",
+	}
+	suite.mockNetworkService.On("GetDefaultInterface").Return(i, nil)
 	suite.mockNetworkService.On("GetInterfaceNames").Return([]string{"erouter0"}, nil)
 
 	msg := new(wrp.Message)
