@@ -60,6 +60,7 @@ type Tr181Payload struct {
 	Command    string      `json:"command"`
 	Names      []string    `json:"names"`
 	Parameters []Parameter `json:"parameters"`
+	StatusCode int         `json:"statusCode"`
 }
 
 type Parameters struct {
@@ -71,6 +72,8 @@ type Parameter struct {
 	Value      string                 `json:"value"`
 	DataType   int                    `json:"dataType"`
 	Attributes map[string]interface{} `json:"attributes"`
+	Message    string                 `json:"message"`
+	Count      int                    `json:"parameterCount"`
 }
 
 // New creates a new instance of the Handler struct.  The parameter egress is
@@ -126,23 +129,27 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 
 	switch command {
 	case "GET":
-		statusCode, payloadResponse, err = h.get(payload.Names)
+		statusCode, payloadResponse, err = h.get(payload)
 		if err != nil {
 			return err
 		}
 
 	case "SET":
-		statusCode = h.set(payload.Parameters)
+		statusCode, payloadResponse, err = h.set(payload)
+		if err != nil {
+			return err
+		}
 
 	default:
 		// currently only get and set are implemented for existing mocktr181
-		statusCode = http.StatusOK
+		statusCode = 520
+		payloadResponse = []byte(fmt.Sprintf(`{"message": "command %s is not support", "statusCode": %d}`, command, statusCode))
 	}
 
 	response := msg
 	response.Destination = msg.Source
 	response.Source = h.source
-	response.ContentType = "text/plain"
+	response.ContentType = "application/json"
 	response.Payload = payloadResponse
 
 	response.Status = &statusCode
@@ -152,20 +159,146 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 	return err
 }
 
-func (h Handler) get(names []string) (int64, []byte, error) {
-	result := Tr181Payload{}
-	statusCode := int64(http.StatusOK)
+func (h Handler) get(tr181 *Tr181Payload) (int64, []byte, error) {
+	result := Tr181Payload{
+		Command:    tr181.Command,
+		Names:      tr181.Names,
+		StatusCode: http.StatusOK,
+	}
 
-	for _, name := range names {
+	var (
+		failedNames    []string
+		readableParams []Parameter
+	)
+	for _, name := range tr181.Names {
+		var found bool
 		for _, mockParameter := range h.parameters {
-			if strings.HasPrefix(mockParameter.Name, name) {
-				result.Parameters = append(result.Parameters, Parameter{
+			if name == "" {
+				continue
+			}
+
+			if !strings.HasPrefix(mockParameter.Name, name) {
+				continue
+			}
+
+			// Check whether mockParameter is readable.
+			if strings.Contains(mockParameter.Access, "r") {
+				found = true
+				readableParams = append(readableParams, Parameter{
 					Name:       mockParameter.Name,
 					Value:      mockParameter.Value,
 					DataType:   mockParameter.DataType,
 					Attributes: mockParameter.Attributes,
+					Message:    "Success",
+					Count:      1,
 				})
+				continue
 			}
+
+			// If the requested parameter is a wild card and is not readable,
+			// then continue and don't count it as a failure.
+			if name[len(name)-1] == '.' {
+				continue
+			}
+
+			// mockParameter is not readable.
+			failedNames = append(failedNames, mockParameter.Name)
+		}
+
+		if !found {
+			// Requested parameter was not found.
+			failedNames = append(failedNames, name)
+		}
+	}
+
+	result.Parameters = readableParams
+	// Check if any parameters failed.
+	if len(failedNames) != 0 {
+		// If any names failed, then do not return any parameters that succeeded.
+		result.Parameters = []Parameter{{
+			Message: fmt.Sprintf("Invalid parameter names: %s", failedNames),
+		}}
+		result.StatusCode = 520
+	}
+
+	payload, err := json.Marshal(result)
+	if err != nil {
+		return http.StatusInternalServerError, payload, errors.Join(ErrInvalidResponsePayload, err)
+	}
+
+	return int64(result.StatusCode), payload, nil
+}
+
+func (h Handler) set(tr181 *Tr181Payload) (int64, []byte, error) {
+	result := Tr181Payload{
+		Command:    tr181.Command,
+		Names:      tr181.Names,
+		StatusCode: http.StatusAccepted,
+	}
+
+	var (
+		writableParams []*MockParameter
+		failedParams   []Parameter
+	)
+	// Check for any parameters that are not writable.
+	for _, parameter := range tr181.Parameters {
+		var found bool
+		for i := range h.parameters {
+			mockParameter := &h.parameters[i]
+			if mockParameter.Name != parameter.Name {
+				continue
+			}
+
+			// Check whether mockParameter is writable.
+			if strings.Contains(mockParameter.Access, "w") {
+				found = true
+				// Add mockParameter to the list of parameters to be updated.
+				writableParams = append(writableParams, mockParameter)
+				continue
+			}
+
+			// mockParameter is not writable.
+			failedParams = append(failedParams, Parameter{
+				Name:    mockParameter.Name,
+				Message: "Parameter is not writable",
+			})
+		}
+
+		if !found {
+			// Requested parameter was not found.
+			failedParams = append(failedParams, Parameter{
+				Name:    parameter.Name,
+				Message: "Invalid parameter name",
+			})
+		}
+	}
+
+	// Check if any parameters failed.
+	if len(failedParams) != 0 {
+		// If any parameter failed, then do not apply any changes to the parameters in writableParams.
+		writableParams = nil
+		result.Parameters = failedParams
+		result.StatusCode = 520
+	}
+
+	// If all the selected parameters are writable, then update the parameters. Otherwise, do nothing.
+	for _, parameter := range tr181.Parameters {
+		// writableParams will be nil if any parameters failed (i.e.: were not writable).
+		for _, mockParameter := range writableParams {
+			if mockParameter.Name != parameter.Name {
+				continue
+			}
+
+			mockParameter.Value = parameter.Value
+			mockParameter.DataType = parameter.DataType
+			mockParameter.Attributes = parameter.Attributes
+			result.Parameters = append(result.Parameters, Parameter{
+				Name:       mockParameter.Name,
+				Value:      mockParameter.Value,
+				DataType:   mockParameter.DataType,
+				Attributes: mockParameter.Attributes,
+				Message:    "Success",
+			})
 		}
 	}
 
@@ -174,27 +307,7 @@ func (h Handler) get(names []string) (int64, []byte, error) {
 		return http.StatusInternalServerError, payload, errors.Join(ErrInvalidResponsePayload, err)
 	}
 
-	if len(result.Parameters) == 0 {
-		statusCode = int64(520)
-	}
-
-	return statusCode, payload, nil
-}
-
-func (h Handler) set(parameters []Parameter) int64 {
-	for _, parameter := range parameters {
-		for _, mockParameter := range h.parameters {
-			if strings.HasPrefix(mockParameter.Name, parameter.Name) {
-				if mockParameter.Access == "rw" {
-					mockParameter.Value = parameter.Value
-					mockParameter.DataType = parameter.DataType
-					mockParameter.Attributes = parameter.Attributes
-				}
-			}
-		}
-	}
-
-	return http.StatusAccepted
+	return int64(result.StatusCode), payload, nil
 }
 
 func (h Handler) loadFile() ([]MockParameter, error) {

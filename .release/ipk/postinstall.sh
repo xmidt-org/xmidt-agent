@@ -1,6 +1,5 @@
+#!/bin/bash
 # SPDX-FileCopyrightText: 2024 Comcast Cable Communications Management, LLC
 # SPDX-License-Identifier: Apache-2.0
-mock_tr_181:
-  enabled: true
-  file_path: "/mock_tr181.json"
-  service_name: "config"
+
+systemctl preset xmidt-agent.service >/dev/null 2>&1

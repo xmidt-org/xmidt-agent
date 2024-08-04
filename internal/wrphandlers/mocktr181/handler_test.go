@@ -59,7 +59,7 @@ func TestHandler_HandleWrp(t *testing.T) {
 				var result Tr181Payload
 				err := json.Unmarshal(msg.Payload, &result)
 				a.NoError(err)
-				a.Equal(0, len(result.Parameters))
+				a.Equal(1, len(result.Parameters))
 				a.True(h.Enabled())
 				return nil
 			},
@@ -88,7 +88,22 @@ func TestHandler_HandleWrp(t *testing.T) {
 				Payload:     []byte("{\"command\":\"SET\",\"parameters\":[{\"name\":\"Device.Bridging.MaxBridgeEntries\",\"dataType\":0,\"value\":\"anothername\",\"attributes\":{\"notify\":0}}]}"),
 			},
 			validate: func(a *assert.Assertions, msg wrp.Message, h *Handler) error {
-				a.Equal(int64(http.StatusAccepted), *msg.Status)
+				a.Equal(int64(520), *msg.Status)
+				a.True(h.Enabled())
+
+				return nil
+			},
+		}, {
+			description:     "unknown command",
+			egressCallCount: 1,
+			msg: wrp.Message{
+				Type:        wrp.SimpleEventMessageType,
+				Source:      "dns:tr1d1um.example.com/service/ignored",
+				Destination: "event:event_1/ignored",
+				Payload:     []byte("{\"command\":\"FOOBAR\",\"parameters\":[{\"name\":\"Device.Bridging.MaxBridgeEntries\",\"dataType\":0,\"value\":\"anothername\",\"attributes\":{\"notify\":0}}]}"),
+			},
+			validate: func(a *assert.Assertions, msg wrp.Message, h *Handler) error {
+				a.Equal(int64(520), *msg.Status)
 				a.True(h.Enabled())
 
 				return nil

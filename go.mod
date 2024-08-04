@@ -14,12 +14,12 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/ugorji/go/codec v1.2.12
 	github.com/xmidt-org/arrange v0.5.0
-	github.com/xmidt-org/eventor v1.0.0
+	github.com/xmidt-org/eventor v1.0.11
 	github.com/xmidt-org/retry v0.0.3
 	github.com/xmidt-org/sallust v0.2.2
 	github.com/xmidt-org/wrp-go/v3 v3.5.2
 	go.nanomsg.org/mangos/v3 v3.4.2
-	go.uber.org/fx v1.22.0
+	go.uber.org/fx v1.22.1
 	go.uber.org/zap v1.27.0
 	gopkg.in/dealancer/validate.v2 v2.1.0
 )
