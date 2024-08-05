@@ -45,8 +45,6 @@ func MaxMessageBytes(s int) Option {
 		func(h *Handler) error {
 			if s < 0 {
 				return fmt.Errorf("%w: negative MaxMessageBytes", ErrMisconfiguredQOS)
-			} else if s == 0 {
-				s = DefaultMaxMessageBytes
 			}
 
 			h.maxMessageBytes = s

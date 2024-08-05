@@ -33,7 +33,6 @@ func TestHandler_HandleWrp(t *testing.T) {
 	tests := []struct {
 		description string
 		options     []qos.Option
-		priority    qos.PriorityType
 		// int64 required for nextCallCount atomic.Int64 comparison
 		nextCallCount        int64
 		next                 wrpkit.Handler
@@ -47,6 +46,16 @@ func TestHandler_HandleWrp(t *testing.T) {
 		{
 			description:   "enqueued and delivered message prioritizing newer messages",
 			options:       []qos.Option{qos.MaxQueueBytes(int64(100)), qos.MaxMessageBytes(50), qos.Priority(qos.NewestType)},
+			nextCallCount: 1,
+			next: wrpkit.HandlerFunc(func(wrp.Message) error {
+				nextCallCount.Add(1)
+
+				return nil
+			}),
+		},
+		{
+			description:   "enqueued and delivered message prioritizing newer messages with no message size restriction",
+			options:       []qos.Option{qos.MaxQueueBytes(int64(100)), qos.Priority(qos.NewestType)},
 			nextCallCount: 1,
 			next: wrpkit.HandlerFunc(func(wrp.Message) error {
 				nextCallCount.Add(1)
@@ -93,9 +102,8 @@ func TestHandler_HandleWrp(t *testing.T) {
 			shouldHalt: true,
 		},
 		{
-			description: "zero MaxQueueBytes option value",
-			options:     []qos.Option{qos.MaxQueueBytes(int64(100)), qos.MaxMessageBytes(50), qos.Priority(qos.NewestType)},
-
+			description:   "zero MaxQueueBytes option value",
+			options:       []qos.Option{qos.MaxQueueBytes(int64(100)), qos.MaxMessageBytes(50), qos.Priority(qos.NewestType)},
 			nextCallCount: 1,
 			next: wrpkit.HandlerFunc(func(wrp.Message) error {
 				nextCallCount.Add(1)
