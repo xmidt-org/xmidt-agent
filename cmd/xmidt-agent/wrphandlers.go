@@ -75,10 +75,10 @@ func provideQOSHandler(in qosIn) (*qos.Handler, error) {
 		qos.MaxQueueBytes(in.QOS.MaxQueueBytes),
 		qos.MaxMessageBytes(in.QOS.MaxMessageBytes),
 		qos.Priority(in.QOS.Priority),
-		qos.LowQOSExpires(in.QOS.LowQOSExpires),
-		qos.MediumQOSExpires(in.QOS.MediumQOSExpires),
-		qos.HighQOSExpires(in.QOS.HighQOSExpires),
-		qos.CriticalQOSExpires(in.QOS.CriticalQOSExpires),
+		qos.LowExpires(in.QOS.LowExpires),
+		qos.MediumExpires(in.QOS.MediumExpires),
+		qos.HighExpires(in.QOS.HighExpires),
+		qos.CriticalExpires(in.QOS.CriticalExpires),
 	)
 }
 

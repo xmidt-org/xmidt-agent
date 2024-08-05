@@ -67,14 +67,14 @@ type QOS struct {
 	// Priority determines what is used [newest, oldest message] for QualityOfService tie breakers and trimming,
 	// with the default being to prioritize the newest messages.
 	Priority qos.PriorityType
-	// LowQOSExpires determines when low qos messages are trimmed.
-	LowQOSExpires time.Duration
-	// MediumQOSExpires determines when medium qos messages are trimmed.
-	MediumQOSExpires time.Duration
-	// HighQOSExpires determines when high qos messages are trimmed.
-	HighQOSExpires time.Duration
-	// CriticalQOSExpires determines when critical qos messages are trimmed.
-	CriticalQOSExpires time.Duration
+	// LowExpires determines when low qos messages are trimmed.
+	LowExpires time.Duration
+	// MediumExpires determines when medium qos messages are trimmed.
+	MediumExpires time.Duration
+	// HighExpires determines when high qos messages are trimmed.
+	HighExpires time.Duration
+	// CriticalExpires determines when critical qos messages are trimmed.
+	CriticalExpires time.Duration
 }
 
 type Pubsub struct {

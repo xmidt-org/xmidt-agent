@@ -73,13 +73,13 @@ func testEnqueueDequeueAgePriority(t *testing.T) {
 			assert := assert.New(t)
 			require := require.New(t)
 			pq := priorityQueue{
-				maxQueueBytes:      int64(len(smallLowQOSMsgOldest.Payload)),
-				maxMessageBytes:    len(smallLowQOSMsgOldest.Payload),
-				lowQOSExpires:      DefaultLowQOSExpires,
-				mediumQOSExpires:   DefaultMediumQOSExpires,
-				highQOSExpires:     DefaultHighQOSExpires,
-				criticalQOSExpires: DefaultCriticalQOSExpires,
-				priority:           tc.priority,
+				maxQueueBytes:   int64(len(smallLowQOSMsgOldest.Payload)),
+				maxMessageBytes: len(smallLowQOSMsgOldest.Payload),
+				lowExpires:      DefaultLowExpires,
+				mediumExpires:   DefaultMediumExpires,
+				highExpires:     DefaultHighExpires,
+				criticalExpires: DefaultCriticalExpires,
+				priority:        tc.priority,
 			}
 
 			var err error
@@ -228,12 +228,12 @@ func testEnqueueDequeue(t *testing.T) {
 			assert := assert.New(t)
 			require := require.New(t)
 			pq := priorityQueue{
-				maxQueueBytes:      int64(tc.maxQueueBytes),
-				maxMessageBytes:    tc.maxMessageBytes,
-				lowQOSExpires:      DefaultLowQOSExpires,
-				mediumQOSExpires:   DefaultMediumQOSExpires,
-				highQOSExpires:     DefaultHighQOSExpires,
-				criticalQOSExpires: DefaultCriticalQOSExpires,
+				maxQueueBytes:   int64(tc.maxQueueBytes),
+				maxMessageBytes: tc.maxMessageBytes,
+				lowExpires:      DefaultLowExpires,
+				mediumExpires:   DefaultMediumExpires,
+				highExpires:     DefaultHighExpires,
+				criticalExpires: DefaultCriticalExpires,
 			}
 
 			var err error
@@ -407,7 +407,7 @@ func testTrim(t *testing.T) {
 	pq.queue = []item{
 		{
 			msg:     &msg0,
-			expires: time.Now().Add(DefaultCriticalQOSExpires),
+			expires: time.Now().Add(DefaultCriticalExpires),
 		},
 		{
 			msg:     &msg1,
@@ -419,7 +419,7 @@ func testTrim(t *testing.T) {
 		},
 		{
 			msg:     &msg3,
-			expires: time.Now().Add(DefaultCriticalQOSExpires),
+			expires: time.Now().Add(DefaultCriticalExpires),
 		},
 	}
 

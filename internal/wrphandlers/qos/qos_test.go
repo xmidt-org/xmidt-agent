@@ -114,8 +114,8 @@ func TestHandler_HandleWrp(t *testing.T) {
 			}),
 		},
 		{
-			description:   "non-negative LowQOSExpires option value",
-			options:       []qos.Option{qos.LowQOSExpires(0), qos.MaxQueueBytes(int64(100)), qos.MaxMessageBytes(50), qos.Priority(qos.NewestType)},
+			description:   "non-negative LowExpires option value",
+			options:       []qos.Option{qos.LowExpires(0), qos.MaxQueueBytes(int64(100)), qos.MaxMessageBytes(50), qos.Priority(qos.NewestType)},
 			nextCallCount: 1,
 			next: wrpkit.HandlerFunc(func(wrp.Message) error {
 				nextCallCount.Add(1)
@@ -124,8 +124,8 @@ func TestHandler_HandleWrp(t *testing.T) {
 			}),
 		},
 		{
-			description:   "non-negative MediumQOSExpires option value",
-			options:       []qos.Option{qos.MediumQOSExpires(0), qos.MaxQueueBytes(int64(100)), qos.MaxMessageBytes(50), qos.Priority(qos.NewestType)},
+			description:   "non-negative MediumExpires option value",
+			options:       []qos.Option{qos.MediumExpires(0), qos.MaxQueueBytes(int64(100)), qos.MaxMessageBytes(50), qos.Priority(qos.NewestType)},
 			nextCallCount: 1,
 			next: wrpkit.HandlerFunc(func(wrp.Message) error {
 				nextCallCount.Add(1)
@@ -134,8 +134,8 @@ func TestHandler_HandleWrp(t *testing.T) {
 			}),
 		},
 		{
-			description:   "non-negative HighQOSExpires option value",
-			options:       []qos.Option{qos.HighQOSExpires(0), qos.MaxQueueBytes(int64(100)), qos.MaxMessageBytes(50), qos.Priority(qos.NewestType)},
+			description:   "non-negative HighExpires option value",
+			options:       []qos.Option{qos.HighExpires(0), qos.MaxQueueBytes(int64(100)), qos.MaxMessageBytes(50), qos.Priority(qos.NewestType)},
 			nextCallCount: 1,
 			next: wrpkit.HandlerFunc(func(wrp.Message) error {
 				nextCallCount.Add(1)
@@ -144,8 +144,8 @@ func TestHandler_HandleWrp(t *testing.T) {
 			}),
 		},
 		{
-			description:   "non-negative CriticalQOSExpires option value",
-			options:       []qos.Option{qos.CriticalQOSExpires(0), qos.MaxQueueBytes(int64(100)), qos.MaxMessageBytes(50), qos.Priority(qos.NewestType)},
+			description:   "non-negative CriticalExpires option value",
+			options:       []qos.Option{qos.CriticalExpires(0), qos.MaxQueueBytes(int64(100)), qos.MaxMessageBytes(50), qos.Priority(qos.NewestType)},
 			nextCallCount: 1,
 			next: wrpkit.HandlerFunc(func(wrp.Message) error {
 				nextCallCount.Add(1)
@@ -222,8 +222,8 @@ func TestHandler_HandleWrp(t *testing.T) {
 			expectedHandleWRPErr: qos.ErrQOSHasShutdown,
 		},
 		{
-			description:   "negative LowQOSExpires option value",
-			options:       []qos.Option{qos.LowQOSExpires(-1), qos.MaxQueueBytes(int64(100)), qos.MaxMessageBytes(50), qos.Priority(qos.NewestType)},
+			description:   "negative LowExpires option value",
+			options:       []qos.Option{qos.LowExpires(-1), qos.MaxQueueBytes(int64(100)), qos.MaxMessageBytes(50), qos.Priority(qos.NewestType)},
 			nextCallCount: 0,
 			next: wrpkit.HandlerFunc(func(wrp.Message) error {
 				nextCallCount.Add(1)
@@ -233,8 +233,8 @@ func TestHandler_HandleWrp(t *testing.T) {
 			expectedNewErr: qos.ErrMisconfiguredQOS,
 		},
 		{
-			description:   "negative MediumQOSExpires option value",
-			options:       []qos.Option{qos.MediumQOSExpires(-1), qos.MaxQueueBytes(int64(100)), qos.MaxMessageBytes(50), qos.Priority(qos.NewestType)},
+			description:   "negative MediumExpires option value",
+			options:       []qos.Option{qos.MediumExpires(-1), qos.MaxQueueBytes(int64(100)), qos.MaxMessageBytes(50), qos.Priority(qos.NewestType)},
 			nextCallCount: 0,
 			next: wrpkit.HandlerFunc(func(wrp.Message) error {
 				nextCallCount.Add(1)
@@ -244,8 +244,8 @@ func TestHandler_HandleWrp(t *testing.T) {
 			expectedNewErr: qos.ErrMisconfiguredQOS,
 		},
 		{
-			description:   "negative HighQOSExpires option value",
-			options:       []qos.Option{qos.HighQOSExpires(-1), qos.MaxQueueBytes(int64(100)), qos.MaxMessageBytes(50), qos.Priority(qos.NewestType)},
+			description:   "negative HighExpires option value",
+			options:       []qos.Option{qos.HighExpires(-1), qos.MaxQueueBytes(int64(100)), qos.MaxMessageBytes(50), qos.Priority(qos.NewestType)},
 			nextCallCount: 0,
 			next: wrpkit.HandlerFunc(func(wrp.Message) error {
 				nextCallCount.Add(1)
@@ -255,8 +255,8 @@ func TestHandler_HandleWrp(t *testing.T) {
 			expectedNewErr: qos.ErrMisconfiguredQOS,
 		},
 		{
-			description:   "negative CriticalQOSExpires option value",
-			options:       []qos.Option{qos.CriticalQOSExpires(-1), qos.MaxQueueBytes(int64(100)), qos.MaxMessageBytes(50), qos.Priority(qos.NewestType)},
+			description:   "negative CriticalExpires option value",
+			options:       []qos.Option{qos.CriticalExpires(-1), qos.MaxQueueBytes(int64(100)), qos.MaxMessageBytes(50), qos.Priority(qos.NewestType)},
 			nextCallCount: 0,
 			next: wrpkit.HandlerFunc(func(wrp.Message) error {
 				nextCallCount.Add(1)

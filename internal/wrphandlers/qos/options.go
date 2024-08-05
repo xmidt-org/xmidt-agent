@@ -15,10 +15,10 @@ const (
 	DefaultMaxMessageBytes = 256 * 1024      // 256 KB
 
 	// QOS expires defaults.
-	DefaultLowQOSExpires      = time.Minute * 15
-	DefaultMediumQOSExpires   = time.Minute * 20
-	DefaultHighQOSExpires     = time.Minute * 25
-	DefaultCriticalQOSExpires = time.Minute * 30
+	DefaultLowExpires      = time.Minute * 15
+	DefaultMediumExpires   = time.Minute * 20
+	DefaultHighExpires     = time.Minute * 25
+	DefaultCriticalExpires = time.Minute * 30
 )
 
 // MaxQueueBytes is the allowable max size of the qos' priority queue, based on the sum of all queued wrp message's payload.
@@ -84,54 +84,54 @@ func priority(p PriorityType) (enqueueTieBreaker tieBreaker, err error) {
 	return enqueueTieBreaker, nil
 }
 
-// LowQOSExpires determines when low qos messages are trimmed.
-func LowQOSExpires(t time.Duration) Option {
+// LowExpires determines when low qos messages are trimmed.
+func LowExpires(t time.Duration) Option {
 	return optionFunc(
 		func(h *Handler) (err error) {
 			if t < 0 {
-				return fmt.Errorf("%w: negative LowQOSExpires", ErrMisconfiguredQOS)
+				return fmt.Errorf("%w: negative LowExpires", ErrMisconfiguredQOS)
 			}
 
-			h.lowQOSExpires = t
+			h.lowExpires = t
 			return err
 		})
 }
 
-// MediumQOSExpires determines when medium qos messages are trimmed.
-func MediumQOSExpires(t time.Duration) Option {
+// MediumExpires determines when medium qos messages are trimmed.
+func MediumExpires(t time.Duration) Option {
 	return optionFunc(
 		func(h *Handler) (err error) {
 			if t < 0 {
-				return fmt.Errorf("%w: negative MediumQOSExpires", ErrMisconfiguredQOS)
+				return fmt.Errorf("%w: negative MediumExpires", ErrMisconfiguredQOS)
 			}
 
-			h.mediumQOSExpires = t
+			h.mediumExpires = t
 			return err
 		})
 }
 
-// HighQOSExpires determines when high qos messages are trimmed.
-func HighQOSExpires(t time.Duration) Option {
+// HighExpires determines when high qos messages are trimmed.
+func HighExpires(t time.Duration) Option {
 	return optionFunc(
 		func(h *Handler) (err error) {
 			if t < 0 {
-				return fmt.Errorf("%w: negative HighQOSExpires", ErrMisconfiguredQOS)
+				return fmt.Errorf("%w: negative HighExpires", ErrMisconfiguredQOS)
 			}
 
-			h.highQOSExpires = t
+			h.highExpires = t
 			return err
 		})
 }
 
-// CriticalQOSExpires determines when critical qos messages are trimmed.
-func CriticalQOSExpires(t time.Duration) Option {
+// CriticalExpires determines when critical qos messages are trimmed.
+func CriticalExpires(t time.Duration) Option {
 	return optionFunc(
 		func(h *Handler) (err error) {
 			if t < 0 {
-				return fmt.Errorf("%w: negative CriticalQOSExpires", ErrMisconfiguredQOS)
+				return fmt.Errorf("%w: negative CriticalExpires", ErrMisconfiguredQOS)
 			}
 
-			h.criticalQOSExpires = t
+			h.criticalExpires = t
 			return err
 		})
 }

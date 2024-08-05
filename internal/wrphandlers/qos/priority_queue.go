@@ -34,14 +34,14 @@ type priorityQueue struct {
 	sizeBytes int64
 
 	// QOS expiries.
-	// lowQOSExpires determines when low qos messages are trimmed.
-	lowQOSExpires time.Duration
-	// mediumQOSExpires determines when medium qos messages are trimmed.
-	mediumQOSExpires time.Duration
-	// highQOSExpires determines when high qos messages are trimmed.
-	highQOSExpires time.Duration
-	// criticalQOSExpires determines when critical qos messages are trimmed.
-	criticalQOSExpires time.Duration
+	// lowExpires determines when low qos messages are trimmed.
+	lowExpires time.Duration
+	// mediumExpires determines when medium qos messages are trimmed.
+	mediumExpires time.Duration
+	// highExpires determines when high qos messages are trimmed.
+	highExpires time.Duration
+	// criticalExpires determines when critical qos messages are trimmed.
+	criticalExpires time.Duration
 }
 
 type tieBreaker func(i, j item) bool
@@ -188,13 +188,13 @@ func (pq *priorityQueue) Push(x any) {
 	var qosExpires time.Duration
 	switch msg.QualityOfService.Level() {
 	case wrp.QOSLow:
-		qosExpires = pq.lowQOSExpires
+		qosExpires = pq.lowExpires
 	case wrp.QOSMedium:
-		qosExpires = pq.mediumQOSExpires
+		qosExpires = pq.mediumExpires
 	case wrp.QOSHigh:
-		qosExpires = pq.highQOSExpires
+		qosExpires = pq.highExpires
 	case wrp.QOSCritical:
-		qosExpires = pq.criticalQOSExpires
+		qosExpires = pq.criticalExpires
 	}
 
 	pq.queue = append(pq.queue, item{
