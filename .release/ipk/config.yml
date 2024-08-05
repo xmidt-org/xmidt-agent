@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2024 Comcast Cable Communications Management, LLC
+# SPDX-License-Identifier: Apache-2.0
+#
+# Put any configuration values that should always be present here.
+#
+# Note:
+#  These values should be generic and apply to all consumers (openwrt, rdk, etc)
+---

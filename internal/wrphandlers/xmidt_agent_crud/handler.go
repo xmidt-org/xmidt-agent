@@ -5,6 +5,7 @@ package xmidt_agent_crud
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -36,31 +37,35 @@ func New(egress wrpkit.Handler, source string, logLevel loglevel.LogLevel) (*Han
 }
 
 func (h *Handler) HandleWrp(msg wrp.Message) error {
+	response := msg
+	response.Destination = msg.Source
+	response.Source = h.source
+	response.ContentType = "application/json"
 	payload := make(map[string]string)
 
 	err := json.Unmarshal(msg.Payload, &payload)
-	if err != nil { // do we still want to return a response here?
-		return err // this would be sent to the eventor error handler
+	if err != nil {
+		statusCode := int64(http.StatusInternalServerError)
+		response.Status = &statusCode
+		response.Payload = []byte(fmt.Sprintf(`{statusCode: %d, message: "%s"}`, statusCode, err.Error()))
+		return h.egress.HandleWrp(response)
 	}
 
-	var payloadResponse []byte
 	statusCode := int64(http.StatusBadRequest)
+	payloadResponse := []byte(fmt.Sprintf(`{statusCode: %d, message: "%s"}`, statusCode, ""))
 
 	switch msg.Type {
 	case wrp.UpdateMessageType:
 		statusCode, err = h.update(msg.Path, payload)
+		payloadResponse = []byte(fmt.Sprintf(`{statusCode: %d, message: "%s"}`, statusCode, ""))
 		if err != nil {
-			payloadResponse = []byte(err.Error())
+			payloadResponse = []byte(fmt.Sprintf(`{statusCode: %d, message: "%s"}`, statusCode, err.Error()))
 		}
 
 	default:
 
 	}
 
-	response := msg
-	response.Destination = msg.Source
-	response.Source = h.source
-	response.ContentType = "text/plain"
 	response.Payload = payloadResponse
 
 	response.Status = &statusCode
