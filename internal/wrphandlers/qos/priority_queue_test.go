@@ -167,6 +167,12 @@ func testEnqueueDequeue(t *testing.T) {
 			expectedQueueSize: 0,
 		},
 		{
+			description:       "allow any message size",
+			messages:          []wrp.Message{largeCriticalQOSMsg},
+			maxQueueBytes:     len(largeCriticalQOSMsg.Payload),
+			expectedQueueSize: 1,
+		},
+		{
 			description:       "message too large with a nonempty queue",
 			messages:          []wrp.Message{largeCriticalQOSMsg, largeCriticalQOSMsg},
 			maxQueueBytes:     len(largeCriticalQOSMsg.Payload),
