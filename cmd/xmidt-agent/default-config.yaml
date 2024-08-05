@@ -127,8 +127,7 @@ mock_tr_181:
 xmidt_agent_crud:
   service_name: xmidt_agent
 qos:
-  max_queue_bytes:  1048576  # 1 * 1024 * 1024 // 1MB max/queue,
-  max_message_bytes: 262144 # 256 * 1024      // 256 KB
+  max_queue_bytes:  104857600  # 100 * 1024 * 1024 // 100MB max/queue,
   priority: newest
 metadata:
   fields:
