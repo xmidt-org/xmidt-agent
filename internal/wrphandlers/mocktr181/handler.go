@@ -119,7 +119,7 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 
 	err := json.Unmarshal(msg.Payload, &payload)
 	if err != nil {
-		return err
+		return errors.Join(err, wrpkit.ErrNotHandled)
 	}
 
 	var payloadResponse []byte
@@ -131,13 +131,13 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 	case "GET":
 		statusCode, payloadResponse, err = h.get(payload)
 		if err != nil {
-			return err
+			return errors.Join(err, wrpkit.ErrNotHandled)
 		}
 
 	case "SET":
 		statusCode, payloadResponse, err = h.set(payload)
 		if err != nil {
-			return err
+			return errors.Join(err, wrpkit.ErrNotHandled)
 		}
 
 	default:
@@ -155,8 +155,11 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 	response.Status = &statusCode
 
 	err = h.egress.HandleWrp(response)
+	if err != nil {
+		return errors.Join(err, wrpkit.ErrNotHandled)
+	}
 
-	return err
+	return nil
 }
 
 func (h Handler) get(tr181 *Tr181Payload) (int64, []byte, error) {

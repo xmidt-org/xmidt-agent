@@ -108,6 +108,14 @@ func TestHandler_HandleWrp(t *testing.T) {
 
 				return nil
 			},
+		}, {
+			description: "no payload",
+			expectedErr: wrpkit.ErrNotHandled,
+			msg: wrp.Message{
+				Type:        wrp.SimpleEventMessageType,
+				Source:      "dns:tr1d1um.example.com/service/ignored",
+				Destination: "event:event_1/ignored",
+			},
 		},
 	}
 	for _, tc := range tests {
