@@ -115,35 +115,9 @@ func (h Handler) Enabled() bool {
 
 // HandleWrp is called to process a tr181 command
 func (h Handler) HandleWrp(msg wrp.Message) error {
-	payload := new(Tr181Payload)
-
-	err := json.Unmarshal(msg.Payload, &payload)
+	statusCode, payloadResponse, err := h.proccessCommand(msg.Payload)
 	if err != nil {
 		return errors.Join(err, wrpkit.ErrNotHandled)
-	}
-
-	var payloadResponse []byte
-	var statusCode int64
-
-	command := payload.Command
-
-	switch command {
-	case "GET":
-		statusCode, payloadResponse, err = h.get(payload)
-		if err != nil {
-			return errors.Join(err, wrpkit.ErrNotHandled)
-		}
-
-	case "SET":
-		statusCode, payloadResponse, err = h.set(payload)
-		if err != nil {
-			return errors.Join(err, wrpkit.ErrNotHandled)
-		}
-
-	default:
-		// currently only get and set are implemented for existing mocktr181
-		statusCode = 520
-		payloadResponse = []byte(fmt.Sprintf(`{"message": "command '%s' is not supported", "statusCode": %d}`, command, statusCode))
 	}
 
 	response := msg
@@ -151,15 +125,40 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 	response.Source = h.source
 	response.ContentType = "application/json"
 	response.Payload = payloadResponse
-
 	response.Status = &statusCode
-
-	err = h.egress.HandleWrp(response)
-	if err != nil {
+	if err = h.egress.HandleWrp(response); err != nil {
 		return errors.Join(err, wrpkit.ErrNotHandled)
 	}
 
 	return nil
+}
+
+func (h Handler) proccessCommand(wrpPayload []byte) (int64, []byte, error) {
+	var (
+		err             error
+		payloadResponse []byte
+		statusCode      = int64(520)
+	)
+
+	if len(wrpPayload) == 0 {
+		return statusCode, []byte(fmt.Sprintf(`{"message": ""Invalid Input Command"", "statusCode": %d}`, statusCode)), nil
+	}
+
+	payload := new(Tr181Payload)
+	err = json.Unmarshal(wrpPayload, &payload)
+	if err != nil {
+		return statusCode, payloadResponse, err
+	}
+
+	switch payload.Command {
+	case "GET":
+		return h.get(payload)
+	case "SET":
+		return h.set(payload)
+	default:
+		// currently only get and set are implemented for existing mocktr181
+		return statusCode, []byte(fmt.Sprintf(`{"message": "command '%s' is not supported", "statusCode": %d}`, payload.Command, statusCode)), nil
+	}
 }
 
 func (h Handler) get(tr181 *Tr181Payload) (int64, []byte, error) {
