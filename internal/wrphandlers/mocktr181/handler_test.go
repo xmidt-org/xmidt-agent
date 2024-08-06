@@ -109,12 +109,18 @@ func TestHandler_HandleWrp(t *testing.T) {
 				return nil
 			},
 		}, {
-			description: "no payload",
-			expectedErr: wrpkit.ErrNotHandled,
+			description:     "no payload",
+			egressCallCount: 1,
 			msg: wrp.Message{
 				Type:        wrp.SimpleEventMessageType,
 				Source:      "dns:tr1d1um.example.com/service/ignored",
 				Destination: "event:event_1/ignored",
+			},
+			validate: func(a *assert.Assertions, msg wrp.Message, h *Handler) error {
+				a.Equal(int64(520), *msg.Status)
+				a.True(h.Enabled())
+
+				return nil
 			},
 		},
 	}
