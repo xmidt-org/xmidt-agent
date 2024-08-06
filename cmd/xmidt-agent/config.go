@@ -149,7 +149,7 @@ type OperationalState struct {
 	// BootTime is the time the device was last booted.
 	BootTime time.Time
 
-	// webpa connection interface - need more explanation how this is determined
+	// network interface to use for connection from agent to webpa cloud
 	WebpaInterfaceUsed string
 }
 
