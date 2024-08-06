@@ -150,7 +150,7 @@ type OperationalState struct {
 	BootTime time.Time
 
 	// webpa connection interface - need more explanation how this is determined
-	WebpaConnectionInterface string
+	WebpaInterfaceUsed string
 }
 
 // XmidtCredentials contains the information needed to retrieve the credentials

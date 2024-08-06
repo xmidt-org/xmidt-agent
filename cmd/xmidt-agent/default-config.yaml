@@ -117,7 +117,7 @@ logger:
 operational_state:
   last_reboot_reason: sleepy
   boot_time: "1970-01-01T00:00:00Z"
-  webpa_connection_interface: "erouter0"
+  webpa_interface_used: "erouter0"
 storage:
   # temporary: "~/local-rdk-testing/temporary"
   # durable: "~/local-rdk-testing/durable"

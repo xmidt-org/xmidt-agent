@@ -32,7 +32,7 @@ func provideMetadataProvider(in metadataIn) (*metadata.MetadataProvider, error) 
 		metadata.XmidtProtocolOpt(xmidtProtocol),
 		metadata.BootTimeOpt(in.Ops.BootTime.String()),
 		metadata.BootRetryWaitOpt(time.Second), // should this be configured?
-		metadata.InterfaceUsedOpt(in.Ops.WebpaConnectionInterface),
+		metadata.InterfaceUsedOpt(in.Ops.WebpaInterfaceUsed),
 	}
 	return metadata.New(opts...)
 }

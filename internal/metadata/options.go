@@ -57,9 +57,6 @@ func SerialNumberOpt(serialNumber string) Option {
 func HardwareModelOpt(hardwareModel string) Option {
 	return optionFunc(
 		func(c *MetadataProvider) error {
-			if hardwareModel == "" {
-				return fmt.Errorf("%w: invalid hardware model field", ErrInvalidInput)
-			}
 			c.hardware = hardwareModel
 			return nil
 		})
@@ -68,9 +65,6 @@ func HardwareModelOpt(hardwareModel string) Option {
 func FirmwareOpt(firmware string) Option {
 	return optionFunc(
 		func(c *MetadataProvider) error {
-			if firmware == "" {
-				return fmt.Errorf("%w: invalid firmware field", ErrInvalidInput)
-			}
 			c.firmware = firmware
 			return nil
 		})
@@ -79,9 +73,6 @@ func FirmwareOpt(firmware string) Option {
 func ManufacturerOpt(manufacturer string) Option {
 	return optionFunc(
 		func(c *MetadataProvider) error {
-			if manufacturer == "" {
-				return fmt.Errorf("%w: invalid manufacturer field", ErrInvalidInput)
-			}
 			c.manufacturer = manufacturer
 			return nil
 		})
@@ -123,9 +114,6 @@ func BootRetryWaitOpt(bootTimeRetryDelay time.Duration) Option {
 func InterfaceUsedOpt(interfaceUsed string) Option {
 	return optionFunc(
 		func(c *MetadataProvider) error {
-			if interfaceUsed == "" {
-				return fmt.Errorf("%w: invalid connection interface used field", ErrInvalidInput)
-			}
 			c.interfaceUsed = interfaceUsed
 			return nil
 		})
