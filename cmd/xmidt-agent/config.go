@@ -148,6 +148,9 @@ type OperationalState struct {
 
 	// BootTime is the time the device was last booted.
 	BootTime time.Time
+
+	// webpa connection interface - need more explanation how this is determined
+	WebpaConnectionInterface string
 }
 
 // XmidtCredentials contains the information needed to retrieve the credentials

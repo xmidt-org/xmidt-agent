@@ -117,6 +117,7 @@ logger:
 operational_state:
   last_reboot_reason: sleepy
   boot_time: "1970-01-01T00:00:00Z"
+  webpa_connection_interface: "erouter0"
 storage:
   # temporary: "~/local-rdk-testing/temporary"
   # durable: "~/local-rdk-testing/durable"
@@ -141,7 +142,7 @@ metadata:
     - boot-time-retry-wait
     - webpa-interface-used
     - interfaces-available
-# lowest priority wins for network interfaces
+# lowest priority wins for network interfaces - note that this is not really used and may need to be removed in the future
 network_service:
   allowed_interfaces:
     eth0:

@@ -5,6 +5,7 @@ package metadata
 
 const DefaultInterface = "erouter0"
 
+// this class is only used if we want websocket to populate this value dynamically, currently not used
 type InterfaceUsedProvider struct {
 	interfaceUsed string
 }

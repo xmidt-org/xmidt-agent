@@ -39,7 +39,6 @@ type ConveySuite struct {
 func (suite *ConveySuite) SetupTest() {
 	mockNetworkService := newMockNetworkService()
 	suite.mockNetworkService = mockNetworkService
-	interfaceUsed, _ := NewInterfaceUsedProvider()
 
 	opts := []Option{
 		NetworkServiceOpt(mockNetworkService),
@@ -52,7 +51,7 @@ func (suite *ConveySuite) SetupTest() {
 		XmidtProtocolOpt("some-protocol"),
 		BootTimeOpt("1111111111"),
 		BootRetryWaitOpt(time.Second),
-		InterfaceUsedOpt(interfaceUsed),
+		InterfaceUsedOpt("erouter0"),
 	}
 
 	conveyHeaderProvider, err := New(opts...)
@@ -98,6 +97,72 @@ func (suite *ConveySuite) TestGetConveyHeaderSubsetFields() {
 	suite.Nil(header["boot-time-retry-wait"])
 	suite.Nil(header["interfaces-available"])
 	suite.Nil(header["webpa-interface-used"])
+}
+
+func (suite *ConveySuite) TestRequiredOptionValidation() {
+	fields := []string{"fw-name", "hw-model", "hw-manufacturer", "webpa-interface-used"}
+
+	opts := []Option{
+		NetworkServiceOpt(suite.mockNetworkService),
+		FieldsOpt([]string{"fw-name", "hw-model", "hw-manufacturer", "webpa-interface-used"}),
+		HardwareModelOpt("some-hardware-model"),
+		ManufacturerOpt("some-manufacturer"),
+		FirmwareOpt("1.1"),
+		InterfaceUsedOpt("erouter0"),
+	}
+
+	_, err := New(opts...)
+	suite.NoError(err)
+
+	opts = []Option{
+		NetworkServiceOpt(suite.mockNetworkService),
+		FieldsOpt(fields),
+		HardwareModelOpt(""),
+		ManufacturerOpt("some-manufacturer"),
+		FirmwareOpt("1.1"),
+		SerialNumberOpt("some-serial-no"),
+		InterfaceUsedOpt("erouter0"),
+	}
+
+	_, err = New(opts...)
+	suite.Error(err)
+
+	opts = []Option{
+		NetworkServiceOpt(suite.mockNetworkService),
+		FieldsOpt(fields),
+		HardwareModelOpt("some-hardware-model"),
+		ManufacturerOpt(""),
+		FirmwareOpt("1.1"),
+		InterfaceUsedOpt("erouter0"),
+	}
+
+	_, err = New(opts...)
+	suite.Error(err)
+
+	opts = []Option{
+		NetworkServiceOpt(suite.mockNetworkService),
+		FieldsOpt(fields),
+		HardwareModelOpt("some-hardware-model"),
+		ManufacturerOpt("some-manufacturer"),
+		FirmwareOpt(""),
+		InterfaceUsedOpt("erouter0"),
+	}
+
+	_, err = New(opts...)
+	suite.Error(err)
+
+	opts = []Option{
+		NetworkServiceOpt(suite.mockNetworkService),
+		FieldsOpt(fields),
+		HardwareModelOpt("some-hardware-model"),
+		ManufacturerOpt("some-manufacturer"),
+		FirmwareOpt("1.1"),
+		InterfaceUsedOpt(""),
+	}
+
+	_, err = New(opts...)
+	suite.Error(err)
+
 }
 
 func (suite *ConveySuite) TestDecorate() {
