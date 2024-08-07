@@ -53,7 +53,6 @@ type MetadataProvider struct {
 	protocol           string
 	bootTime           string
 	bootTimeRetryDelay string
-	// if we want websocket to populate this value, we would use InterfaceUsedProvider instead of string
 	interfaceUsed string
 }
 
