@@ -39,7 +39,6 @@ type ConveySuite struct {
 func (suite *ConveySuite) SetupTest() {
 	mockNetworkService := newMockNetworkService()
 	suite.mockNetworkService = mockNetworkService
-	interfaceUsed, _ := NewInterfaceUsedProvider()
 
 	opts := []Option{
 		NetworkServiceOpt(mockNetworkService),
@@ -52,7 +51,7 @@ func (suite *ConveySuite) SetupTest() {
 		XmidtProtocolOpt("some-protocol"),
 		BootTimeOpt("1111111111"),
 		BootRetryWaitOpt(time.Second),
-		InterfaceUsedOpt(interfaceUsed),
+		InterfaceUsedOpt("erouter0"),
 	}
 
 	conveyHeaderProvider, err := New(opts...)
