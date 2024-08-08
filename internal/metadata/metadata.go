@@ -53,7 +53,7 @@ type MetadataProvider struct {
 	protocol           string
 	bootTime           string
 	bootTimeRetryDelay string
-	interfaceUsed string
+	interfaceUsed      string
 }
 
 func New(opts ...Option) (*MetadataProvider, error) {
