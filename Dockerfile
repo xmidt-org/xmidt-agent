@@ -5,11 +5,7 @@ FROM docker.io/library/golang:1.19-alpine as builder
 
 WORKDIR /src
 
-RUN apk add --no-cache --no-progress \
-    ca-certificates \
-    curl \
-    traceroute \
-    netstat
+RUN apk add --no-cache --no-progress ca-certificates
 
 COPY . .
 
