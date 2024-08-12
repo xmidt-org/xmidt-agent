@@ -18,7 +18,6 @@ type metadataIn struct {
 	ID             Identity
 	Ops            OperationalState
 	Metadata       Metadata
-	InterfaceUsed  *metadata.InterfaceUsedProvider
 }
 
 func provideMetadataProvider(in metadataIn) (*metadata.MetadataProvider, error) {
@@ -33,7 +32,7 @@ func provideMetadataProvider(in metadataIn) (*metadata.MetadataProvider, error) 
 		metadata.XmidtProtocolOpt(xmidtProtocol),
 		metadata.BootTimeOpt(in.Ops.BootTime.String()),
 		metadata.BootRetryWaitOpt(time.Second), // should this be configured?
-		metadata.InterfaceUsedOpt(in.InterfaceUsed),
+		metadata.InterfaceUsedOpt(in.Ops.WebpaInterfaceUsed),
 	}
 	return metadata.New(opts...)
 }

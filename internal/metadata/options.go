@@ -110,12 +110,10 @@ func BootRetryWaitOpt(bootTimeRetryDelay time.Duration) Option {
 		})
 }
 
-func InterfaceUsedOpt(interfaceUsed *InterfaceUsedProvider) Option {
+// if we want websocket to populate this value, pass in InterfaceUsedProvider instead
+func InterfaceUsedOpt(interfaceUsed string) Option {
 	return optionFunc(
 		func(c *MetadataProvider) error {
-			if interfaceUsed == nil {
-				return fmt.Errorf("%w: nil interfaceUsed provider", ErrInvalidInput)
-			}
 			c.interfaceUsed = interfaceUsed
 			return nil
 		})

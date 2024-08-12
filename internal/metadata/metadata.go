@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"encoding/base64"
+
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/net"
 )
@@ -52,7 +53,7 @@ type MetadataProvider struct {
 	protocol           string
 	bootTime           string
 	bootTimeRetryDelay string
-	interfaceUsed      *InterfaceUsedProvider
+	interfaceUsed      string
 }
 
 func New(opts ...Option) (*MetadataProvider, error) {
@@ -91,7 +92,7 @@ func (c *MetadataProvider) GetMetadata() map[string]interface{} {
 		case BootTimeRetryDelay:
 			header[field] = c.bootTimeRetryDelay
 		case InterfaceUsed:
-			header[field] = c.interfaceUsed.GetInterfaceUsed()
+			header[field] = c.interfaceUsed
 		case InterfacesAvailable: // what if we can't get interfaces available?
 			names, err := c.networkService.GetInterfaceNames()
 			if err != nil {
