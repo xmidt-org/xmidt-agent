@@ -23,6 +23,8 @@ linters:
     - ineffassign
 
 issues:
+  exclude-files:
+    - "internal/jwtxt/keypairs_for_test.go"
   exclude-rules:
     - path: _test.go
       linters:
@@ -31,7 +33,7 @@ issues:
     - path: internal/credentials/cmd/example/main.go
       linters:
         - gosec
-    - path: internal/nhooyr.io
+    - path: internal/nhooyr.io/*
       linters:
         - bodyclose
         - errorlint
@@ -39,7 +41,5 @@ issues:
         - goconst
         - misspell
         - prealloc
-
-run:
-  skip-files:
-    - "internal/jwtxt/keypairs_for_test.go"
+        - govet
+        - staticcheck
