@@ -117,9 +117,6 @@ nfpms:
     formats:
       - ipk
 
-    dependencies:
-      - systemd
-
     contents:
       # base configuration file
       - src: .release/ipk/config.yml
