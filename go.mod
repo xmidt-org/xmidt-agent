@@ -1,6 +1,8 @@
 module github.com/xmidt-org/xmidt-agent
 
-go 1.21.8
+go 1.22
+
+toolchain go1.22.5
 
 require (
 	github.com/alecthomas/kong v1.2.0
@@ -13,7 +15,7 @@ require (
 	github.com/goschtalt/yaml-encoder v0.0.3
 	github.com/stretchr/testify v1.9.0
 	github.com/ugorji/go/codec v1.2.12
-	github.com/xmidt-org/arrange v0.5.0
+	github.com/xmidt-org/arrange v0.5.1
 	github.com/xmidt-org/eventor v1.0.15
 	github.com/xmidt-org/retry v0.0.3
 	github.com/xmidt-org/sallust v0.2.2
@@ -35,7 +37,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
-	github.com/xmidt-org/httpaux v0.4.0 // indirect
+	github.com/xmidt-org/httpaux v0.4.1 // indirect
 	go.uber.org/dig v1.18.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/mod v0.17.0 // indirect
