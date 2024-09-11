@@ -1,6 +1,7 @@
 module github.com/xmidt-org/xmidt-agent
 
-go 1.21.8
+go 1.22
+
 toolchain go1.22.5
 
 require (
