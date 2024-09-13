@@ -6,6 +6,7 @@ package qos
 import (
 	"container/heap"
 	"errors"
+	"fmt"
 	"slices"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 
 var ErrMaxMessageBytes = errors.New("wrp message payload exceeds maxMessageBytes")
 
-var (
+const (
 	// https://xmidt.io/docs/wrp/basics/#request-delivery-response-rdr-codes
 	messageIsTooLarge                int64 = 4
 	higherPriorityMessageTookTheSpot int64 = 102
@@ -62,13 +63,15 @@ type item struct {
 }
 
 func (itm *item) dispose() (payloadSize int64) {
+	var rdr = higherPriorityMessageTookTheSpot
+
 	payloadSize = int64(len(itm.msg.Payload))
 	// Mark itm to be discarded.
 	itm.discard = true
 	// Preemptively discard itm's payload to reduce
 	// resource usage, since itm will be discarded,
 	itm.msg.Payload = nil
-	itm.msg.RequestDeliveryResponse = &higherPriorityMessageTookTheSpot
+	itm.msg.RequestDeliveryResponse = &rdr
 
 	return payloadSize
 }
@@ -89,16 +92,23 @@ func (pq *priorityQueue) Dequeue() (msg wrp.Message, ok bool) {
 }
 
 // Enqueue queues the given message.
-func (pq *priorityQueue) Enqueue(msg wrp.Message) {
+func (pq *priorityQueue) Enqueue(msg wrp.Message) error {
+	var err error
+
 	// Check whether msg violates maxMessageBytes.
 	// The zero value of `pq.maxMessageBytes` will disable individual message size validation.
 	if pq.maxMessageBytes != 0 && len(msg.Payload) > pq.maxMessageBytes {
+		var rdr = messageIsTooLarge
+
 		msg.Payload = nil
-		msg.RequestDeliveryResponse = &messageIsTooLarge
+		msg.RequestDeliveryResponse = &rdr
+		err = fmt.Errorf("%w: %v", ErrMaxMessageBytes, pq.maxMessageBytes)
 	}
 
 	heap.Push(pq, msg)
 	pq.trim()
+
+	return err
 }
 
 // trim removes messages with the lowest QualityOfService until the queue no longer violates `maxQueueSize“.

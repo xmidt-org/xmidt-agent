@@ -87,7 +87,12 @@ func testEnqueueDequeueAgePriority(t *testing.T) {
 			require.NoError(err)
 
 			for _, msg := range messages {
-				pq.Enqueue(msg)
+				err = pq.Enqueue(msg)
+				if len(msg.Payload) > pq.maxMessageBytes && pq.maxMessageBytes != 0 {
+					assert.Error(err)
+				} else {
+					assert.NoError(err)
+				}
 			}
 
 			actualMsg, ok := pq.Dequeue()
@@ -100,6 +105,7 @@ func testEnqueueDequeueAgePriority(t *testing.T) {
 }
 
 func testEnqueueDequeue(t *testing.T) {
+	var rdr = messageIsTooLarge
 	emptyLowQOSMsg := wrp.Message{
 		Destination:      "mac:00deadbeef00/config",
 		QualityOfService: 10,
@@ -132,7 +138,7 @@ func testEnqueueDequeue(t *testing.T) {
 	emptyXLargeCriticalQOSMsg := wrp.Message{
 		Destination:             "mac:00deadbeef04/config",
 		QualityOfService:        wrp.QOSCriticalValue,
-		RequestDeliveryResponse: &messageIsTooLarge,
+		RequestDeliveryResponse: &rdr,
 	}
 	enqueueSequenceTest := []wrp.Message{
 		mediumMediumQosMsg,
@@ -257,7 +263,12 @@ func testEnqueueDequeue(t *testing.T) {
 			require.NoError(err)
 
 			for _, msg := range tc.messages {
-				pq.Enqueue(msg)
+				err = pq.Enqueue(msg)
+				if len(msg.Payload) > pq.maxMessageBytes && pq.maxMessageBytes != 0 {
+					assert.Error(err)
+				} else {
+					assert.NoError(err)
+				}
 			}
 
 			if len(tc.expectedDequeueSequence) == 0 {
