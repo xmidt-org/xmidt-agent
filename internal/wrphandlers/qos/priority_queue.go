@@ -15,6 +15,12 @@ import (
 
 var ErrMaxMessageBytes = errors.New("wrp message payload exceeds maxMessageBytes")
 
+const (
+	// https://xmidt.io/docs/wrp/basics/#request-delivery-response-rdr-codes
+	messageIsTooLarge                int64 = 4
+	higherPriorityMessageTookTheSpot int64 = 102
+)
+
 // priorityQueue implements heap.Interface and holds wrp Message, using wrp.QOSValue as its priority.
 // https://xmidt.io/docs/wrp/basics/#qos-description-qos
 type priorityQueue struct {
@@ -56,23 +62,29 @@ type item struct {
 	discard bool
 }
 
-// Dequeue returns the next highest priority message.
-func (pq *priorityQueue) Dequeue() (wrp.Message, bool) {
-	var (
-		msg wrp.Message
-		ok  bool
-	)
-	for pq.Len() != 0 {
-		itm := heap.Pop(pq).(item)
-		// itm.discard will be true if `itm` has been marked to be discarded,
-		// i.e. trimmed by `pq.trim()'.
-		if itm.discard {
-			continue
-		}
+func (itm *item) dispose() (payloadSize int64) {
+	var rdr = higherPriorityMessageTookTheSpot
 
+	payloadSize = int64(len(itm.msg.Payload))
+	// Mark itm to be discarded.
+	itm.discard = true
+	// Preemptively discard itm's payload to reduce
+	// resource usage, since itm will be discarded,
+	itm.msg.Payload = nil
+	itm.msg.RequestDeliveryResponse = &rdr
+
+	return payloadSize
+}
+
+// Dequeue returns the next highest priority message.
+func (pq *priorityQueue) Dequeue() (msg wrp.Message, ok bool) {
+	if pq.Len() == 0 {
+		return msg, false
+	}
+
+	itm, ok := heap.Pop(pq).(item)
+	if ok {
 		msg = *itm.msg
-		ok = true
-		break
 	}
 
 	// ok will be false if no message was found, otherwise ok will be true.
@@ -81,15 +93,22 @@ func (pq *priorityQueue) Dequeue() (wrp.Message, bool) {
 
 // Enqueue queues the given message.
 func (pq *priorityQueue) Enqueue(msg wrp.Message) error {
+	var err error
+
 	// Check whether msg violates maxMessageBytes.
 	// The zero value of `pq.maxMessageBytes` will disable individual message size validation.
 	if pq.maxMessageBytes != 0 && len(msg.Payload) > pq.maxMessageBytes {
-		return fmt.Errorf("%w: %v", ErrMaxMessageBytes, pq.maxMessageBytes)
+		var rdr = messageIsTooLarge
+
+		msg.Payload = nil
+		msg.RequestDeliveryResponse = &rdr
+		err = fmt.Errorf("%w: %v", ErrMaxMessageBytes, pq.maxMessageBytes)
 	}
 
 	heap.Push(pq, msg)
 	pq.trim()
-	return nil
+
+	return err
 }
 
 // trim removes messages with the lowest QualityOfService until the queue no longer violates `maxQueueSize“.
@@ -111,12 +130,7 @@ func (pq *priorityQueue) trim() {
 		}
 		if now.After(itm.expires) {
 			// Mark itm to be discarded.
-			// `pq.Dequeue()` will fully discard itm.
-			itm.discard = true
-			pq.sizeBytes -= int64(len(itm.msg.Payload))
-			// Preemptively discard itm's payload to reduce
-			// resource usage, since itm will be discarded,
-			itm.msg.Payload = nil
+			pq.sizeBytes -= itm.dispose()
 			continue
 		}
 
@@ -153,12 +167,7 @@ func (pq *priorityQueue) trim() {
 		}
 
 		// Mark itm to be discarded.
-		// `pq.Dequeue()` will fully discard itm.
-		itm.discard = true
-		pq.sizeBytes -= int64(len(itm.msg.Payload))
-		// Preemptively discard itm's payload to reduce
-		// resource usage, since itm will be discarded,
-		itm.msg.Payload = nil
+		pq.sizeBytes -= itm.dispose()
 	}
 
 }
