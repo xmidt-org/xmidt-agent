@@ -124,8 +124,17 @@ func testEnqueueDequeue(t *testing.T) {
 		Payload:          []byte("{\"command\":\"GET\",\"names\":[\"NoSuchParameter\"]}"),
 		QualityOfService: wrp.QOSCriticalValue,
 	}
+	xLargeCriticalQOSMsg := wrp.Message{
+		Destination:      "mac:00deadbeef04/config",
+		Payload:          []byte("{\"command\":\"GET\",\"names\":[\"NoSuchParameterXL\"]}"),
+		QualityOfService: wrp.QOSCriticalValue,
+	}
+	emptyXLargeCriticalQOSMsg := wrp.Message{
+		Destination:             "mac:00deadbeef04/config",
+		QualityOfService:        wrp.QOSCriticalValue,
+		RequestDeliveryResponse: &messageIsTooLarge,
+	}
 	enqueueSequenceTest := []wrp.Message{
-		largeCriticalQOSMsg,
 		mediumMediumQosMsg,
 		smallLowQOSMsg,
 		largeCriticalQOSMsg,
@@ -136,7 +145,6 @@ func testEnqueueDequeue(t *testing.T) {
 		mediumHighQosMsg,
 	}
 	dequeueSequenceTest := []wrp.Message{
-		largeCriticalQOSMsg,
 		largeCriticalQOSMsg,
 		largeCriticalQOSMsg,
 		mediumHighQosMsg,
@@ -152,8 +160,9 @@ func testEnqueueDequeue(t *testing.T) {
 		queueSizeSequenceTest += len(msg.Payload)
 	}
 
-	// expect 1 message to be drop
-	enqueueSequenceTest = append(enqueueSequenceTest, smallLowQOSMsg)
+	// test message payload drop
+	enqueueSequenceTest = append(enqueueSequenceTest, xLargeCriticalQOSMsg)
+	dequeueSequenceTest = append([]wrp.Message{emptyXLargeCriticalQOSMsg}, dequeueSequenceTest...)
 
 	tests := []struct {
 		description             string
@@ -192,11 +201,12 @@ func testEnqueueDequeue(t *testing.T) {
 			expectedQueueSize: 1,
 		},
 		{
-			description:       "message too large with a nonempty queue",
-			messages:          []wrp.Message{largeCriticalQOSMsg, largeCriticalQOSMsg},
-			maxQueueBytes:     len(largeCriticalQOSMsg.Payload),
-			maxMessageBytes:   len(largeCriticalQOSMsg.Payload),
-			expectedQueueSize: 1,
+			description:             "message too large with a nonempty queue",
+			messages:                []wrp.Message{largeCriticalQOSMsg, xLargeCriticalQOSMsg},
+			maxQueueBytes:           len(largeCriticalQOSMsg.Payload),
+			maxMessageBytes:         len(largeCriticalQOSMsg.Payload),
+			expectedQueueSize:       1,
+			expectedDequeueSequence: []wrp.Message{emptyXLargeCriticalQOSMsg, largeCriticalQOSMsg},
 		},
 		{
 			description:             "drop incoming low priority messages",
