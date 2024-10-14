@@ -21,7 +21,7 @@ require (
 	github.com/xmidt-org/sallust v0.2.2
 	github.com/xmidt-org/wrp-go/v3 v3.5.2
 	go.nanomsg.org/mangos/v3 v3.4.2
-	go.uber.org/fx v1.22.2
+	go.uber.org/fx v1.23.0
 	go.uber.org/zap v1.27.0
 	gopkg.in/dealancer/validate.v2 v2.1.0
 )
