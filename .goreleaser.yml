@@ -68,7 +68,7 @@ upx:
   -
     enabled: true
     compress: best
-    
+
 archives:
   - format: tar.gz
     wrap_in_directory: true
