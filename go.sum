@@ -66,8 +66,8 @@ github.com/ugorji/go/codec v1.2.12 h1:9LC83zGrHhuUA9l16C9AHXAqEV/2wBQ4nkvumAE65E
 github.com/ugorji/go/codec v1.2.12/go.mod h1:UNopzCgEMSXjBc6AOMqYvWC1ktqTAfzJZUZgYf6w6lg=
 github.com/xmidt-org/arrange v0.5.1 h1:JHoU8C03ZQfZAG9Vpudj7RQj97pAHblwm6Co8mepU9A=
 github.com/xmidt-org/arrange v0.5.1/go.mod h1:zeJWY01z21ihPiAnGNF+bELbJANWwsahGE2bzGyyPIs=
-github.com/xmidt-org/eventor v1.0.19 h1:bZ9ThK54mzCpAdI0uXWzdpzmFAtNN8PNpywTYxGj018=
-github.com/xmidt-org/eventor v1.0.19/go.mod h1:NpaRwPEiiaB5oEdFI41o6Lf4iQHAVwCdtwKb3z7R8mY=
+github.com/xmidt-org/eventor v1.0.20 h1:MPFvjkbP/AfxHOEejW1M59Dwkgp3IBBgkHQkKyy3sLQ=
+github.com/xmidt-org/eventor v1.0.20/go.mod h1:NpaRwPEiiaB5oEdFI41o6Lf4iQHAVwCdtwKb3z7R8mY=
 github.com/xmidt-org/httpaux v0.4.1 h1:hvI4lZ7RacQRA/jMqUgwEQGcYm85125P4s7Y1imn6KY=
 github.com/xmidt-org/httpaux v0.4.1/go.mod h1:tZJ+SBoGNCxDOLopuSqrxaCkIVAQ+aPjNRf2XfMVwJA=
 github.com/xmidt-org/retry v0.0.3 h1:wvmBnEEn1OKwSZaQtr1RZ2Vey8JIvP72mGTgR+3wPiM=
