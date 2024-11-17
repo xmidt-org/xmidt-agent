@@ -11,11 +11,22 @@ import (
 	"time"
 
 	"github.com/foxcpp/go-mockdns"
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/xmidt-org/xmidt-agent/internal/jwtxt/event"
 )
+
+// The orignal JWT:
+// {
+//   "alg": "ES256",
+//   "typ": "JWT"
+// }
+// {
+//   "endpoint": "fabric.xmidt.example.org",
+//   "exp": 1690000000
+// }
+// The JWT is signed with the private key and the public key is used to verify it.
 
 func randomResolver() Option {
 	return UseResolver(&mockdns.Resolver{
@@ -159,7 +170,7 @@ func TestInstructions_EndToEnd(t *testing.T) {
 		}, {
 			description:         "missing segments",
 			times:               []int64{1680000000},
-			expectedEndpointErr: jwt.ErrTokenMalformed,
+			expectedEndpointErr: ErrInvalidJWT,
 			opts: []Option{
 				BaseURL("https://fabric.random.example.org"),
 				DeviceID("mac:112233445566"),
@@ -181,7 +192,7 @@ func TestInstructions_EndToEnd(t *testing.T) {
 		}, {
 			description:         "expired token",
 			times:               []int64{1700000000},
-			expectedEndpointErr: jwt.ErrTokenExpired,
+			expectedEndpointErr: jwt.ErrTokenExpired(),
 			opts: []Option{
 				BaseURL("https://fabric.random.example.org"),
 				DeviceID("mac:112233445566"),
@@ -197,7 +208,7 @@ func TestInstructions_EndToEnd(t *testing.T) {
 				assert.Equal(time.Time{}, fe.Expiration)
 				assert.False(fe.TemporaryErr)
 				assert.Equal("", fe.Endpoint)
-				assert.ErrorIs(fe.Err, jwt.ErrTokenExpired)
+				assert.ErrorIs(fe.Err, jwt.ErrTokenExpired())
 			},
 		}, {
 			description:         "times out with nice resolver",
@@ -244,9 +255,9 @@ func TestInstructions_EndToEnd(t *testing.T) {
 				assert.Error(fe.Err)
 			},
 		}, {
-			description:         "no algorithms",
-			times:               []int64{1680000000},
-			expectedEndpointErr: jwt.ErrTokenSignatureInvalid,
+			description:    "no algorithms",
+			times:          []int64{1680000000},
+			expectedNewErr: ErrInvalidInput,
 			opts: []Option{
 				BaseURL("https://fabric.random.example.org"),
 				DeviceID("mac:112233445566"),
@@ -254,9 +265,9 @@ func TestInstructions_EndToEnd(t *testing.T) {
 				randomResolver(),
 			},
 		}, {
-			description:         "no keys",
-			times:               []int64{1680000000},
-			expectedEndpointErr: jwt.ErrTokenUnverifiable,
+			description:    "no keys",
+			times:          []int64{1680000000},
+			expectedNewErr: ErrInvalidInput,
 			opts: []Option{
 				BaseURL("https://fabric.random.example.org"),
 				DeviceID("mac:112233445566"),
@@ -340,7 +351,7 @@ func TestInstructions_EndToEnd(t *testing.T) {
 				return
 			}
 
-			when := jwt.WithTimeFunc(then)
+			when := jwt.WithClock(jwt.ClockFunc(then))
 			obj.jwtOptions = append(obj.jwtOptions, when)
 
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)

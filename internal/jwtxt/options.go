@@ -8,7 +8,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/lestrrat-go/jwx/v2/jws"
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/jwtxt/event"
 )
@@ -16,6 +18,20 @@ import (
 // Option is a functional option for the Instructions constructor.
 type Option interface {
 	apply(*Instructions) error
+}
+
+func errorOptionFn(err error) Option {
+	return errorOption{
+		err: err,
+	}
+}
+
+type errorOption struct {
+	err error
+}
+
+func (e errorOption) apply(*Instructions) error {
+	return e.err
 }
 
 // WithFetchListener adds a listener for fetch events.
@@ -66,31 +82,45 @@ func (u useNowFunc) apply(ins *Instructions) error {
 	return nil
 }
 
+var allowedSigningAlgorithms = map[string]jwa.SignatureAlgorithm{
+	"EdDSA": jwa.EdDSA,
+	"ES256": jwa.ES256,
+	"ES384": jwa.ES384,
+	"ES512": jwa.ES512,
+	"PS256": jwa.PS256,
+	"PS384": jwa.PS384,
+	"PS512": jwa.PS512,
+	"RS256": jwa.RS256,
+	"RS384": jwa.RS384,
+	"RS512": jwa.RS512,
+}
+
 // Algorithms sets the algorithms to use for verification.  Valid algorithms
 // are "EdDSA", "ES256", "ES384", "ES512", "PS256", "PS384", "PS512",
 // "RS256", "RS384", and "RS512".
 func Algorithms(algs ...string) Option {
+	allowed := make([]jwa.SignatureAlgorithm, 0, len(algs))
+
+	for _, alg := range algs {
+		got, found := allowedSigningAlgorithms[alg]
+		if !found {
+			return errorOptionFn(fmt.Errorf("%w '%s'", ErrUnspportedAlg, alg))
+		}
+		allowed = append(allowed, got)
+	}
+
 	return &algorithms{
-		algs: algs,
+		algs: allowed,
 	}
 }
 
 type algorithms struct {
-	algs []string
+	algs []jwa.SignatureAlgorithm
 }
 
 func (a algorithms) apply(ins *Instructions) error {
 	for _, alg := range a.algs {
-		switch alg {
-		case "EdDSA",
-			"ES256", "ES384", "ES512",
-			"PS256", "PS384", "PS512",
-			"RS256", "RS384", "RS512":
-		default:
-			return fmt.Errorf("%w '%s'", ErrUnspportedAlg, alg)
-		}
-		ins.jwtOptions = append(ins.jwtOptions, jwt.WithValidMethods([]string{alg}))
-		ins.algorithms = append(ins.algorithms, alg)
+		ins.algorithms[alg] = struct{}{}
 	}
 	return nil
 }
@@ -130,25 +160,24 @@ type pemOption struct {
 }
 
 func (p pemOption) apply(ins *Instructions) error {
-	for _, pem := range p.pems {
-		var key jwt.VerificationKey
-		var err error
-
-		key, err = jwt.ParseECPublicKeyFromPEM(pem)
-
-		if err != nil {
-			key, err = jwt.ParseRSAPublicKeyFromPEM(pem)
-		}
-
-		if err != nil {
-			key, err = jwt.ParseEdPublicKeyFromPEM(pem)
-		}
-
+	for _, single := range p.pems {
+		key, err := jwk.ParseKey(single, jwk.WithPEM(true))
 		if err != nil {
 			return fmt.Errorf("%w: invalid pem", ErrInvalidInput)
 		}
 
-		ins.publicKeys.Keys = append(ins.publicKeys.Keys, key)
+		algs, err := jws.AlgorithmsForKey(key)
+		if err != nil {
+			return fmt.Errorf("%w: invalid key", ErrInvalidInput)
+		}
+
+		for _, a := range algs {
+			if _, ok := allowedSigningAlgorithms[a.String()]; !ok {
+				return fmt.Errorf("%w: algorithm not allowed %s", ErrInvalidInput, a)
+			}
+		}
+
+		ins.publicKeys = append(ins.publicKeys, key)
 	}
 
 	return nil
@@ -192,5 +221,87 @@ func (i idOption) apply(ins *Instructions) error {
 		return fmt.Errorf("%w: invalid id %s", ErrInvalidInput, i.id)
 	}
 	ins.id = id.ID()
+	return nil
+}
+
+// -- validation options -------------------------------------------------------
+
+func validateAlgs() Option {
+	return &validateAlgorithms{}
+}
+
+type validateAlgorithms struct{}
+
+func (validateAlgorithms) apply(ins *Instructions) error {
+	if len(ins.algorithms) == 0 {
+		return fmt.Errorf("%w: zero provided algorithms", ErrInvalidInput)
+	}
+
+	if len(ins.publicKeys) == 0 {
+		return fmt.Errorf("%w: zero provided public keys", ErrInvalidInput)
+	}
+
+	// Ensure each key passed in provides an allowed algorithm.
+	for _, k := range ins.publicKeys {
+		var allowed bool
+
+		algs, _ := jws.AlgorithmsForKey(k)
+		for _, alg := range algs {
+			if _, ok := ins.algorithms[alg]; ok {
+				allowed = true
+				break
+			}
+		}
+
+		if !allowed {
+			return fmt.Errorf("%w: provided pem does not support allowed algorithm", ErrInvalidInput)
+		}
+	}
+
+	return nil
+}
+
+func validateBase() Option {
+	return &validateBaseURL{}
+}
+
+type validateBaseURL struct{}
+
+func (validateBaseURL) apply(ins *Instructions) error {
+	if ins.baseURL == "" {
+		return fmt.Errorf("%w: baseURL must be set", ErrInvalidInput)
+	}
+
+	return nil
+}
+
+func validateTheID() Option {
+	return &validateID{}
+}
+
+type validateID struct{}
+
+func (validateID) apply(ins *Instructions) error {
+	if ins.id == "" {
+		return fmt.Errorf("%w: id must be set", ErrInvalidInput)
+	}
+
+	return nil
+}
+
+// -- internal options ---------------------------------------------------------
+
+func makeSet() Option {
+	return &makeSetOption{}
+}
+
+type makeSetOption struct{}
+
+func (makeSetOption) apply(ins *Instructions) error {
+	ins.set = jwk.NewSet()
+
+	for _, k := range ins.publicKeys {
+		ins.set.AddKey(k)
+	}
 	return nil
 }

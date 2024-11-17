@@ -7,13 +7,15 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/alecthomas/kong"
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/lestrrat-go/jwx/v2/jws"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/xmidt-org/wrp-go/v3"
 	cred "github.com/xmidt-org/xmidt-agent/internal/credentials"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials/event"
@@ -120,41 +122,44 @@ func main() {
 	defer cancel()
 
 	credentials.WaitUntilFetched(ctx)
-	token, expires, err := credentials.Credentials()
+	tokenString, expires, err := credentials.Credentials()
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Printf("JWT:     %s\n", token)
+	fmt.Printf("JWT:     %s\n", tokenString)
 	fmt.Printf("Expires: %s\n", expires.Format(time.RFC3339))
 
-	claims := jwt.RegisteredClaims{}
-	parser := jwt.NewParser()
-	_, parts, err := parser.ParseUnverified(token, &claims)
+	token, err := jwt.ParseString(tokenString)
 	if err != nil {
 		panic(err)
 	}
 
 	fmt.Println("Claims:")
-	fmt.Printf("  ID:             %s\n", claims.ID)
-	fmt.Printf("  ExpirationTime: %s\n", claims.ExpiresAt)
-	fmt.Printf("  IssuedAt:       %s\n", claims.IssuedAt)
-	fmt.Printf("  NotBefore:      %s\n", claims.NotBefore)
-	fmt.Printf("  Issuer:         %s\n", claims.Issuer)
-	fmt.Printf("  Subject:        %s\n", claims.Subject)
-	fmt.Printf("  Audience:       %s\n", claims.Audience)
+	fmt.Printf("  ID:         %s\n", token.JwtID())
+	fmt.Printf("  Expiration: %s\n", token.Expiration())
+	fmt.Printf("  IssuedAt:   %s\n", token.IssuedAt())
+	fmt.Printf("  NotBefore:  %s\n", token.NotBefore())
+	fmt.Printf("  Issuer:     %s\n", token.Issuer())
+	fmt.Printf("  Subject:    %s\n", token.Subject())
+	fmt.Printf("  Audience:   %v\n", token.Audience())
 
-	header, err := parser.DecodeSegment(parts[0])
+	header, body, _, err := jws.SplitCompactString(tokenString)
 	if err != nil {
 		panic(err)
 	}
 
-	body, err := parser.DecodeSegment(parts[1])
+	decodedHeader, err := base64.RawURLEncoding.DecodeString(string(header))
+	if err != nil {
+		panic(err)
+	}
+
+	decodedBody, err := base64.RawURLEncoding.DecodeString(string(body))
 	if err != nil {
 		panic(err)
 	}
 
 	fmt.Println("Parts:")
-	fmt.Printf("  Header: %s\n", header)
-	fmt.Printf("  Body:   %s\n", body)
+	fmt.Printf("  Header: %s\n", decodedHeader)
+	fmt.Printf("  Body:   %s\n", decodedBody)
 }
