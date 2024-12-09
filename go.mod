@@ -5,7 +5,7 @@ go 1.22
 toolchain go1.22.5
 
 require (
-	github.com/alecthomas/kong v1.5.1
+	github.com/alecthomas/kong v1.6.0
 	github.com/foxcpp/go-mockdns v1.1.0
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/uuid v1.6.0
