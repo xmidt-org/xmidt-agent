@@ -12,7 +12,7 @@ require (
 	github.com/goschtalt/goschtalt v0.25.0
 	github.com/goschtalt/properties-decoder v0.1.0
 	github.com/goschtalt/yaml-decoder v0.0.1
-	github.com/goschtalt/yaml-encoder v0.0.3
+	github.com/goschtalt/yaml-encoder v0.0.4
 	github.com/stretchr/testify v1.10.0
 	github.com/ugorji/go/codec v1.2.12
 	github.com/xmidt-org/arrange v0.5.1

@@ -30,8 +30,8 @@ github.com/goschtalt/properties-decoder v0.1.0 h1:e4otCq3mUY4Wbwj/iFrJtA+IcwRBxs
 github.com/goschtalt/properties-decoder v0.1.0/go.mod h1:TgczKTeyA8DPmW0ajpGQ59xH5k8aF9W9b0jwQ2RFITI=
 github.com/goschtalt/yaml-decoder v0.0.1 h1:fwXf5OoC2tUm6+FOzMizvh6UITFALw6OWxJTVNgbJwg=
 github.com/goschtalt/yaml-decoder v0.0.1/go.mod h1:b+hYjmM/e9rzRhPB8EKlb+LUwrgntMrOpqEAel3wRGQ=
-github.com/goschtalt/yaml-encoder v0.0.3 h1:vfQ3vXZNvoEFPa3NzOWNtweYVa+2qMh8eqhXByLi2t0=
-github.com/goschtalt/yaml-encoder v0.0.3/go.mod h1:E9ANM2mgRmoqP+JTFFv03fVWcnn+QrIDfVu5shDvX3A=
+github.com/goschtalt/yaml-encoder v0.0.4 h1:H/kiZSVWsGUHCgxZzyPmztyH1puTB4lEO9/W+jb3f4k=
+github.com/goschtalt/yaml-encoder v0.0.4/go.mod h1:F9KKLGzHCh0X3NsThKmzP1Qf4UQNGIDd+739IRN6YeU=
 github.com/hexops/gotextdiff v1.0.3 h1:gitA9+qJrrTCsiCl7+kh75nPqQt1cx4ZkudSTLoUqJM=
 github.com/hexops/gotextdiff v1.0.3/go.mod h1:pSWU5MAI3yDq+fZBTazCSJysOMbxWL1BSow5/V2vxeg=
 github.com/kr/pretty v0.3.1 h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=
