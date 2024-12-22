@@ -12,7 +12,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/lestrrat-go/jwx/v2/jws"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/xmidt-org/eventor"
 	"github.com/xmidt-org/xmidt-agent/internal/jwtxt/event"
 )
@@ -50,16 +53,19 @@ type Instructions struct {
 	fqdn string
 
 	// jwtOptions allows for normal and test configurations.
-	jwtOptions []jwt.ParserOption
+	jwtOptions []jwt.ParseOption
 
 	// timeout is the timeout for the DNS query.
 	timeout time.Duration
 
 	// algorithms is the list of algorithms allowed for JWT validation.
-	algorithms []string
+	algorithms map[jwa.SignatureAlgorithm]struct{}
 
 	// publicKeys is the collection of keys split out by supported algorithm.
-	publicKeys jwt.VerificationKeySet
+	publicKeys []jwk.Key
+
+	// The useable set of keys to use for validation.
+	set jwk.Set
 
 	// now is used to supply the current time that is needed for expiration.
 	// it's here just for testing support.
@@ -93,10 +99,17 @@ func New(opts ...Option) (*Instructions, error) {
 		now:        time.Now,
 		resolver:   net.DefaultResolver,
 		timeout:    DefaultTimeout,
-		algorithms: []string{},
+		algorithms: map[jwa.SignatureAlgorithm]struct{}{},
 	}
 
-	for _, opt := range opts {
+	full := append(opts,
+		validateAlgs(),
+		validateBase(),
+		validateTheID(),
+		makeSet(),
+	)
+
+	for _, opt := range full {
 		if opt != nil {
 			err := opt.apply(&ins)
 			if err != nil {
@@ -105,12 +118,7 @@ func New(opts ...Option) (*Instructions, error) {
 		}
 	}
 
-	if ins.baseURL == "" || ins.id == "" {
-		return nil, fmt.Errorf("%w: baseURL and id must be set", ErrInvalidInput)
-	}
-
 	ins.fqdn = ins.id + "." + ins.baseURL
-	ins.jwtOptions = []jwt.ParserOption{jwt.WithValidMethods(ins.algorithms)}
 
 	return &ins, nil
 }
@@ -240,39 +248,29 @@ func (ins *Instructions) reassemble(lines []string) string {
 // If it is valid, the information is saved in the Instruction object for
 // use along with when the information is no longer valid after.
 func (ins *Instructions) validate(input string) error {
-	parser := jwt.NewParser(ins.jwtOptions...)
-
-	token, err := parser.ParseWithClaims(input, &customClaims{},
-		func(t *jwt.Token) (any, error) {
-			return ins.publicKeys, nil
-		})
+	token, err := jwt.ParseString(input,
+		jwt.WithKeySet(ins.set,
+			jws.WithRequireKid(false),
+			jws.WithInferAlgorithmFromKey(true),
+		),
+		jwt.WithClock(jwt.ClockFunc(ins.now)),
+		jwt.WithRequiredClaim("endpoint"),
+		jwt.WithValidate(true),
+	)
 	if err != nil {
-		return err
+		return errors.Join(err, ErrInvalidJWT)
 	}
 
-	until, err := token.Claims.GetExpirationTime()
+	msg, err := jws.ParseString(input)
 	if err != nil {
-		return err
+		return errors.Join(err, ErrInvalidJWT)
 	}
 
-	_, parts, err := parser.ParseUnverified(input, &customClaims{})
-	if err != nil {
-		return err
-	}
+	ins.payload = msg.Payload()
+	ins.validUntil = token.Expiration().Local()
 
-	payload, err := parser.DecodeSegment(parts[1])
-	if err != nil {
-		return err
-	}
-
-	ins.endpoint = token.Claims.(*customClaims).Endpoint
-	ins.payload = payload
-	ins.validUntil = (*until).Time
+	ep, _ := token.Get("endpoint")
+	ins.endpoint = ep.(string)
 
 	return nil
-}
-
-type customClaims struct {
-	Endpoint string `json:"endpoint"`
-	jwt.RegisteredClaims
 }
