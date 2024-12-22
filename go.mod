@@ -5,18 +5,18 @@ go 1.22
 toolchain go1.22.5
 
 require (
-	github.com/alecthomas/kong v1.4.0
+	github.com/alecthomas/kong v1.6.0
 	github.com/foxcpp/go-mockdns v1.1.0
 	github.com/google/uuid v1.6.0
 	github.com/goschtalt/goschtalt v0.25.0
 	github.com/goschtalt/properties-decoder v0.1.0
 	github.com/goschtalt/yaml-decoder v0.0.1
-	github.com/goschtalt/yaml-encoder v0.0.3
 	github.com/lestrrat-go/jwx/v2 v2.1.2
-	github.com/stretchr/testify v1.9.0
+	github.com/goschtalt/yaml-encoder v0.0.4
+	github.com/stretchr/testify v1.10.0
 	github.com/ugorji/go/codec v1.2.12
 	github.com/xmidt-org/arrange v0.5.1
-	github.com/xmidt-org/eventor v1.0.21
+	github.com/xmidt-org/eventor v1.0.23
 	github.com/xmidt-org/retry v0.0.3
 	github.com/xmidt-org/sallust v0.2.2
 	github.com/xmidt-org/wrp-go/v3 v3.6.0
