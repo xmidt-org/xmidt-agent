@@ -239,6 +239,14 @@ func (a *Adapter) register(ctx context.Context, msg wrp.Message) error {
 }
 
 func (a *Adapter) forward(msg wrp.Message) error {
+	// Send to the pubsub which is responsible for forwarding the message to the
+	// appropriate services and/or egress.
+	_ = a.pubsub.HandleWrp(msg)
+
+	// The message needs to be sent to the appropriate service attached to this
+	// adapter.  The service is determined by the source of the message.
+	// Pubsub doesn't handle this because it doesn't know about the services
+	// attached to this adapter.
 	src, err := wrp.ParseLocator(msg.Source)
 	if err != nil {
 		return err

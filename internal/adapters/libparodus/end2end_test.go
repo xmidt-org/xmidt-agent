@@ -6,6 +6,7 @@ package libparodus
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -112,6 +113,45 @@ func (m *mockLibParodus) WaitFor(ctx context.Context, expected wrp.Message) {
 	}
 }
 
+type mockEgress struct {
+	assert  *assert.Assertions
+	require *require.Assertions
+	lock    sync.Mutex
+	rx      []wrp.Message
+}
+
+func (m *mockEgress) HandleWrp(msg wrp.Message) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	m.rx = append(m.rx, msg)
+	return nil
+}
+
+func (m *mockEgress) AssertReceived(ctx context.Context, expected []wrp.Message) {
+	for {
+		m.lock.Lock()
+		if len(m.rx) == len(expected) {
+			m.assert.Equal(expected, m.rx)
+			m.lock.Unlock()
+			return
+		}
+		m.lock.Unlock()
+
+		if ctx.Err() != nil {
+			break
+		}
+
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	if len(expected) > 0 {
+		m.lock.Lock()
+		m.assert.Fail(fmt.Sprintf("expected %d messages got: %d", len(expected), len(m.rx)))
+		m.lock.Unlock()
+	}
+}
+
 func TestEnd2End(t *testing.T) {
 	lpURL := "tcp://127.0.0.1:9999"
 	lpTestUrl := "tcp://127.0.0.1:9998"
@@ -124,7 +164,15 @@ func TestEnd2End(t *testing.T) {
 	require.NoError(err)
 	require.NotEmpty(self)
 
-	ps, err := pubsub.New(self, pubsub.WithPublishTimeout(200*time.Millisecond))
+	egress := mockEgress{
+		assert:  assert,
+		require: require,
+	}
+
+	ps, err := pubsub.New(self,
+		pubsub.WithPublishTimeout(200*time.Millisecond),
+		pubsub.WithEgressHandler(&egress),
+	)
 	require.NoError(err)
 	require.NotNil(ps)
 
@@ -252,6 +300,22 @@ func TestEnd2End(t *testing.T) {
 	// Ensure the other service was sent a keepalive message.
 	mOther.WaitFor(ctx, wrp.Message{
 		Type: wrp.ServiceAliveMessageType,
+	})
+
+	// Send a message from the 'test' service to the egress handler.
+	err = mTest.Send(lpURL, wrp.Message{
+		Type:        wrp.SimpleEventMessageType,
+		Source:      "mac:112233445566/eventer",
+		Destination: "event:testing/other",
+	})
+	require.NoError(err)
+
+	egress.AssertReceived(ctx, []wrp.Message{
+		{
+			Type:        wrp.SimpleEventMessageType,
+			Source:      "mac:112233445566/eventer",
+			Destination: "event:testing/other",
+		},
 	})
 
 	// Send a message to the 'test' service.
