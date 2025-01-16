@@ -111,9 +111,9 @@ logger:
     encode_duration: string
     encode_caller:   short
   rotation:
-    max_size:    1 #  1MB max/file
+    max_size:    1  # 1MB max/file
     max_age:     30 # 30 days max
-    MaxBackups: 10 # max 10 files
+    max_backups: 10 # max 10 files
 operational_state:
   last_reboot_reason: sleepy
   boot_time: "1970-01-01T00:00:00Z"
