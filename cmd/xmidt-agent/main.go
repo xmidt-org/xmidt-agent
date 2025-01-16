@@ -172,7 +172,26 @@ func provideCLIWithOpts(args cliArgs, testOpts bool) (*CLI, error) {
 			fmt.Sprintf("\tVersion:  %s\n", version)+
 			fmt.Sprintf("\tDate:     %s\n", date)+
 			fmt.Sprintf("\tCommit:   %s\n", commit)+
-			fmt.Sprintf("\tBuilt By: %s\n", builtBy),
+			fmt.Sprintf("\tBuilt By: %s\n", builtBy)+
+			"\n"+
+			"Configuration files are read in the following order unless the "+
+			"-f option is presented:\n"+
+			"----------------------------------------------------\n"+
+			"\t1.  $(pwd)/xmidt-agent.{properties|yaml|yml}\n"+
+			"\t2.  $(pwd)/conf.d/*.{properties|yaml|yml}\n"+
+			"\t3.  /etc/xmidt-agent/xmidt-agent.{properties|yaml|yml}\n"+
+			"\t4.  /etc/xmidt-agent/xonfig.d/*.{properties|yaml|yml}\n"+
+			"\nIf an exact file (1 or 3) is found, the search stops.  If "+
+			"a conf.d directory is found, all files in that directory are "+
+			"read in lexical order."+
+			"\n\nWhen the -f is used, it adds to the list of files or directories "+
+			"to read.  The -f option can be used multiple times."+
+			"\n\nEnvironment variables are may be used in the configuration "+
+			"files.  The environment variables are expanded in the "+
+			"configuration files using the standard ${ VAR } syntax."+
+			"\n\nIt is suggested to explore the configuration using the -s/--show "+
+			"option to help ensure you understand how the client is configured."+
+			"",
 		),
 		kong.UsageOnError(),
 		opt,
