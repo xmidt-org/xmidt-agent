@@ -100,7 +100,7 @@ nfpms:
 
       # base configuration file
       - src: .release/ipk/config.yml
-        dst: /etc/xmidt-agent/01-config.yml
+        dst: /etc/xmidt-agent/conf.d/01-config.yml
 
     scripts:
       preinstall: .release/ipk/preinstall.sh
@@ -125,7 +125,7 @@ nfpms:
     contents:
       # base configuration file
       - src: .release/ipk/config.yml
-        dst: /etc/xmidt-agent/01-config.yml
+        dst: /etc/xmidt-agent/conf.d/01-config.yml
 
     ipk:
       fields:
