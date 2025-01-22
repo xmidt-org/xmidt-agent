@@ -131,6 +131,34 @@ nfpms:
       fields:
         Bugs: https://github.com/xmidt-org/xmidt-agent/issues
 
+  -
+    id: server
+    file_name_template: '{{ .PackageName }}_{{ .Version }}_debian_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
+    vendor: xmidt-org
+    homepage: https://github.com/xmidt-org/xmidt-agent
+    license: Apache-2.0
+    maintainer: see_maintainers_file@example.com
+    description: The client agent for the Xmidt service.
+
+    formats:
+      - deb
+      - rpm
+
+    contents:
+      # base configuration file
+      - src: .release/ipk/config.yml
+        dst: /etc/xmidt-agent/conf.d/01-config.yml
+
+    deb:
+      signature:
+        key_file: .secrets/deb_gpg_private_key_file
+      fields:
+        Bugs: https://github.com/xmidt-org/xmidt-agent/issues
+    rpm:
+      group: System Environment/Daemons
+      signature:
+        key_file: .secrets/rpm_gpg_private_key_file
+
 source:
   enabled: true
   name_template: '{{ .ProjectName }}_{{ .Version }}_src'

@@ -26,6 +26,9 @@ __debug_bin*
 # Go workspace file
 go.work
 
+# Any secrets
+.secrets/*
+
 cmd/xmidt-agent/xmidt-agent
 .release/docker/config/xmidt_agent.*
 
