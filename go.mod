@@ -8,7 +8,7 @@ require (
 	github.com/alecthomas/kong v1.6.1
 	github.com/foxcpp/go-mockdns v1.1.0
 	github.com/google/uuid v1.6.0
-	github.com/goschtalt/goschtalt v0.25.0
+	github.com/goschtalt/goschtalt v0.26.0
 	github.com/goschtalt/properties-decoder v0.1.0
 	github.com/goschtalt/yaml-decoder v0.0.1
 	github.com/goschtalt/yaml-encoder v0.0.4
@@ -41,8 +41,8 @@ require (
 	github.com/lestrrat-go/option v1.0.1 // indirect
 	github.com/magiconair/properties v1.8.9 // indirect
 	github.com/miekg/dns v1.1.62 // indirect
-	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/xmidt-org/httpaux v0.4.2 // indirect
