@@ -20,7 +20,7 @@ on:
 
 jobs:
   ci:
-    uses: xmidt-org/shared-go/.github/workflows/ci.yml@63b8f5845b2f2ca7dfc453e70bb95fa2acbf3e1d # v4.5.2
+    uses: xmidt-org/shared-go/.github/workflows/ci.yml@a3bea51e93c7fbe573af78745c7b15f5c8491395 # v4.5.3
     with:
       release-type:         program
       release-main-package: ./cmd/xmidt-agent
