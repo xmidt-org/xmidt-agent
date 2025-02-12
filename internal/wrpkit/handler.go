@@ -6,7 +6,7 @@ package wrpkit
 import (
 	"errors"
 
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v4"
 )
 
 var (

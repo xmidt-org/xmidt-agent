@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v4"
 )
 
 // HeartbeatType is the type of heartbeat that occurred.
