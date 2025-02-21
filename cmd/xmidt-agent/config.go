@@ -46,6 +46,7 @@ type Config struct {
 	XmidtAgentCrud   XmidtAgentCrud
 	Metadata         Metadata
 	NetworkService   NetworkService
+	Quic Quic
 }
 
 type LibParodus struct {
@@ -84,6 +85,43 @@ type Pubsub struct {
 
 type Websocket struct {
 	// Disable determines whether or not to disable xmidt-agent's websocket
+	Disable bool
+	// URLPath is the device registration url path
+	URLPath string
+	// BackUpURL is the back up XMiDT service endpoint in case `XmidtCredentials.URL` fails.
+	BackUpURL string
+	// AdditionalHeaders are any additional headers for the WS connection.
+	AdditionalHeaders http.Header
+	// FetchURLTimeout is the timeout for the fetching the WS url. If this is not set, the default is 30 seconds.
+	FetchURLTimeout time.Duration
+	// InactivityTimeout is the inactivity timeout for the WS connection.
+	InactivityTimeout time.Duration
+	// PingWriteTimeout is the ping timeout for the WS connection.
+	PingWriteTimeout time.Duration
+	// SendTimeout is the send timeout for the WS connection.
+	SendTimeout time.Duration
+	// HTTPClient is the configuration for the HTTP client.
+	HTTPClient arrangehttp.ClientConfig
+	// KeepAliveInterval is the keep alive interval for the WS connection.
+	KeepAliveInterval time.Duration
+	// MaxMessageBytes is the largest allowable message to send or receive.
+	MaxMessageBytes int64
+	// (optional) DisableV4 determines whether or not to allow IPv4 for the WS connection.
+	// If this is not set, the default is false (IPv4 is enabled).
+	// Either V4 or V6 can be disabled, but not both.
+	DisableV4 bool
+	// (optional) DisableV6 determines whether or not to allow IPv6 for the WS connection.
+	// If this is not set, the default is false (IPv6 is enabled).
+	// Either V4 or V6 can be disabled, but not both.
+	DisableV6 bool
+	// RetryPolicy sets the retry policy factory used for delaying between retry attempts for reconnection.
+	RetryPolicy retry.Config
+	// Once sets whether or not to only attempt to connect once.
+	Once bool
+}
+
+type Quic struct {
+	// Disable determines whether or not to disable xmidt-agent's quic client
 	Disable bool
 	// URLPath is the device registration url path
 	URLPath string
