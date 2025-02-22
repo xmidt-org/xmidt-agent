@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/xmidt-org/retry"
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/nhooyr.io/websocket"
 	ws "github.com/xmidt-org/xmidt-agent/internal/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
@@ -42,8 +42,9 @@ func TestEndToEnd(t *testing.T) {
 				defer cancel()
 
 				msg := wrp.Message{
-					Type:   wrp.SimpleEventMessageType,
-					Source: "server",
+					Type:        wrp.SimpleEventMessageType,
+					Source:      "dns:server",
+					Destination: "dns:client",
 				}
 				err = c.Write(ctx, websocket.MessageBinary, wrp.MustEncode(&msg, wrp.Msgpack))
 				require.NoError(err)
@@ -63,7 +64,7 @@ func TestEndToEnd(t *testing.T) {
 				err = wrp.NewDecoderBytes(got, wrp.Msgpack).Decode(&msg)
 				require.NoError(err)
 				require.Equal(wrp.SimpleEventMessageType, msg.Type)
-				require.Equal("client", msg.Source)
+				require.Equal("dns:client", msg.Source)
 
 				c.Close(websocket.StatusNormalClosure, "")
 			}))
@@ -78,7 +79,7 @@ func TestEndToEnd(t *testing.T) {
 			event.MsgListenerFunc(
 				func(m wrp.Message) {
 					require.Equal(wrp.SimpleEventMessageType, m.Type)
-					require.Equal("server", m.Source)
+					require.Equal("dns:server", m.Source)
 					msgCnt.Add(1)
 				})),
 		ws.AddConnectListener(
@@ -134,8 +135,9 @@ func TestEndToEnd(t *testing.T) {
 
 	got.Send(context.Background(),
 		wrp.Message{
-			Type:   wrp.SimpleEventMessageType,
-			Source: "client",
+			Type:        wrp.SimpleEventMessageType,
+			Source:      "dns:client",
+			Destination: "dns:server",
 		})
 
 	for {
@@ -205,7 +207,7 @@ func TestEndToEndBadData(t *testing.T) {
 					event.MsgListenerFunc(
 						func(m wrp.Message) {
 							require.Equal(wrp.SimpleEventMessageType, m.Type)
-							require.Equal("server", m.Source)
+							require.Equal("dns:server", m.Source)
 							msgCnt.Add(1)
 						})),
 				ws.AddConnectListener(
@@ -278,8 +280,9 @@ func TestEndToEndConnectionIssues(t *testing.T) {
 				defer cancel()
 
 				msg := wrp.Message{
-					Type:   wrp.SimpleEventMessageType,
-					Source: "server",
+					Type:        wrp.SimpleEventMessageType,
+					Source:      "dns:server",
+					Destination: "dns:client",
 				}
 				err = c.Write(ctx, websocket.MessageBinary, wrp.MustEncode(&msg, wrp.Msgpack))
 				require.NoError(err)

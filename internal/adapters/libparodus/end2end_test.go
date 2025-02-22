@@ -13,7 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
 	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 	"go.nanomsg.org/mangos/v3"
@@ -66,7 +66,7 @@ func (m *mockLibParodus) HasReceived(expected wrp.Message) bool {
 	defer m.lock.Unlock()
 
 	for _, msg := range m.rx {
-		if expected.MessageType() == msg.MessageType() {
+		if expected.MsgType() == msg.MsgType() {
 			return true
 		}
 	}
@@ -93,7 +93,7 @@ func (m *mockLibParodus) Send(url string, msg wrp.Message) error {
 	m.require.NoError(err)
 
 	var buf []byte
-	err = wrp.NewEncoderBytes(&buf, wrp.Msgpack).Encode(msg)
+	err = wrp.NewEncoderBytes(&buf, wrp.Msgpack).Encode(&msg)
 	m.require.NoError(err)
 
 	return sock.Send(buf)
@@ -276,19 +276,12 @@ func TestEnd2End(t *testing.T) {
 		Type: wrp.SimpleEventMessageType,
 	})
 
-	// Send an invalid message from test to other.
-	err = mTest.Send(lpURL, wrp.Message{
-		Type:        wrp.Invalid0MessageType,
-		Source:      "mac:112233445566/test",
-		Destination: "mac:112233445566/other",
-	})
-	assert.NoError(err)
-
 	// Send a message from test to other.
 	err = mTest.Send(lpURL, wrp.Message{
-		Type:        wrp.SimpleRequestResponseMessageType,
-		Source:      "mac:112233445566/test",
-		Destination: "mac:112233445566/other",
+		Type:            wrp.SimpleRequestResponseMessageType,
+		Source:          "mac:112233445566/test",
+		Destination:     "mac:112233445566/other",
+		TransactionUUID: "1234",
 	})
 	assert.NoError(err)
 
@@ -304,17 +297,19 @@ func TestEnd2End(t *testing.T) {
 
 	// Send a message from the 'test' service to the egress handler.
 	err = mTest.Send(lpURL, wrp.Message{
-		Type:        wrp.SimpleEventMessageType,
-		Source:      "mac:112233445566/eventer",
-		Destination: "event:testing/other",
+		Type:            wrp.SimpleEventMessageType,
+		Source:          "mac:112233445566/eventer",
+		Destination:     "event:testing/other",
+		TransactionUUID: "1234",
 	})
 	require.NoError(err)
 
 	egress.AssertReceived(ctx, []wrp.Message{
 		{
-			Type:        wrp.SimpleEventMessageType,
-			Source:      "mac:112233445566/eventer",
-			Destination: "event:testing/other",
+			Type:            wrp.SimpleEventMessageType,
+			Source:          "mac:112233445566/eventer",
+			Destination:     "event:testing/other",
+			TransactionUUID: "1234",
 		},
 	})
 

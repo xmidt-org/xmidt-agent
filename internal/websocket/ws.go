@@ -14,7 +14,7 @@ import (
 	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/eventor"
 	"github.com/xmidt-org/retry"
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v5"
 	nhws "github.com/xmidt-org/xmidt-agent/internal/nhooyr.io/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
 )
@@ -221,7 +221,6 @@ func (ws *Websocket) run(ctx context.Context) {
 	ws.wg.Add(1)
 	defer ws.wg.Done()
 
-	decoder := wrp.NewDecoder(nil, wrp.Msgpack)
 	mode := ws.nextMode(ipv4)
 
 	policy := ws.retryPolicyFactory.NewPolicy(ctx)
@@ -321,8 +320,7 @@ func (ws *Websocket) run(ctx context.Context) {
 					if typ != nhws.MessageBinary {
 						err = ErrInvalidMsgType
 					} else {
-						decoder.Reset(reader)
-						err = decoder.Decode(&msg)
+						err = wrp.Msgpack.Decoder(reader).Decode(&msg)
 					}
 				}
 

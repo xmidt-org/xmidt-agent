@@ -6,7 +6,7 @@ package loghandler
 import (
 	"fmt"
 
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"

@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 )
 
@@ -77,16 +77,6 @@ func TestNew(t *testing.T) {
 				a.NotNil(ps.routes["event:device-status"])
 				a.NotNil(ps.routes["service:*"])
 				a.NotNil(ps.routes["service:config"])
-			},
-		}, {
-			description: "Confirm normify options",
-			self:        "mac:112233445566",
-			opts: []Option{
-				Normify(wrp.EnsureTransactionUUID()),
-			},
-			validate: func(a *assert.Assertions, ps *PubSub) {
-				a.NotNil(ps.desiredOpts)
-				a.Equal(1, len(ps.desiredOpts))
 			},
 		},
 
