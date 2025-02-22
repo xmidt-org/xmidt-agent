@@ -15,7 +15,7 @@ import (
 	"go.nanomsg.org/mangos/v3/protocol/pull"
 
 	// register transports
-	_ "go.nanomsg.org/mangos/v3/transport/all"
+	_ "go.nanomsg.org/mangos/v3/transport/tcp"
 )
 
 var (
