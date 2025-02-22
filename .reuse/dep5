@@ -54,3 +54,7 @@ License: ISC
 Files: docs/*.md
 Copyright: SPDX-FileCopyrightText: 2024 Comcast Cable Communications Management, LLC
 License: Apache-2.0
+
+Files: internal/credentials/internal/storage/*_gen.go
+Copyright: SPDX-FileCopyrightText: 2025 Comcast Cable Communications Management, LLC
+License: Apache-2.0

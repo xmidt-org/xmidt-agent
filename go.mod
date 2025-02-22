@@ -14,7 +14,7 @@ require (
 	github.com/goschtalt/yaml-encoder v0.0.4
 	github.com/lestrrat-go/jwx/v2 v2.1.3
 	github.com/stretchr/testify v1.10.0
-	github.com/ugorji/go/codec v1.2.12
+	github.com/tinylib/msgp v1.2.5
 	github.com/xmidt-org/arrange v0.5.1
 	github.com/xmidt-org/eventor v1.0.23
 	github.com/xmidt-org/retry v0.0.3
@@ -46,7 +46,6 @@ require (
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
-	github.com/tinylib/msgp v1.2.5 // indirect
 	github.com/xmidt-org/httpaux v0.4.1 // indirect
 	go.uber.org/dig v1.18.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
