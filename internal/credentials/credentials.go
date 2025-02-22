@@ -15,10 +15,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/ugorji/go/codec"
 	"github.com/xmidt-org/eventor"
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials/event"
+	"github.com/xmidt-org/xmidt-agent/internal/credentials/internal/storage"
 	"github.com/xmidt-org/xmidt-agent/internal/fs"
 )
 
@@ -78,7 +78,7 @@ type Credentials struct {
 	partnerID            func() string // dynamic
 
 	// What we are using to decorate the request.
-	token *xmidtInfo
+	token *storage.Info
 }
 
 // Option is the interface implemented by types that can be used to
@@ -245,7 +245,7 @@ func (c *Credentials) decorate(headers http.Header) error {
 
 // fetch fetches the credentials from the server.  This should only be called
 // by the run() method.
-func (c *Credentials) fetch(ctx context.Context) (*xmidtInfo, time.Duration, error) {
+func (c *Credentials) fetch(ctx context.Context) (*storage.Info, time.Duration, error) {
 	fe := event.Fetch{
 		Origin: "network",
 	}
@@ -299,7 +299,7 @@ func (c *Credentials) fetch(ctx context.Context) (*xmidtInfo, time.Duration, err
 		return nil, retryIn, c.dispatch(fe)
 	}
 
-	var token xmidtInfo
+	var token storage.Info
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fe.Err = errors.Join(err, ErrFetchFailed)
@@ -314,7 +314,7 @@ func (c *Credentials) fetch(ctx context.Context) (*xmidtInfo, time.Duration, err
 	return &token, 0, c.dispatch(fe)
 }
 
-func (c *Credentials) determineExpiration(resp *http.Response, token *xmidtInfo) {
+func (c *Credentials) determineExpiration(resp *http.Response, token *storage.Info) {
 	// One hundred years is forever.
 	token.ExpiresAt = c.nowFunc().Add(time.Hour * 24 * 365 * 100)
 	if c.assumedLifetime > 0 {
@@ -408,15 +408,12 @@ func (c *Credentials) run(ctx context.Context) {
 	}
 }
 
-func (c *Credentials) store(token *xmidtInfo) error {
+func (c *Credentials) store(token *storage.Info) error {
 	if c.fs == nil {
 		return nil
 	}
 
-	buf := make([]byte, 0, len(token.Token))
-	handle := new(codec.MsgpackHandle)
-	enc := codec.NewEncoderBytes(&buf, handle)
-	err := enc.Encode(token)
+	buf, err := token.MarshalMsg(nil)
 	if err != nil {
 		return err
 	}
@@ -426,7 +423,7 @@ func (c *Credentials) store(token *xmidtInfo) error {
 		fs.WriteFileWithSHA256(c.filename, buf, c.perm))
 }
 
-func (c *Credentials) load() (*xmidtInfo, error) {
+func (c *Credentials) load() (*storage.Info, error) {
 	fe := event.Fetch{
 		Origin: "fs",
 	}
@@ -447,11 +444,8 @@ func (c *Credentials) load() (*xmidtInfo, error) {
 		return nil, c.dispatch(fe)
 	}
 
-	handle := new(codec.MsgpackHandle)
-	dec := codec.NewDecoderBytes(buf, handle)
-
-	var token xmidtInfo
-	err = dec.Decode(&token)
+	var token storage.Info
+	_, err = token.UnmarshalMsg(buf)
 	if err != nil {
 		fe.Err = errors.Join(err, ErrFetchFailed)
 		return nil, c.dispatch(fe)
@@ -477,11 +471,4 @@ func (c *Credentials) dispatch(evnt any) error {
 	}
 
 	panic("unknown event type")
-}
-
-// xmidtInfo is the token returned from the server as well as the expiration
-// time.
-type xmidtInfo struct {
-	Token     string
-	ExpiresAt time.Time
 }
