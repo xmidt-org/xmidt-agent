@@ -11,8 +11,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/xmidt-org/eventor"
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 )
 
@@ -33,9 +34,7 @@ type CancelFunc func()
 type PubSub struct {
 	lock           sync.RWMutex
 	self           wrp.DeviceID
-	required       *wrp.Normifier
-	desiredOpts    []wrp.NormifierOption
-	desired        *wrp.Normifier
+	selfLocator    wrp.Locator
 	routes         map[string]*eventor.Eventor[wrpkit.Handler]
 	publishTimeout time.Duration
 }
@@ -53,20 +52,17 @@ type Option interface {
 // publishing, messages will be sent to the appropriate listeners based on the
 // service in the message and the device id of the PubSub instance.
 func New(self wrp.DeviceID, opts ...Option) (*PubSub, error) {
-	if self == "" {
-		return nil, fmt.Errorf("%w: self may not be empty", ErrInvalidInput)
+	if self.Prefix() == "" || self.ID() == "" {
+		return nil, fmt.Errorf("%w: self is invalid", ErrInvalidInput)
 	}
 
 	ps := PubSub{
 		routes: make(map[string]*eventor.Eventor[wrpkit.Handler]),
 		self:   self,
-		required: wrp.NewNormifier(
-			// Only the absolutely required normalizers are included here.
-			wrp.ValidateDestination(),
-			wrp.ValidateSource(),
-			wrp.ReplaceAnySelfLocator(string(self)),
-			wrp.ClampQualityOfService(),
-		),
+		selfLocator: wrp.Locator{
+			Scheme:    self.Prefix(),
+			Authority: self.ID(),
+		},
 	}
 
 	for _, opt := range opts {
@@ -76,8 +72,6 @@ func New(self wrp.DeviceID, opts ...Option) (*PubSub, error) {
 			}
 		}
 	}
-
-	ps.desired = wrp.NewNormifier(ps.desiredOpts...)
 
 	return &ps, nil
 }
@@ -156,7 +150,7 @@ func (ps *PubSub) HandleWrp(msg wrp.Message) error {
 	// to the service route.
 	routes := []string{egressRoute()}
 	switch {
-	case dest.ID == ps.self:
+	case dest.ID == ps.self || dest.Scheme == wrp.SchemeSelf:
 		routes = []string{
 			serviceRoute(dest.Service),
 			serviceRoute("*"),
@@ -229,23 +223,22 @@ func (ps *PubSub) HandleWrp(msg wrp.Message) error {
 }
 
 func (ps *PubSub) normalize(msg *wrp.Message) (*wrp.Message, wrp.Locator, error) {
-	if err := ps.required.Normify(msg); err != nil {
+	list := wrp.Modifiers([]wrp.Modifier{
+		valid(),
+		routable(),
+		wrp.ReplaceAnySelfLocator(ps.selfLocator),
+		ensureTransactionUUID(),
+	})
+
+	out, err := list.ModifyWRP(context.Background(), *msg)
+	if err != nil {
 		return nil, wrp.Locator{}, err
 	}
 
 	// These have already been validated by the required normifier.
 	dst, _ := wrp.ParseLocator(msg.Destination)
-	src, _ := wrp.ParseLocator(msg.Source)
 
-	if src.ID == ps.self {
-		// Apply the additional normalization for messages that originated from this
-		// device.
-		if err := ps.desired.Normify(msg); err != nil {
-			return nil, wrp.Locator{}, err
-		}
-	}
-
-	return msg, dst, nil
+	return &out, dst, nil
 }
 
 func serviceRoute(service string) string {
@@ -258,4 +251,44 @@ func egressRoute() string {
 
 func eventRoute(event string) string {
 	return "event:" + event
+}
+
+func valid() wrp.Modifier {
+	return wrp.ProcessorAsModifier(
+		wrp.ProcessorFunc(func(_ context.Context, msg wrp.Message) error {
+			err := msg.Validate()
+			if err != nil {
+				return err
+			}
+
+			return wrp.ErrNotHandled
+		}))
+}
+
+func routable() wrp.Modifier {
+	return wrp.ProcessorAsModifier(
+		wrp.ProcessorFunc(func(_ context.Context, msg wrp.Message) error {
+			if msg.Destination == "" {
+				return fmt.Errorf("%w: destination may not be empty", ErrInvalidInput)
+			}
+			if msg.Source == "" {
+				return fmt.Errorf("%w: source may not be empty", ErrInvalidInput)
+			}
+
+			return nil
+		}))
+}
+
+func ensureTransactionUUID() wrp.Modifier {
+	return wrp.ModifierFunc(func(_ context.Context, msg wrp.Message) (wrp.Message, error) {
+		if msg.TransactionUUID == "" {
+			id, err := uuid.NewRandom()
+			if err != nil {
+				return wrp.Message{}, err
+			}
+			msg.TransactionUUID = id.String()
+		}
+
+		return msg, nil
+	})
 }

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/adapters/libparodus"
 	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
 )

@@ -11,7 +11,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v5"
 )
 
 type mockNetworkService struct {

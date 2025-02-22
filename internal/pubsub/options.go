@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 )
 
@@ -17,18 +16,6 @@ var _ Option = optionFunc(nil)
 
 func (f optionFunc) apply(ps *PubSub) error {
 	return f(ps)
-}
-
-// Normify is an option that sets the desired normalization options used to
-// normalize/validate the wrp message.
-//
-// As an example, if you want all messages to contain metadata about something
-// like the network interface used, this is the place to define it.
-func Normify(opts ...wrp.NormifierOption) Option {
-	return optionFunc(func(ps *PubSub) error {
-		ps.desiredOpts = append(ps.desiredOpts, opts...)
-		return nil
-	})
 }
 
 // WithEgressHandler is an option that adds a handler for egress messages.

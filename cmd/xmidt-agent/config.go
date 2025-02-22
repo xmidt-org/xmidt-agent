@@ -19,7 +19,7 @@ import (
 	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/sallust"
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/configuration"
 	"github.com/xmidt-org/xmidt-agent/internal/net"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/qos"

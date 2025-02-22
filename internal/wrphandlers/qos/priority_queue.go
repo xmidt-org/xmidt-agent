@@ -10,7 +10,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v5"
 )
 
 var ErrMaxMessageBytes = errors.New("wrp message payload exceeds maxMessageBytes")

@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials/event"
 	"github.com/xmidt-org/xmidt-agent/internal/fs"
 )
