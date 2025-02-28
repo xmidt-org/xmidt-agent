@@ -10,7 +10,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/xmidt-org/wrp-go/v3"
-	"github.com/xmidt-org/xmidt-agent/internal/websocket"
+	"github.com/xmidt-org/xmidt-agent/internal/quic"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
 )
 
@@ -23,12 +23,21 @@ type CLI struct {
 	Once bool   `optional:""                                                    help:"Only attempt to connect once."`
 }
 
+
+type MessageListenerFunc func(wrp.Message)
+
+func (f MessageListenerFunc) OnMessage(m wrp.Message) {
+	f(m)
+}
+
+// Run this and then run a server... otherwise I don't know what the point of this is because it runs in the same 
+// process as the quic client
 func main() {
 	var cli CLI
 
 	parser, err := kong.New(&cli,
 		kong.Name("example"),
-		kong.Description("The test agent for websocket service.\n"),
+		kong.Description("The test agent for quic service.\n"),
 		kong.UsageOnError(),
 	)
 	if err != nil {
@@ -46,40 +55,45 @@ func main() {
 		panic(err)
 	}
 
-	opts := []websocket.Option{
-		websocket.DeviceID(id),
-		websocket.URL(cli.URL),
-		websocket.AddConnectListener(
+	opts := []quic.Option{
+		quic.DeviceID(id),
+		quic.URL(cli.URL),
+		quic.AddConnectListener(
 			event.ConnectListenerFunc(
 				func(e event.Connect) {
 					fmt.Println(e)
 				})),
-		websocket.AddDisconnectListener(
+		quic.AddDisconnectListener(
 			event.DisconnectListenerFunc(
 				func(e event.Disconnect) {
 					fmt.Println(e)
 				})),
+		quic.AddMessageListener(
+			MessageListenerFunc(
+				func(m wrp.Message) {
+					fmt.Println(m)  // send a message back
+				})),
 	}
 
 	if cli.V4 {
-		opts = append(opts, websocket.WithIPv6(false))
+		opts = append(opts, quic.WithIPv6(false))
 	}
 
 	if cli.V6 {
-		opts = append(opts, websocket.WithIPv4(false))
+		opts = append(opts, quic.WithIPv4(false))
 	}
 
 	if cli.Once {
-		opts = append(opts, websocket.Once())
+		opts = append(opts, quic.Once())
 	}
 
-	ws, err := websocket.New(opts...)
+	q, err := quic.New(opts...)
 	if err != nil {
 		panic(err)
 	}
 
-	ws.Start()
-	defer ws.Stop()
+	q.Start()
+	defer q.Stop()
 
 	time.Sleep(time.Minute)
 }

@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -105,7 +106,7 @@ type QuicClient struct {
 	wg       sync.WaitGroup
 	shutdown context.CancelFunc
 
-	client *http.Client
+	conn quic.Connection
 }
 
 // Option is a functional option type for WS.
@@ -125,31 +126,28 @@ func emptyDecorator(http.Header) error {
 
 // New creates a new http3 connection with the given options.
 func New(opts ...Option) (*QuicClient, error) {
-	roundTripper := &http3.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-			NextProtos:         []string{"h3"},
-		},
-		QUICConfig: &quic.Config{
-			KeepAlivePeriod: 10 * time.Second,
-		},
-	}
+	// roundTripper := &http3.Transport{
+	// 	TLSClientConfig: &tls.Config{
+	// 		InsecureSkipVerify: true,
+	// 		NextProtos:         []string{"h3"},
+	// 	},
+	// 	QUICConfig: &quic.Config{
+	// 		KeepAlivePeriod: 10 * time.Second,
+	// 	},
+	// }
 
 	ws := QuicClient{
 		inactivityTimeout: time.Minute,
 		credDecorator:     emptyDecorator,
 		conveyDecorator:   emptyDecorator,
 		// same default as `xmidt-agent/cmd/xmidt-agent/config.go`'s defaultConfig.Websocket.HTTPClient
-		httpClientConfig: arrangehttp.ClientConfig{
+		httpClientConfig: arrangehttp.ClientConfig{  // TODO - not using arrange so get rid of this
 			Timeout: 30 * time.Second,
 			Transport: arrangehttp.TransportConfig{
 				IdleConnTimeout:       10 * time.Second,
 				TLSHandshakeTimeout:   10 * time.Second,
 				ExpectContinueTimeout: 1 * time.Second,
 			},
-		},
-		client: &http.Client{
-			Transport: roundTripper,
 		},
 	}
 
@@ -229,20 +227,16 @@ func (ws *QuicClient) Send(ctx context.Context, msg wrp.Message) error {
 	// 	return nil, nil, err
 	// }
 
-	req, err := http.NewRequest(http.MethodPost, "https://localhost:4433", bytes.NewBuffer(wrp.MustEncode(&msg, wrp.Msgpack)))
+	stream, err := ws.conn.OpenStream()
 	if err != nil {
+		fmt.Printf("error opening stream to client %s", err)
 		return err
 	}
-	req.Header.Set("Content-Type", "application/msgpack")
+	defer stream.Close()
 
-	// Send request
-	resp, err := ws.client.Do(req)
+	_, err = stream.Write(wrp.MustEncode(&msg, wrp.Msgpack))
 	if err != nil {
-		return err
-	}
-
-	_, err = io.ReadAll(resp.Body)
-	if err != nil {
+		fmt.Printf("error writing to client %s", err)
 		return err
 	}
 
@@ -250,7 +244,7 @@ func (ws *QuicClient) Send(ctx context.Context, msg wrp.Message) error {
 }
 
 // create client and send headers
-func (ws *QuicClient) dial(ctx context.Context) (*http.Client, *http.Response, error) {
+func (ws *QuicClient) dial(ctx context.Context) (quic.Connection, error) {
 	// fetchCtx, cancel := context.WithTimeout(ctx, ws.urlFetchingTimeout)
 	// defer cancel()
 	// url, err := ws.urlFetcher(fetchCtx)
@@ -261,39 +255,168 @@ func (ws *QuicClient) dial(ctx context.Context) (*http.Client, *http.Response, e
 	// fake usage
 	fmt.Println(ctx)
 
-	client, err := ws.newHTTPClient()
-	if err != nil {
-		return nil, nil, err
+	fmt.Println("in dial")
+
+	// tr := quic.Transport{}
+    // h3tr := &http3.Transport{
+	// 	TLSClientConfig: &tls.Config{},  
+	// 	QUICConfig:      &quic.Config{
+			
+	// 		KeepAlivePeriod: 5*time.Second,
+	// 	},  
+	// 	Dial: func(ctx context.Context, addr string, tlsConf *tls.Config, quicConf *quic.Config) (quic.EarlyConnection, error) {
+	// 		a, err := net.ResolveUDPAddr("udp", addr)
+	// 		if err != nil {
+	// 			return nil, err
+	// 		}
+	// 		conn, err := tr.DialEarly(ctx, a, tlsConf, quicConf)
+	// 		if (err != nil) {
+	// 			fmt.Println(err)
+	// 		}
+	// 		return conn, err
+	// 	},
+	// }
+
+	// conn, err := h3tr.Dial(ctx, "localhost:4433", &tls.Config{}, &quic.Config{
+	// 	KeepAlivePeriod: 5*time.Second,
+	//   },
+	// )
+	// if (err != nil) {
+	// 	fmt.Printf("error dialing %s", err)
+	// 	return conn, err
+	// }
+
+	// client := &http.Client{
+	// 	Transport: h3tr,
+	// }
+
+	// client, err := ws.newHTTPClient()
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	tlsConf := &tls.Config{
+		InsecureSkipVerify: true,
+		NextProtos:         []string{"h3"},
 	}
+
+	quicConf := &quic.Config{
+		KeepAlivePeriod: 10 * time.Second,
+	}
+
+	fmt.Println("before resolve address")
+	udpAddr, err := net.ResolveUDPAddr("udp", "0.0.0.0:4432")
+	if err != nil {
+		return nil, err
+	}
+	
+	fmt.Println("before listen UDP")
+	udpConn, err := net.ListenUDP("udp", udpAddr)
+	if err != nil {
+		return nil, err
+	}
+	tr := &quic.Transport{
+		Conn:            udpConn,
+	}
+
+	fmt.Println("after listen udp")
+
+    // Create a QUIC transport
+	
+	roundTripper := &http3.Transport{
+		TLSClientConfig: tlsConf,
+		QUICConfig: quicConf,
+	    Dial: func(ctx context.Context, addr string, tlsConf *tls.Config, quicConf *quic.Config) (quic.EarlyConnection, error) {
+			a, err := net.ResolveUDPAddr("udp", addr)
+			if err != nil {
+				return nil, err
+			}
+			return tr.DialEarly(ctx, a, tlsConf, quicConf)
+		},
+	}
+
+	client := &http.Client{
+		Transport: roundTripper,
+	}
+
+	// update client redirect to send all headers on subsequent requests
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		// Copy headers from the first request to original requests
+		for key, value := range via[0].Header {
+			req.Header[key] = value
+		}
+		return nil
+	}
+
+	fmt.Println("before dial")
+	conn, err := roundTripper.Dial(ctx, "localhost:4433", tlsConf, quicConf)
+	if (err != nil) {
+		fmt.Println(err)
+		return conn, err
+	}
+
+	fmt.Println("after dial")
 
 	// TODO configure
 	req, err := http.NewRequest(http.MethodPost, "https://localhost:4433", bytes.NewBuffer([]byte{}))
 	if err != nil {
-		return client, nil, err
+		return conn, err
 	}
 	req.Header.Set("Content-Type", "application/msgpack")
 	ws.credDecorator(req.Header)
 	ws.conveyDecorator(req.Header)
 
+	fmt.Println("before send request")
 	// Send request
-	resp, err := ws.client.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
-		return client, resp, err
+		return conn, err
 	}
+
+	fmt.Println("after send request")
 
 	_, err = io.ReadAll(resp.Body)
 	if err != nil {
-		return client, resp, err
+		return conn, err
 	}
 
-	return client, resp, nil
+	fmt.Println("about to dump context")
+	dumpContext(req.Context())
+
+	return conn, err
 }
 
+func dumpContext(ctx context.Context, keys ...interface{}) {
+	fmt.Println("Context Values:")
+	for _, key := range keys {
+		if value := ctx.Value(key); value != nil {
+			fmt.Printf("  %v: %v\n", key, value)
+		}
+	}
+}
+
+// TODO - go back to using http3 api only and see if this works
+// func accessQUICConnection(client *http.Client) (*quic.Connection, error) {
+//     rt, ok := client.Transport.(*http3.Transport)
+//     if !ok {
+//         return nil,  errors.New("transport is not an http3.RoundTripper")
+//     }
+
+// 	rt.Dial
+//     connState := rt.ConnectionState()
+//     if connState == nil {
+//         return nil, errors.New("no QUIC connection available")
+//     }
+
+//     return connState.Connection, nil
+// }
+
 func (ws *QuicClient) run(ctx context.Context) {
+	fmt.Println("in run")
 	ws.wg.Add(1)
 	defer ws.wg.Done()
 
-	decoder := wrp.NewDecoder(nil, wrp.Msgpack)
+	//decoder := wrp.NewDecoder(nil, wrp.Msgpack)
 	mode := ws.nextMode(ipv4)
 
 	policy := ws.retryPolicyFactory.NewPolicy(ctx)
@@ -312,9 +435,10 @@ func (ws *QuicClient) run(ctx context.Context) {
 
 		ws.conveyDecorator(ws.additionalHeaders)
 
-		client, _, dialErr := ws.dial(ctx) //nolint:bodyclose
+		conn, dialErr := ws.dial(ctx) //nolint:bodyclose
 		cEvent.At = ws.nowFunc()
 
+		fmt.Printf("in run after dial %s", dialErr)
 		if dialErr == nil {
 			ws.connectListeners.Visit(func(l event.ConnectListener) {
 				l.OnConnect(cEvent)
@@ -325,34 +449,56 @@ func (ws *QuicClient) run(ctx context.Context) {
 
 			// Store the connection so writing can take place.
 			ws.m.Lock()
-			ws.client = client
+			ws.conn = conn
 			//activity := make(chan struct{})  // this is probably not needed, only used by ping and pong
 			ws.m.Unlock()
 
 			// Read loop
 			for {
+				fmt.Println("in read loop")
 				var msg wrp.Message
 				ctx, cancel := context.WithCancelCause(ctx)
 
 				// Monitor for activity.
 				go func() {
 					//inactivityTimeout := time.After(ws.inactivityTimeout)
-				loop1:
-					for {
-						select {
-						case <-ctx.Done():
-							break loop1
-							// case <-activity:
-							// 	inactivityTimeout = time.After(ws.inactivityTimeout)
-							// case <-inactivityTimeout:
-							// 	// inactivityTimeout occurred, cancel the context.
-							// 	cancel(context.DeadlineExceeded)
-							// 	break loop1
+					loop1:
+						for {
+							select {
+							case <-ctx.Done():
+								break loop1
+								// case <-activity:
+								// 	inactivityTimeout = time.After(ws.inactivityTimeout)
+								// case <-inactivityTimeout:
+								// 	// inactivityTimeout occurred, cancel the context.
+								// 	cancel(context.DeadlineExceeded)
+								// 	break loop1
+							}
 						}
-					}
 				}()
 
-				resp, err := client.Get("https://localhost:4433")
+				fmt.Println("about to get messages")
+				//resp, err := client.Get("https://localhost:4433")
+				
+				stream, err := conn.AcceptStream(ctx)
+				if err != nil {
+					fmt.Printf("error accepting stream %s", err)
+					break // TODO - close and re-open?
+				}
+
+				var b bytes.Buffer
+				if _, err:= io.Copy(&b, stream); err != nil {
+				   fmt.Printf("error reading from stream %s", err)
+				}
+			
+
+				// test code - REMOVE
+				// body, _ := io.ReadAll(resp.Body)
+				// if (err != nil) {
+				// 	fmt.Println(err)
+				// }
+				// fmt.Println(string(body))
+
 				ctxErr := context.Cause(ctx)
 				err = errors.Join(err, ctxErr)
 				// If ctxErr is context.Canceled then the parent context has been canceled.
@@ -361,8 +507,9 @@ func (ws *QuicClient) run(ctx context.Context) {
 					break
 				}
 
+				
 				if err == nil {
-					decoder.Reset(resp.Body)
+					//decoder.Reset(resp.Body)
 					//err = decoder.Decode(&msg)  // TODO - just for testing
 					msg = wrp.Message{}  // TODO - temp
 				}
@@ -372,7 +519,7 @@ func (ws *QuicClient) run(ctx context.Context) {
 				if err != nil {
 					// The connection gave us an unexpected message, or a message
 					// that could not be decoded.  Close & reconnect.
-					defer ws.client.Transport.(*http3.Transport).Close()
+					//defer ws.conn.CloseWithError(quic.ApplicationErrorCode(quic.StreamStateError)))
 
 					dEvent := event.Disconnect{
 						At:  ws.nowFunc(),
@@ -388,8 +535,11 @@ func (ws *QuicClient) run(ctx context.Context) {
 				ws.msgListeners.Visit(func(l event.MsgListener) {
 					l.OnMessage(msg)
 				})
+				stream.Close() // TODO
 			}
 		}
+
+		fmt.Println("not in read loop")
 
 		if ws.once {
 			return
@@ -398,6 +548,7 @@ func (ws *QuicClient) run(ctx context.Context) {
 		next, _ = policy.Next()
 
 		if dialErr != nil {
+			fmt.Printf("dial error %s", dialErr)
 			cEvent.Err = dialErr
 			cEvent.RetryingAt = ws.nowFunc().Add(next)
 			ws.connectListeners.Visit(func(l event.ConnectListener) {
