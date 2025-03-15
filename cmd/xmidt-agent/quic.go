@@ -68,8 +68,8 @@ func provideQuic(in QuicIn) (quicOut, error) {
 		quic.FetchURL(
 			fetchURL(in.Quic.URLPath, in.Quic.BackUpURL,
 				fetchURLFunc)),
-		quic.InactivityTimeout(in.Quic.InactivityTimeout),
-		quic.PingWriteTimeout(in.Quic.PingWriteTimeout),
+		//quic.InactivityTimeout(in.Quic.InactivityTimeout),
+		//quic.PingWriteTimeout(in.Quic.PingWriteTimeout),
 		quic.SendTimeout(in.Quic.SendTimeout),
 		quic.KeepAliveInterval(in.Quic.KeepAliveInterval),
 		quic.HTTPClientWithForceSets(in.Quic.HTTPClient),

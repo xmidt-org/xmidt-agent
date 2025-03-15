@@ -53,9 +53,12 @@ type Option interface {
 // publishing, messages will be sent to the appropriate listeners based on the
 // service in the message and the device id of the PubSub instance.
 func New(self wrp.DeviceID, opts ...Option) (*PubSub, error) {
+	fmt.Println("Creating PubSub Handler")
 	if self == "" {
 		return nil, fmt.Errorf("%w: self may not be empty", ErrInvalidInput)
 	}
+
+	fmt.Println("REMOVE " + self)
 
 	ps := PubSub{
 		routes: make(map[string]*eventor.Eventor[wrpkit.Handler]),
@@ -146,6 +149,7 @@ func (ps *PubSub) subscribe(route string, h wrpkit.Handler) (CancelFunc, error) 
 // if there was at least one handler that accepted the message.  The error
 // wrpkit.ErrNotHandled is returned if no listeners were found for the message.
 func (ps *PubSub) HandleWrp(msg wrp.Message) error {
+	fmt.Println("REMOVE pubSub handling WRP")
 	normalized, dest, err := ps.normalize(&msg)
 	if err != nil {
 		return errors.Join(err, wrpkit.ErrNotHandled)
@@ -157,11 +161,13 @@ func (ps *PubSub) HandleWrp(msg wrp.Message) error {
 	routes := []string{egressRoute()}
 	switch {
 	case dest.ID == ps.self:
+		fmt.Println("REMOVE dest is self " + dest.ID)
 		routes = []string{
 			serviceRoute(dest.Service),
 			serviceRoute("*"),
 		}
 	case dest.Scheme == wrp.SchemeEvent:
+		fmt.Println("REMOVE dest is egress " + dest.Scheme)
 		routes = []string{
 			eventRoute(dest.Authority),
 			eventRoute("*"),

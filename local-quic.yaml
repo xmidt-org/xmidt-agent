@@ -3,7 +3,7 @@
 
 websocket:
   url_path: api/v2/device
-  back_up_url: http://localhost:6400
+  back_up_url: https://localhost:6400
 quic:
   url_path: api/v2/device
   back_up_url: https://localhost:4433
@@ -32,5 +32,6 @@ storage:
 mock_tr_181:
   enabled: true
   file_path: ./mock_tr181.json
+  service_name: mock_config
 lib_parodus:
   parodus_service_url: "tcp://127.0.0.1:6666"

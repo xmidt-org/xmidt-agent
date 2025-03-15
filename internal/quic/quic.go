@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -56,9 +55,6 @@ type QuicClient struct {
 	// inactivityTimeout is the inactivity timeout for the WS connection.
 	// Defaults to 1 minute.
 	inactivityTimeout time.Duration
-
-	// pingWriteTimeout is the ping timeout for the WS connection.
-	pingWriteTimeout time.Duration
 
 	// sendTimeout is the send timeout for the WS connection.
 	sendTimeout time.Duration
@@ -126,29 +122,10 @@ func emptyDecorator(http.Header) error {
 
 // New creates a new http3 connection with the given options.
 func New(opts ...Option) (*QuicClient, error) {
-	// roundTripper := &http3.Transport{
-	// 	TLSClientConfig: &tls.Config{
-	// 		InsecureSkipVerify: true,
-	// 		NextProtos:         []string{"h3"},
-	// 	},
-	// 	QUICConfig: &quic.Config{
-	// 		KeepAlivePeriod: 10 * time.Second,
-	// 	},
-	// }
-
-	ws := QuicClient{
+	client := QuicClient{
 		inactivityTimeout: time.Minute,
 		credDecorator:     emptyDecorator,
 		conveyDecorator:   emptyDecorator,
-		// same default as `xmidt-agent/cmd/xmidt-agent/config.go`'s defaultConfig.Websocket.HTTPClient
-		httpClientConfig: arrangehttp.ClientConfig{  // TODO - not using arrange so get rid of this
-			Timeout: 30 * time.Second,
-			Transport: arrangehttp.TransportConfig{
-				IdleConnTimeout:       10 * time.Second,
-				TLSHandshakeTimeout:   10 * time.Second,
-				ExpectContinueTimeout: 1 * time.Second,
-			},
-		},
 	}
 
 	opts = append(opts,
@@ -164,70 +141,63 @@ func New(opts ...Option) (*QuicClient, error) {
 
 	for _, opt := range opts {
 		if opt != nil {
-			if err := opt.apply(&ws); err != nil {
+			if err := opt.apply(&client); err != nil {
 				return nil, err
 			}
 		}
 	}
 
-	return &ws, nil
+	return &client, nil
 }
 
 // Start starts the http3 connection and a long running goroutine to maintain
 // the connection.
-func (ws *QuicClient) Start() {
-	ws.m.Lock()
-	defer ws.m.Unlock()
+func (client *QuicClient) Start() {
+	client.m.Lock()
+	defer client.m.Unlock()
 
-	if ws.shutdown != nil {
+	if client.shutdown != nil {
 		return
 	}
 
 	var ctx context.Context
-	ctx, ws.shutdown = context.WithCancel(context.Background())
+	ctx, client.shutdown = context.WithCancel(context.Background())
 
-	go ws.run(ctx)
+	go client.run(ctx)
 }
 
 // Stop stops the quic connection.
-func (ws *QuicClient) Stop() {
-	ws.m.Lock()
+func (client *QuicClient) Stop() {
+	client.m.Lock()
 	// if ws.client != nil {
 	// 	_ = ws.cl
 	// }
 
-	shutdown := ws.shutdown
-	ws.m.Unlock()
+	shutdown := client.shutdown
+	client.m.Unlock()
 
 	if shutdown != nil {
 		shutdown()
 	}
 
-	ws.wg.Wait()
+	client.wg.Wait()
 }
 
-func (ws *QuicClient) HandleWrp(m wrp.Message) error {
-	return ws.Send(context.Background(), m)
+func (client *QuicClient) HandleWrp(m wrp.Message) error {
+	return client.Send(context.Background(), m)
 }
 
 // AddMessageListener adds a message listener to the WS connection.
 // The listener will be called for every message received from the WS.
-func (ws *QuicClient) AddMessageListener(listener event.MsgListener) event.CancelFunc {
-	return event.CancelFunc(ws.msgListeners.Add(listener))
+func (client *QuicClient) AddMessageListener(listener event.MsgListener) event.CancelFunc {
+	return event.CancelFunc(client.msgListeners.Add(listener))
 }
 
-// Send sends the provided WRP message through the existing websocket.  This
-// call synchronously blocks until the write is complete.
-func (ws *QuicClient) Send(ctx context.Context, msg wrp.Message) error {
-	// TODO - configure url
-	// fetchCtx, cancel := context.WithTimeout(ctx, ws.urlFetchingTimeout)
-	// defer cancel()
-	// url, err := ws.urlFetcher(fetchCtx)
-	// if err != nil {
-	// 	return nil, nil, err
-	// }
+// Send sends the provided WRP message through the existing quic connection.
+func (client *QuicClient) Send(ctx context.Context, msg wrp.Message) error {
 
-	stream, err := ws.conn.OpenStream()
+	fmt.Println("REMOVE sending wrp response")
+	stream, err := client.conn.OpenStream()
 	if err != nil {
 		fmt.Printf("error opening stream to client %s", err)
 		return err
@@ -244,144 +214,89 @@ func (ws *QuicClient) Send(ctx context.Context, msg wrp.Message) error {
 }
 
 // create client and send headers
-func (ws *QuicClient) dial(ctx context.Context) (quic.Connection, error) {
-	// fetchCtx, cancel := context.WithTimeout(ctx, ws.urlFetchingTimeout)
-	// defer cancel()
-	// url, err := ws.urlFetcher(fetchCtx)
-	// if err != nil {
-	// 	return nil, nil, err
-	// }
-
-	// fake usage
-	fmt.Println(ctx)
+func (client *QuicClient) dial(ctx context.Context) (quic.Connection, error) {
+	fetchCtx, cancel := context.WithTimeout(ctx, client.urlFetchingTimeout)
+	defer cancel()
+	url, err := client.urlFetcher(fetchCtx)
+	if err != nil {
+		return nil, err
+	}
 
 	fmt.Println("in dial")
 
-	// tr := quic.Transport{}
-    // h3tr := &http3.Transport{
-	// 	TLSClientConfig: &tls.Config{},  
-	// 	QUICConfig:      &quic.Config{
-			
-	// 		KeepAlivePeriod: 5*time.Second,
-	// 	},  
-	// 	Dial: func(ctx context.Context, addr string, tlsConf *tls.Config, quicConf *quic.Config) (quic.EarlyConnection, error) {
-	// 		a, err := net.ResolveUDPAddr("udp", addr)
-	// 		if err != nil {
-	// 			return nil, err
-	// 		}
-	// 		conn, err := tr.DialEarly(ctx, a, tlsConf, quicConf)
-	// 		if (err != nil) {
-	// 			fmt.Println(err)
-	// 		}
-	// 		return conn, err
-	// 	},
-	// }
-
-	// conn, err := h3tr.Dial(ctx, "localhost:4433", &tls.Config{}, &quic.Config{
-	// 	KeepAlivePeriod: 5*time.Second,
-	//   },
-	// )
-	// if (err != nil) {
-	// 	fmt.Printf("error dialing %s", err)
-	// 	return conn, err
-	// }
-
-	// client := &http.Client{
-	// 	Transport: h3tr,
-	// }
-
-	// client, err := ws.newHTTPClient()
-	// if err != nil {
-	// 	return nil, err
-	// }
-
 	tlsConf := &tls.Config{
-		InsecureSkipVerify: true,
+		InsecureSkipVerify: true, // TODO - configure
 		NextProtos:         []string{"h3"},
 	}
 
 	quicConf := &quic.Config{
-		KeepAlivePeriod: 10 * time.Second,
+		KeepAlivePeriod:      10 * time.Second,
+		HandshakeIdleTimeout: 1 * time.Minute,
+		MaxIdleTimeout:       1 * time.Minute,
 	}
 
-	fmt.Println("before resolve address")
-	udpAddr, err := net.ResolveUDPAddr("udp", "0.0.0.0:4432")
+	// TODO - configure
+	conn, err := quic.DialAddr(context.Background(), "localhost:4433", tlsConf, quicConf)
 	if err != nil {
+		fmt.Println("error dialing")
 		return nil, err
 	}
-	
-	fmt.Println("before listen UDP")
-	udpConn, err := net.ListenUDP("udp", udpAddr)
-	if err != nil {
-		return nil, err
-	}
-	tr := &quic.Transport{
-		Conn:            udpConn,
-	}
 
-	fmt.Println("after listen udp")
-
-    // Create a QUIC transport
-	
 	roundTripper := &http3.Transport{
 		TLSClientConfig: tlsConf,
-		QUICConfig: quicConf,
-	    Dial: func(ctx context.Context, addr string, tlsConf *tls.Config, quicConf *quic.Config) (quic.EarlyConnection, error) {
-			a, err := net.ResolveUDPAddr("udp", addr)
-			if err != nil {
-				return nil, err
-			}
-			return tr.DialEarly(ctx, a, tlsConf, quicConf)
-		},
+		QUICConfig:      quicConf,
 	}
 
-	client := &http.Client{
-		Transport: roundTripper,
-	}
+	h3Conn := roundTripper.NewClientConn(conn)
 
-	// update client redirect to send all headers on subsequent requests
-	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		// Copy headers from the first request to original requests
-		for key, value := range via[0].Header {
-			req.Header[key] = value
-		}
-		return nil
-	}
-
-	fmt.Println("before dial")
-	conn, err := roundTripper.Dial(ctx, "localhost:4433", tlsConf, quicConf)
-	if (err != nil) {
-		fmt.Println(err)
-		return conn, err
-	}
-
-	fmt.Println("after dial")
-
-	// TODO configure
-	req, err := http.NewRequest(http.MethodPost, "https://localhost:4433", bytes.NewBuffer([]byte{}))
+	reqStream, err := h3Conn.OpenRequestStream(context.Background())
 	if err != nil {
-		return conn, err
+		fmt.Printf("error opening request stream %s", err)
+		return nil, err
 	}
+
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer([]byte{}))
+	if err != nil {
+		roundTripper.Close()
+		return nil, err
+	}
+
 	req.Header.Set("Content-Type", "application/msgpack")
-	ws.credDecorator(req.Header)
-	ws.conveyDecorator(req.Header)
+	client.credDecorator(req.Header)
+	client.conveyDecorator(req.Header)
 
-	fmt.Println("before send request")
-	// Send request
-	resp, err := client.Do(req)
+	// TODO
+	// update client redirect to send all headers on subsequent requests
+	// reqStream.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+	// 	// Copy headers from the first request to original requests
+	// 	for key, value := range via[0].Header {
+	// 		req.Header[key] = value
+	// 	}
+	// 	return nil
+	// }
+
+	// TODO - loop until there is no redirect, but limit redirects
+
+	err = reqStream.SendRequestHeader(req)
 	if err != nil {
-		return conn, err
+		fmt.Printf("error sending request %s", err)
+		return nil, err
 	}
 
-	fmt.Println("after send request")
-
-	_, err = io.ReadAll(resp.Body)
+	resp, err := reqStream.ReadResponse()
 	if err != nil {
-		return conn, err
+		fmt.Println("error reading http3 response from server")
+		return nil, err
 	}
 
-	fmt.Println("about to dump context")
-	dumpContext(req.Context())
+	if (resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusPermanentRedirect ) {}
+
+	_, err = io.Copy(io.Discard, resp.Body)
+	if (err != nil) && !errors.Is(err, io.EOF) {
+		fmt.Printf("error reading body %s", err)
+	}
+
+	resp.Body.Close()
 
 	return conn, err
 }
@@ -395,153 +310,111 @@ func dumpContext(ctx context.Context, keys ...interface{}) {
 	}
 }
 
-// TODO - go back to using http3 api only and see if this works
-// func accessQUICConnection(client *http.Client) (*quic.Connection, error) {
-//     rt, ok := client.Transport.(*http3.Transport)
-//     if !ok {
-//         return nil,  errors.New("transport is not an http3.RoundTripper")
-//     }
-
-// 	rt.Dial
-//     connState := rt.ConnectionState()
-//     if connState == nil {
-//         return nil, errors.New("no QUIC connection available")
-//     }
-
-//     return connState.Connection, nil
-// }
-
-func (ws *QuicClient) run(ctx context.Context) {
+func (client *QuicClient) run(ctx context.Context) {
 	fmt.Println("in run")
-	ws.wg.Add(1)
-	defer ws.wg.Done()
+	client.wg.Add(1)
+	defer client.wg.Done()
 
-	//decoder := wrp.NewDecoder(nil, wrp.Msgpack)
-	mode := ws.nextMode(ipv4)
+	decoder := wrp.NewDecoder(nil, wrp.Msgpack)
+	mode := client.nextMode(ipv4) // TODO
 
-	policy := ws.retryPolicyFactory.NewPolicy(ctx)
+	policy := client.retryPolicyFactory.NewPolicy(ctx) 
 
 	for {
 		var next time.Duration
 
-		mode = ws.nextMode(mode)
+		mode = client.nextMode(mode)
 		cEvent := event.Connect{
-			Started: ws.nowFunc(),
-			Mode:    mode.ToEvent(),
+			Started: client.nowFunc(),
+			Mode:    mode.ToEvent(), // TODO
 		}
 
 		// If auth fails, then continue with no credentials.
-		ws.credDecorator(ws.additionalHeaders)
+		client.credDecorator(client.additionalHeaders)
+		client.conveyDecorator(client.additionalHeaders)
 
-		ws.conveyDecorator(ws.additionalHeaders)
-
-		conn, dialErr := ws.dial(ctx) //nolint:bodyclose
-		cEvent.At = ws.nowFunc()
+		conn, dialErr := client.dial(ctx) //nolint:bodyclose
+		cEvent.At = client.nowFunc()
 
 		fmt.Printf("in run after dial %s", dialErr)
 		if dialErr == nil {
-			ws.connectListeners.Visit(func(l event.ConnectListener) {
+			client.connectListeners.Visit(func(l event.ConnectListener) {
 				l.OnConnect(cEvent)
 			})
 
 			// Reset the retry policy on a successful connection.
-			policy = ws.retryPolicyFactory.NewPolicy(ctx)
+			policy = client.retryPolicyFactory.NewPolicy(ctx)
 
 			// Store the connection so writing can take place.
-			ws.m.Lock()
-			ws.conn = conn
-			//activity := make(chan struct{})  // this is probably not needed, only used by ping and pong
-			ws.m.Unlock()
+			client.m.Lock()
+			client.conn = conn
+			client.m.Unlock()
 
 			// Read loop
 			for {
 				fmt.Println("in read loop")
 				var msg wrp.Message
-				ctx, cancel := context.WithCancelCause(ctx)
+				//_, cancel := context.WithCancelCause(ctx)
 
-				// Monitor for activity.
-				go func() {
-					//inactivityTimeout := time.After(ws.inactivityTimeout)
-					loop1:
-						for {
-							select {
-							case <-ctx.Done():
-								break loop1
-								// case <-activity:
-								// 	inactivityTimeout = time.After(ws.inactivityTimeout)
-								// case <-inactivityTimeout:
-								// 	// inactivityTimeout occurred, cancel the context.
-								// 	cancel(context.DeadlineExceeded)
-								// 	break loop1
-							}
-						}
-				}()
+				fmt.Println("listening for messages")
 
-				fmt.Println("about to get messages")
-				//resp, err := client.Get("https://localhost:4433")
-				
-				stream, err := conn.AcceptStream(ctx)
+				stream, err := conn.AcceptStream(context.Background())
 				if err != nil {
-					fmt.Printf("error accepting stream %s", err)
-					break // TODO - close and re-open?
+					fmt.Println("error accepting stream")
+					break
 				}
 
-				var b bytes.Buffer
-				if _, err:= io.Copy(&b, stream); err != nil {
-				   fmt.Printf("error reading from stream %s", err)
+				data, err := readBytes(stream)
+				if err != nil {
+					fmt.Println("Error reading from stream", err)
+					break
 				}
-			
 
-				// test code - REMOVE
-				// body, _ := io.ReadAll(resp.Body)
-				// if (err != nil) {
-				// 	fmt.Println(err)
-				// }
-				// fmt.Println(string(body))
+				fmt.Println("Client received:", string(data))
+				stream.Close()
 
 				ctxErr := context.Cause(ctx)
 				err = errors.Join(err, ctxErr)
 				// If ctxErr is context.Canceled then the parent context has been canceled.
 				if errors.Is(ctxErr, context.Canceled) {
-					cancel(nil)
+					//cancel(nil)
 					break
 				}
 
-				
 				if err == nil {
-					//decoder.Reset(resp.Body)
-					//err = decoder.Decode(&msg)  // TODO - just for testing
-					msg = wrp.Message{}  // TODO - temp
+					decoder.Reset(bytes.NewReader(data))
+					err = decoder.Decode(&msg)  
 				}
 
 				// Cancel ws.conn.Reader()'s context after wrp decoding.
-				cancel(nil)
+				//cancel(nil) // what is this doing?
 				if err != nil {
 					// The connection gave us an unexpected message, or a message
 					// that could not be decoded.  Close & reconnect.
-					//defer ws.conn.CloseWithError(quic.ApplicationErrorCode(quic.StreamStateError)))
+					defer client.conn.CloseWithError(quic.ApplicationErrorCode(quic.StreamStateError), "unable to decode wrp message")
 
 					dEvent := event.Disconnect{
-						At:  ws.nowFunc(),
+						At:  client.nowFunc(),
 						Err: err,
 					}
-					ws.disconnectListeners.Visit(func(l event.DisconnectListener) {
+					client.disconnectListeners.Visit(func(l event.DisconnectListener) {
 						l.OnDisconnect(dEvent)
 					})
+
+					stream.Close()
 
 					break
 				}
 
-				ws.msgListeners.Visit(func(l event.MsgListener) {
+				client.msgListeners.Visit(func(l event.MsgListener) {
 					l.OnMessage(msg)
 				})
-				stream.Close() // TODO
 			}
 		}
 
-		fmt.Println("not in read loop")
+		fmt.Println("out of read loop")
 
-		if ws.once {
+		if client.once {
 			return
 		}
 
@@ -550,8 +423,8 @@ func (ws *QuicClient) run(ctx context.Context) {
 		if dialErr != nil {
 			fmt.Printf("dial error %s", dialErr)
 			cEvent.Err = dialErr
-			cEvent.RetryingAt = ws.nowFunc().Add(next)
-			ws.connectListeners.Visit(func(l event.ConnectListener) {
+			cEvent.RetryingAt = client.nowFunc().Add(next)
+			client.connectListeners.Visit(func(l event.ConnectListener) {
 				l.OnConnect(cEvent)
 			})
 		}
@@ -564,33 +437,16 @@ func (ws *QuicClient) run(ctx context.Context) {
 	}
 }
 
-
-// newHTTPClient returns a HTTP client using the provided `mode` as its named network.
-func (ws *QuicClient) newHTTPClient() (*http.Client, error) {
-	roundTripper := &http3.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-			NextProtos:         []string{"h3"},
-		},
-		QUICConfig: &quic.Config{
-			KeepAlivePeriod: 10 * time.Second,
-		},
-	}
-
-	client := &http.Client{
-		Transport: roundTripper,
-	}
-
-	// update client redirect to send all headers on subsequent requests
-	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		// Copy headers from the first request to original requests
-		for key, value := range via[0].Header {
-			req.Header[key] = value
+func readBytes(reader io.Reader) ([]byte, error) {
+	buffer := new(bytes.Buffer)
+	_, err := buffer.ReadFrom(reader)
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return buffer.Bytes(), nil
 		}
-		return nil
+		return nil, err
 	}
-
-	return client, nil
+	return buffer.Bytes(), nil
 }
 
 func (ws *QuicClient) nextMode(mode ipMode) ipMode {
@@ -603,11 +459,4 @@ func (ws *QuicClient) nextMode(mode ipMode) ipMode {
 	}
 
 	return mode
-}
-
-func limit(s string) string {
-	if len(s) > 125 {
-		return s[:125]
-	}
-	return s
 }

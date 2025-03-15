@@ -101,33 +101,6 @@ func ConveyDecorator(f func(http.Header) error) Option {
 		})
 }
 
-// InactivityTimeout sets inactivity timeout for the WS connection.
-func InactivityTimeout(d time.Duration) Option {
-	return optionFunc(
-		func(ws *QuicClient) error {
-			if d < 0 {
-				return fmt.Errorf("%w: negative InactivityTimeout", ErrMisconfiguredWS)
-			}
-
-			ws.inactivityTimeout = d
-			return nil
-		})
-}
-
-// PingWriteTimeout sets the maximum time allowed between PINGs for the WS connection
-// before the connection is closed.  If this is not set, the default is 90 seconds.
-func PingWriteTimeout(d time.Duration) Option {
-	return optionFunc(
-		func(ws *QuicClient) error {
-			if d < 0 {
-				return fmt.Errorf("%w: negative PingWriteTimeout", ErrMisconfiguredWS)
-			}
-
-			ws.pingWriteTimeout = d
-			return nil
-		})
-}
-
 // KeepAliveInterval sets the keep alive interval for the WS connection.
 // If this is not set, the default is 30 seconds.
 func KeepAliveInterval(d time.Duration) Option {

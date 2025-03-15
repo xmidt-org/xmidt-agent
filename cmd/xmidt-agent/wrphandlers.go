@@ -4,10 +4,12 @@ package main
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/xmidt-org/wrp-go/v3"
 	"github.com/xmidt-org/xmidt-agent/internal/loglevel"
 	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
+	"github.com/xmidt-org/xmidt-agent/internal/quic"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/auth"
@@ -31,43 +33,81 @@ func provideWRPHandlers() fx.Option {
 			provideMissingHandler,
 			provideAuthHandler,
 			provideCrudHandler,
-			provideQOSHandler,
-			provideWSEventorToHandlerAdapter,
+			//provideQOSHandler,
+			provideQuicQOSHandler,
+			//provideWSEventorToHandlerAdapter,
+			provideQuicEventorToHandlerAdapter,
 			provideMockTr181Handler,
 		),
 	)
 }
 
-type wsAdapterIn struct {
+type quicAdapterIn struct {
 	fx.In
 
-	WS     *websocket.Websocket
+	QuicClient     *quic.QuicClient
 	Logger *zap.Logger
 
 	// wrphandlers
 	AuthHandler *auth.Handler
 }
 
-type wsAdapterOut struct {
+type quicAdapterOut struct {
 	fx.Out
 
 	Cancels []func() `group:"cancels,flatten"`
 }
 
-func provideWSEventorToHandlerAdapter(in wsAdapterIn) (wsAdapterOut, error) {
+// type wsAdapterIn struct {
+// 	fx.In
+
+// 	WS     *websocket.Websocket
+// 	Logger *zap.Logger
+
+// 	// wrphandlers
+// 	AuthHandler *auth.Handler
+// }
+
+// type wsAdapterOut struct {
+// 	fx.Out
+
+// 	Cancels []func() `group:"cancels,flatten"`
+// }
+
+// func provideWSEventorToHandlerAdapter(in wsAdapterIn) (wsAdapterOut, error) {
+// 	lh, err := loghandler.New(in.AuthHandler,
+// 		in.Logger.With(
+// 			zap.String("stage", "ingress"),
+// 			zap.String("handler", "websocket")))
+
+// 	if err != nil {
+// 		return wsAdapterOut{}, err
+// 	}
+
+// 	return wsAdapterOut{
+// 		Cancels: []func(){
+// 			in.WS.AddMessageListener(
+// 				event.MsgListenerFunc(func(m wrp.Message) {
+// 					_ = lh.HandleWrp(m)
+// 				})),
+// 		}}, nil
+// }
+
+func provideQuicEventorToHandlerAdapter(in quicAdapterIn) (quicAdapterOut, error) {
 	lh, err := loghandler.New(in.AuthHandler,
 		in.Logger.With(
 			zap.String("stage", "ingress"),
-			zap.String("handler", "websocket")))
+			zap.String("handler", "quic")))
 
 	if err != nil {
-		return wsAdapterOut{}, err
+		return quicAdapterOut{}, err
 	}
 
-	return wsAdapterOut{
+	return quicAdapterOut{
 		Cancels: []func(){
-			in.WS.AddMessageListener(
+			in.QuicClient.AddMessageListener(
 				event.MsgListenerFunc(func(m wrp.Message) {
+					fmt.Println("REMOVE in quicAdapter message listener")
 					_ = lh.HandleWrp(m)
 				})),
 		}}, nil
@@ -79,13 +119,14 @@ type qosIn struct {
 	QOS    QOS
 	Logger *zap.Logger
 	WS     *websocket.Websocket
+	QuicClient *quic.QuicClient
 }
 
-func provideQOSHandler(in qosIn) (*qos.Handler, error) {
-	lh, err := loghandler.New(in.WS,
+func provideQuicQOSHandler(in qosIn) (*qos.Handler, error) {
+	lh, err := loghandler.New(in.QuicClient,
 		in.Logger.With(
 			zap.String("stage", "egress"),
-			zap.String("handler", "websocket")))
+			zap.String("handler", "quic")))
 	if err != nil {
 		return nil, err
 	}
@@ -101,6 +142,27 @@ func provideQOSHandler(in qosIn) (*qos.Handler, error) {
 		qos.CriticalExpires(in.QOS.CriticalExpires),
 	)
 }
+
+// func provideQOSHandler(in qosIn) (*qos.Handler, error) {
+// 	lh, err := loghandler.New(in.WS,
+// 		in.Logger.With(
+// 			zap.String("stage", "egress"),
+// 			zap.String("handler", "websocket")))
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	return qos.New(
+// 		lh,
+// 		qos.MaxQueueBytes(in.QOS.MaxQueueBytes),
+// 		qos.MaxMessageBytes(in.QOS.MaxMessageBytes),
+// 		qos.Priority(in.QOS.Priority),
+// 		qos.LowExpires(in.QOS.LowExpires),
+// 		qos.MediumExpires(in.QOS.MediumExpires),
+// 		qos.HighExpires(in.QOS.HighExpires),
+// 		qos.CriticalExpires(in.QOS.CriticalExpires),
+// 	)
+// }
 
 type missingIn struct {
 	fx.In
@@ -172,8 +234,6 @@ func provideCrudHandler(in crudIn) (*xmidt_agent_crud.Handler, error) {
 		return nil, err
 	}
 
-	// what do we do with the return value?  Does this have to be passed to pubSub somehow? Seems
-	// fishy if it does
 	_, err = in.PubSub.SubscribeService(in.XmidtAgentCrud.ServiceName, h)
 	if err != nil {
 		return nil, errors.Join(ErrWRPHandlerConfig, err)
@@ -193,6 +253,7 @@ type pubsubIn struct {
 
 	// wrphandlers
 	Egress *qos.Handler
+	QuicClient *quic.QuicClient
 }
 
 type pubsubOut struct {
@@ -216,6 +277,7 @@ func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 	opts := []pubsub.Option{
 		pubsub.WithPublishTimeout(in.Pubsub.PublishTimeout),
 		pubsub.WithEgressHandler(lh, &cancel),
+		pubsub.WithEventHandler("*", in.QuicClient, &cancel),
 	}
 	ps, err := pubsub.New(
 		in.Identity.DeviceID,
@@ -283,6 +345,7 @@ func provideMockTr181Handler(in mockTr181In) (mockTr181Out, error) {
 	}
 	mocktr, err := in.PubSub.SubscribeService(in.MockTr181.ServiceName, loggerIn)
 	if err != nil {
+		fmt.Println("error subscribing mocktr1i1  service")
 		return mockTr181Out{}, errors.Join(ErrWRPHandlerConfig, err)
 	}
 
