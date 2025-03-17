@@ -2,8 +2,6 @@ module github.com/xmidt-org/xmidt-agent
 
 go 1.23
 
-toolchain go1.23.1
-
 require (
 	github.com/alecthomas/kong v1.9.0
 	github.com/foxcpp/go-mockdns v1.1.0
@@ -17,7 +15,7 @@ require (
 	github.com/tinylib/msgp v1.2.5
 	github.com/xmidt-org/arrange v0.5.1
 	github.com/xmidt-org/eventor v1.0.23
-	github.com/xmidt-org/retry v0.0.3
+	github.com/xmidt-org/retry v0.0.4
 	github.com/xmidt-org/sallust v0.2.3
 	github.com/xmidt-org/wrp-go/v5 v5.0.0
 	go.nanomsg.org/mangos/v3 v3.4.2
