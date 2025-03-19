@@ -264,6 +264,7 @@ type pubsubOut struct {
 }
 
 func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
+	fmt.Println("REMOVE providing pubsubhandler")
 	var cancel pubsub.CancelFunc
 
 	lh, err := loghandler.New(in.Egress,
