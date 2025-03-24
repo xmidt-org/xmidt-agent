@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
@@ -215,14 +216,58 @@ func (client *QuicClient) Send(ctx context.Context, msg wrp.Message) error {
 
 // create client and send headers
 func (client *QuicClient) dial(ctx context.Context) (quic.Connection, error) {
-	fetchCtx, cancel := context.WithTimeout(ctx, client.urlFetchingTimeout)
-	defer cancel()
-	url, err := client.urlFetcher(fetchCtx)
+	// fetchCtx, cancel := context.WithTimeout(ctx, client.urlFetchingTimeout)
+	// defer cancel()
+	// url, err := client.urlFetcher(fetchCtx)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	origUrl := "http://localhost:4432"
+
+	fmt.Println("in dial")
+
+	httpClient := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			fmt.Println("Redirected to:", req.URL.String())
+			return http.ErrUseLastResponse // Prevent further redirects
+		},
+	}
+
+	req, err := http.NewRequest(http.MethodPost, origUrl, bytes.NewBuffer([]byte{}))
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println("in dial")
+	req.Header.Set("Content-Type", "application/msgpack")
+	client.credDecorator(req.Header)
+	client.conveyDecorator(req.Header)
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		// Handle errors, such as network issues or the initial request failing.
+		fmt.Println("Error dialing redirect host:", err)
+		return nil, err
+	}
+
+	redirectURL, err := url.Parse(origUrl)
+	if (err != nil) {
+		fmt.Println("invalid url configured")
+		return nil, err
+	}
+	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+		redirectURL, err = url.Parse(resp.Header.Get("Location"))
+		if err != nil {
+			fmt.Println("Error parsing redirect URL:", err)
+			return nil, err
+		}
+		
+		fmt.Println("Redirect URL from header:", redirectURL.String())
+	} 
+
+	fmt.Println("Final URL:", redirectURL.String())
+	
+	resp.Body.Close()
 
 	tlsConf := &tls.Config{
 		InsecureSkipVerify: true, // TODO - configure
@@ -236,7 +281,9 @@ func (client *QuicClient) dial(ctx context.Context) (quic.Connection, error) {
 	}
 
 	// TODO - configure
-	conn, err := quic.DialAddr(context.Background(), "localhost:4433", tlsConf, quicConf)
+
+
+	conn, err := quic.DialAddr(context.Background(), redirectURL.Host, tlsConf, quicConf)
 	if err != nil {
 		fmt.Println("error dialing")
 		return nil, err
@@ -255,7 +302,7 @@ func (client *QuicClient) dial(ctx context.Context) (quic.Connection, error) {
 		return nil, err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer([]byte{}))
+	req, err = http.NewRequest(http.MethodPost, redirectURL.String(), bytes.NewBuffer([]byte{}))
 	if err != nil {
 		roundTripper.Close()
 		return nil, err
@@ -283,11 +330,15 @@ func (client *QuicClient) dial(ctx context.Context) (quic.Connection, error) {
 		return nil, err
 	}
 
-	resp, err := reqStream.ReadResponse()
+	fmt.Println("sent request")
+
+	resp, err = reqStream.ReadResponse()
 	if err != nil {
 		fmt.Println("error reading http3 response from server")
 		return nil, err
 	}
+
+	fmt.Println("read response")
 
 	if (resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusPermanentRedirect ) {}
 

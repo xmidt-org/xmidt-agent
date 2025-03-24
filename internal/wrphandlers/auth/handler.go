@@ -69,6 +69,7 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 			got = strings.TrimSpace(got)
 			if allowed == got || allowed == wildcard {
 				// We found a match, so continue processing the message.
+				fmt.Println("REMOVE partner matched, continue processing")
 				return h.next.HandleWrp(msg)
 			}
 		}
@@ -95,5 +96,6 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 
 	sendErr := h.egress.HandleWrp(response)
 
+	fmt.Println("REMOVE unauthorized")
 	return errors.Join(ErrUnauthorized, sendErr)
 }

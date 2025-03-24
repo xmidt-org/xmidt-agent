@@ -6,7 +6,7 @@ websocket:
   back_up_url: https://localhost:6400
 quic:
   url_path: api/v2/device
-  back_up_url: https://localhost:4433
+  back_up_url: https://localhost:4432
 xmidt_credentials:
   url: http://localhost:6501/issue
   file_name: xmidt_agent_creds.txt

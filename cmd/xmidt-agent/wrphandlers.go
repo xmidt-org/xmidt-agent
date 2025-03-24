@@ -278,8 +278,9 @@ func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 	opts := []pubsub.Option{
 		pubsub.WithPublishTimeout(in.Pubsub.PublishTimeout),
 		pubsub.WithEgressHandler(lh, &cancel),
-		pubsub.WithEventHandler("*", in.QuicClient, &cancel),
+		pubsub.WithEventHandler("*", in.QuicClient, &cancel),  
 	}
+
 	ps, err := pubsub.New(
 		in.Identity.DeviceID,
 		opts...,
@@ -287,6 +288,15 @@ func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 	if err != nil {
 		return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
 	}
+
+	// TODO - Wes, needed this to get messages to pubsub.  
+	// in.QuicClient.AddMessageListener(
+	// 	event.MsgListenerFunc(
+	// 		func(m wrp.Message) {
+	// 			ps.HandleWrp(m)
+	// 		},
+	// 	),
+	// )
 
 	return pubsubOut{
 		PubSub: ps,
@@ -303,7 +313,8 @@ type mockTr181In struct {
 	MockTr181 MockTr181
 	Logger    *zap.Logger
 
-	PubSub *pubsub.PubSub
+	PubSub *pubsub.PubSub  // TODO - this doesn't work
+	QuicClient *quic.QuicClient
 }
 
 type mockTr181Out struct {
@@ -313,6 +324,7 @@ type mockTr181Out struct {
 
 func provideMockTr181Handler(in mockTr181In) (mockTr181Out, error) {
 	if !in.MockTr181.Enabled {
+		fmt.Println("REMOVE mocktr181 is not enabled")
 		return mockTr181Out{}, nil
 	}
 
@@ -322,6 +334,7 @@ func provideMockTr181Handler(in mockTr181In) (mockTr181Out, error) {
 			zap.String("handler", "mockTR181"),
 		))
 	if err != nil {
+		fmt.Println(err)
 		return mockTr181Out{}, err
 	}
 	mockDefaults := []mocktr181.Option{
@@ -344,11 +357,22 @@ func provideMockTr181Handler(in mockTr181In) (mockTr181Out, error) {
 	if err != nil {
 		return mockTr181Out{}, err
 	}
+
+	// TODO - this doesn't do anything
 	mocktr, err := in.PubSub.SubscribeService(in.MockTr181.ServiceName, loggerIn)
 	if err != nil {
 		fmt.Println("error subscribing mocktr1i1  service")
 		return mockTr181Out{}, errors.Join(ErrWRPHandlerConfig, err)
 	}
+
+	// in.QuicClient.AddMessageListener(
+	// 	event.MsgListenerFunc(
+	// 		func(m wrp.Message) {
+	// 			mocktr181Handler.HandleWrp(m)
+	// 		},
+	// 	),
+	// )
+
 
 	return mockTr181Out{
 		Cancel: mocktr,
