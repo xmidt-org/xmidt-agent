@@ -13,7 +13,7 @@ import (
 	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v3"
-	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
+	"github.com/xmidt-org/xmidt-agent/internal/event"
 )
 
 // DeviceID sets the device ID for the WS connection.
@@ -115,24 +115,11 @@ func KeepAliveInterval(d time.Duration) Option {
 		})
 }
 
-// WithIPv4 sets whether or not to allow IPv4 for the WS connection.  If this
-// is not set, the default is true.
-func WithIPv4(with ...bool) Option {
-	with = append(with, true)
+// whether or not we are using a redirect server (e.g. petasos)
+func WithRedirect(with bool) Option {
 	return optionFunc(
-		func(ws *QuicClient) error {
-			ws.withIPv4 = with[0]
-			return nil
-		})
-}
-
-// WithIPv6 sets whether or not to allow IPv6 for the WS connection.  If this
-// is not set, the default is true.
-func WithIPv6(with ...bool) Option {
-	with = append(with, true)
-	return optionFunc(
-		func(ws *QuicClient) error {
-			ws.withIPv6 = with[0]
+		func(qc *QuicClient) error {
+			qc.withRedirect = with
 			return nil
 		})
 }
@@ -153,32 +140,23 @@ func SendTimeout(d time.Duration) Option {
 // HTTPClient is the configuration for the HTTP client used for connection attempts.
 func HTTPClient(c arrangehttp.ClientConfig) Option {
 	return optionFunc(
-		func(ws *QuicClient) error {
+		func(qc *QuicClient) error {
 			if _, err := c.NewClient(); err != nil {
 				return errors.Join(err, ErrMisconfiguredWS)
 			}
 
-			ws.httpClientConfig = c
+			qc.httpClientConfig = c
 
 			return nil
 		})
 }
 
-// HTTPClientWithForceSets is the configuration for the HTTP client with recommended force sets, used for connection attempts.
-func HTTPClientWithForceSets(c arrangehttp.ClientConfig) Option {
+// HTTPClient is the configuration for the HTTP3 client used for connection attempts.
+func HTTP3Client(c *Http3ClientConfig) Option {
 	return optionFunc(
-		func(ws *QuicClient) (err error) {
-			// Set the configuration
-			if err := HTTPClient(c).apply(ws); err != nil {
-				return err
-			}
+		func(qc *QuicClient) error {
 
-			// Override the following arrangehttp.ClientConfig.Transport feilds
-			// Note, arrangehttp.ClientConfig.Transport lacks the http.Transport.Proxy,
-			// instead `Proxy` will be set during Websocket.newHTTPClient()
-			ws.httpClientConfig.Transport.MaxIdleConns = 1
-			ws.httpClientConfig.Transport.MaxIdleConnsPerHost = 1
-			ws.httpClientConfig.Transport.MaxConnsPerHost = 1
+			qc.http3ClientConfig = c
 
 			return nil
 		})
@@ -202,8 +180,17 @@ func AdditionalHeaders(headers http.Header) Option {
 func Once(once ...bool) Option {
 	once = append(once, true)
 	return optionFunc(
-		func(ws *QuicClient) error {
-			ws.once = once[0]
+		func(qc *QuicClient) error {
+			qc.once = once[0]
+			return nil
+		})
+}
+
+// Once sets whether or not to only attempt to connect once.
+func Enabled(enabled bool) Option {
+	return optionFunc(
+		func(qc *QuicClient) error {
+			qc.enabled = enabled
 			return nil
 		})
 }

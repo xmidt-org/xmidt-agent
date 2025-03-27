@@ -43,7 +43,6 @@ func New(next wrpkit.Handler, logger *zap.Logger, level ...zapcore.Level) (*Hand
 // HandleWrp is called to process a message.  If the next handler fails to
 // process the message, a response is sent to the source of the message.
 func (h Handler) HandleWrp(msg wrp.Message) error {
-	fmt.Println("REMOVE logging wrp msg handler called")
 	fields := []zap.Field{
 		zap.String("type", msg.Type.String()),
 		zap.String("source", msg.Source),
@@ -58,6 +57,5 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 
 	h.logger.Log(h.level, "Handling message", fields...)
 
-	fmt.Println("about to call next handler")
 	return h.next.HandleWrp(msg)
 }

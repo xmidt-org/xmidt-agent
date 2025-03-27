@@ -27,16 +27,6 @@ func validateURL() Option {
 		})
 }
 
-func validateIPMode() Option {
-	return optionFunc(
-		func(c *QuicClient) error {
-			if !c.withIPv4 && !c.withIPv6 {
-				return fmt.Errorf("%w: at least one IP mode must be allowed", ErrMisconfiguredWS)
-			}
-			return nil
-		})
-}
-
 func validateFetchURL() Option {
 	return optionFunc(
 		func(ws *QuicClient) error {

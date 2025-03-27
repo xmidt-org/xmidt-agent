@@ -9,43 +9,19 @@ import (
 	"time"
 
 	"github.com/xmidt-org/wrp-go/v3"
-	"github.com/xmidt-org/xmidt-agent/internal/credentials"
-	"github.com/xmidt-org/xmidt-agent/internal/jwtxt"
-	"github.com/xmidt-org/xmidt-agent/internal/metadata"
-	"github.com/xmidt-org/xmidt-agent/internal/quic"
-	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
-	"go.uber.org/fx"
 	"go.uber.org/zap"
+
+	"github.com/xmidt-org/xmidt-agent/internal/event"
+	"github.com/xmidt-org/xmidt-agent/internal/quic"
 )
 
 var (
 	ErrQuicConfig = errors.New("quic configuration error")
 )
 
-type QuicIn struct {
-	fx.In
-	Identity   Identity
-	Logger     *zap.Logger
-	CLI        *CLI
-	JWTXT      *jwtxt.Instructions
-	Cred       *credentials.Credentials
-	Metadata   *metadata.MetadataProvider
-	Quic Quic
-}
-
-type quicOut struct {
-	fx.Out
-	//QuicHandler wrpkit.Handler  // duplicate with Websocket
-	QuicClient  *quic.QuicClient
-	Egress      quic.Egress
-
-	// cancels
-	Cancels []func() `group:"cancels,flatten"`
-}
-
-func provideQuic(in QuicIn) (quicOut, error) {
+func provideQuic(in CloudHandlerIn) (cloudHandlerOut, error) {
 	if in.Quic.Disable {
-		return quicOut{}, nil
+		return cloudHandlerOut{}, nil
 	}
 
 	var fetchURLFunc func(context.Context) (string, error)
@@ -68,17 +44,14 @@ func provideQuic(in QuicIn) (quicOut, error) {
 		quic.FetchURL(
 			fetchURL(in.Quic.URLPath, in.Quic.BackUpURL,
 				fetchURLFunc)),
-		//quic.InactivityTimeout(in.Quic.InactivityTimeout),
-		//quic.PingWriteTimeout(in.Quic.PingWriteTimeout),
 		quic.SendTimeout(in.Quic.SendTimeout),
-		quic.KeepAliveInterval(in.Quic.KeepAliveInterval),
-		quic.HTTPClientWithForceSets(in.Quic.HTTPClient),
+		quic.HTTP3Client(&in.Quic.QuicClient),
+		quic.HTTPClient(in.Quic.HttpClient),
 		quic.MaxMessageBytes(in.Quic.MaxMessageBytes),
 		quic.ConveyDecorator(in.Metadata.Decorate),
 		quic.AdditionalHeaders(in.Quic.AdditionalHeaders),
 		quic.NowFunc(time.Now),
-		quic.WithIPv6(!in.Quic.DisableV6),
-		quic.WithIPv4(!in.Quic.DisableV4),
+		quic.WithRedirect(in.Quic.UseRedirectServer),
 		quic.Once(in.Quic.Once),
 		quic.RetryPolicy(in.Quic.RetryPolicy),
 	)
@@ -119,32 +92,12 @@ func provideQuic(in QuicIn) (quicOut, error) {
 	}
 
 	if in.CLI.Dev {
-		cancels = append(cancels, msg, con, discon, heartbeat) 
+		cancels = append(cancels, msg, con, discon, heartbeat)
 	}
 
-	return quicOut{
-		QuicClient:      quicClient,
+	return cloudHandlerOut{
+		Handler: quicClient,
 		Egress:  quicClient,
-		Cancels: cancels, 
+		Cancels: cancels,
 	}, err
 }
-
-// TODO - duplicated in ws.go
-// func fetchURL(path, backUpURL string, f func(context.Context) (string, error)) func(context.Context) (string, error) {
-// 	return func(ctx context.Context) (string, error) {
-// 		if f == nil {
-// 			return url.JoinPath(backUpURL, path)
-// 		}
-
-// 		baseURL, err := f(ctx)
-// 		if err != nil {
-// 			if backUpURL != "" {
-// 				return url.JoinPath(backUpURL, path)
-// 			}
-
-// 			return "", err
-// 		}
-
-// 		return url.JoinPath(baseURL, path)
-// 	}
-// }

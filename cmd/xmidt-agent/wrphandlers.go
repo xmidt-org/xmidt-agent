@@ -7,17 +7,18 @@ import (
 	"fmt"
 
 	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/xmidt-agent/internal/cloud"
+	"github.com/xmidt-org/xmidt-agent/internal/event"
 	"github.com/xmidt-org/xmidt-agent/internal/loglevel"
 	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
-	"github.com/xmidt-org/xmidt-agent/internal/quic"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
-	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/auth"
 	loghandler "github.com/xmidt-org/xmidt-agent/internal/wrphandlers/logging"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/missing"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/mocktr181"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/qos"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/xmidt_agent_crud"
+	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
@@ -33,105 +34,116 @@ func provideWRPHandlers() fx.Option {
 			provideMissingHandler,
 			provideAuthHandler,
 			provideCrudHandler,
-			//provideQOSHandler,
-			provideQuicQOSHandler,
-			//provideWSEventorToHandlerAdapter,
-			provideQuicEventorToHandlerAdapter,
+			provideQOSHandler,
+			provideEventorToHandlerAdapter,
 			provideMockTr181Handler,
 		),
 	)
 }
 
-type quicAdapterIn struct {
+type eventorAdapterIn struct {
 	fx.In
 
-	QuicClient     *quic.QuicClient
-	Logger *zap.Logger
+	CloudHandler cloud.Handler
+	Logger       *zap.Logger
 
 	// wrphandlers
 	AuthHandler *auth.Handler
 }
 
-type quicAdapterOut struct {
+type eventorAdapterOut struct {
 	fx.Out
 
 	Cancels []func() `group:"cancels,flatten"`
 }
 
-// type wsAdapterIn struct {
-// 	fx.In
-
-// 	WS     *websocket.Websocket
-// 	Logger *zap.Logger
-
-// 	// wrphandlers
-// 	AuthHandler *auth.Handler
-// }
-
-// type wsAdapterOut struct {
-// 	fx.Out
-
-// 	Cancels []func() `group:"cancels,flatten"`
-// }
-
-// func provideWSEventorToHandlerAdapter(in wsAdapterIn) (wsAdapterOut, error) {
-// 	lh, err := loghandler.New(in.AuthHandler,
-// 		in.Logger.With(
-// 			zap.String("stage", "ingress"),
-// 			zap.String("handler", "websocket")))
-
-// 	if err != nil {
-// 		return wsAdapterOut{}, err
-// 	}
-
-// 	return wsAdapterOut{
-// 		Cancels: []func(){
-// 			in.WS.AddMessageListener(
-// 				event.MsgListenerFunc(func(m wrp.Message) {
-// 					_ = lh.HandleWrp(m)
-// 				})),
-// 		}}, nil
-// }
-
-func provideQuicEventorToHandlerAdapter(in quicAdapterIn) (quicAdapterOut, error) {
+func provideEventorToHandlerAdapter(in eventorAdapterIn) (eventorAdapterOut, error) {
 	lh, err := loghandler.New(in.AuthHandler,
 		in.Logger.With(
 			zap.String("stage", "ingress"),
-			zap.String("handler", "quic")))
+			zap.String("handler", in.CloudHandler.Name())))
 
 	if err != nil {
-		return quicAdapterOut{}, err
+		return eventorAdapterOut{}, err
 	}
 
-	return quicAdapterOut{
+	return eventorAdapterOut{
 		Cancels: []func(){
-			in.QuicClient.AddMessageListener(
+			in.CloudHandler.AddMessageListener(
 				event.MsgListenerFunc(func(m wrp.Message) {
-					fmt.Println("REMOVE in quicAdapter message listener")
 					_ = lh.HandleWrp(m)
 				})),
 		}}, nil
 }
 
+// type quicAdapterIn struct {
+// 	fx.In
+
+// 	QuicClient *quic.QuicClient
+// 	Logger     *zap.Logger
+
+// 	// wrphandlers
+// 	AuthHandler *auth.Handler
+// }
+
+// type quicAdapterOut struct {
+// 	fx.Out
+
+// 	Cancels []func() `group:"cancels,flatten"`
+// }
+
+// func provideQuicEventorToHandlerAdapter(in quicAdapterIn) (quicAdapterOut, error) {
+// 	lh, err := loghandler.New(in.AuthHandler,
+// 		in.Logger.With(
+// 			zap.String("stage", "ingress"),
+// 			zap.String("handler", "quic")))
+
+// 	if err != nil {
+// 		return quicAdapterOut{}, err
+// 	}
+
+// 	if in.QuicClient == nil {
+// 		return quicAdapterOut{}, err
+// 	}
+
+// 	return quicAdapterOut{
+// 		Cancels: []func(){
+// 			in.QuicClient.AddMessageListener(
+// 				event.MsgListenerFunc(func(m wrp.Message) {
+// 					fmt.Println("REMOVE in quicAdapter message listener")
+// 					_ = lh.HandleWrp(m)
+// 				})),
+// 		}}, nil
+// }
+
 type qosIn struct {
 	fx.In
 
-	QOS    QOS
-	Logger *zap.Logger
-	WS     *websocket.Websocket
-	QuicClient *quic.QuicClient
+	QOS     QOS
+	Logger  *zap.Logger
+	Handler wrpkit.Handler
 }
 
-func provideQuicQOSHandler(in qosIn) (*qos.Handler, error) {
-	lh, err := loghandler.New(in.QuicClient,
+type qosOut struct {
+	fx.Out
+
+	Handler *qos.Handler
+}
+
+func provideQOSHandler(in qosIn) (qosOut, error) {
+	cloudHandler, ok := in.Handler.(cloud.Handler)
+	if !ok {
+		return qosOut{}, errors.New("invalid cloud handler passed to QOS service")
+	}
+	lh, err := loghandler.New(in.Handler,
 		in.Logger.With(
 			zap.String("stage", "egress"),
-			zap.String("handler", "quic")))
+			zap.String("handler", cloudHandler.Name())))
 	if err != nil {
-		return nil, err
+		return qosOut{}, err
 	}
 
-	return qos.New(
+	handler, err := qos.New(
 		lh,
 		qos.MaxQueueBytes(in.QOS.MaxQueueBytes),
 		qos.MaxMessageBytes(in.QOS.MaxMessageBytes),
@@ -141,28 +153,11 @@ func provideQuicQOSHandler(in qosIn) (*qos.Handler, error) {
 		qos.HighExpires(in.QOS.HighExpires),
 		qos.CriticalExpires(in.QOS.CriticalExpires),
 	)
+
+	return qosOut{
+		Handler: handler,
+	}, err
 }
-
-// func provideQOSHandler(in qosIn) (*qos.Handler, error) {
-// 	lh, err := loghandler.New(in.WS,
-// 		in.Logger.With(
-// 			zap.String("stage", "egress"),
-// 			zap.String("handler", "websocket")))
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return qos.New(
-// 		lh,
-// 		qos.MaxQueueBytes(in.QOS.MaxQueueBytes),
-// 		qos.MaxMessageBytes(in.QOS.MaxMessageBytes),
-// 		qos.Priority(in.QOS.Priority),
-// 		qos.LowExpires(in.QOS.LowExpires),
-// 		qos.MediumExpires(in.QOS.MediumExpires),
-// 		qos.HighExpires(in.QOS.HighExpires),
-// 		qos.CriticalExpires(in.QOS.CriticalExpires),
-// 	)
-// }
 
 type missingIn struct {
 	fx.In
@@ -252,8 +247,8 @@ type pubsubIn struct {
 	Logger   *zap.Logger
 
 	// wrphandlers
-	Egress *qos.Handler
-	QuicClient *quic.QuicClient
+	Egress   *qos.Handler
+	Producer wrpkit.Handler
 }
 
 type pubsubOut struct {
@@ -278,7 +273,7 @@ func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 	opts := []pubsub.Option{
 		pubsub.WithPublishTimeout(in.Pubsub.PublishTimeout),
 		pubsub.WithEgressHandler(lh, &cancel),
-		pubsub.WithEventHandler("*", in.QuicClient, &cancel),  
+		pubsub.WithEventHandler("*", in.Producer, &cancel),
 	}
 
 	ps, err := pubsub.New(
@@ -288,15 +283,6 @@ func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 	if err != nil {
 		return pubsubOut{}, errors.Join(ErrWRPHandlerConfig, err)
 	}
-
-	// TODO - Wes, needed this to get messages to pubsub.  
-	// in.QuicClient.AddMessageListener(
-	// 	event.MsgListenerFunc(
-	// 		func(m wrp.Message) {
-	// 			ps.HandleWrp(m)
-	// 		},
-	// 	),
-	// )
 
 	return pubsubOut{
 		PubSub: ps,
@@ -313,8 +299,8 @@ type mockTr181In struct {
 	MockTr181 MockTr181
 	Logger    *zap.Logger
 
-	PubSub *pubsub.PubSub  // TODO - this doesn't work
-	QuicClient *quic.QuicClient
+	PubSub   *pubsub.PubSub // TODO - this doesn't work
+	Producer wrpkit.Handler
 }
 
 type mockTr181Out struct {
@@ -358,21 +344,11 @@ func provideMockTr181Handler(in mockTr181In) (mockTr181Out, error) {
 		return mockTr181Out{}, err
 	}
 
-	// TODO - this doesn't do anything
 	mocktr, err := in.PubSub.SubscribeService(in.MockTr181.ServiceName, loggerIn)
 	if err != nil {
 		fmt.Println("error subscribing mocktr1i1  service")
 		return mockTr181Out{}, errors.Join(ErrWRPHandlerConfig, err)
 	}
-
-	// in.QuicClient.AddMessageListener(
-	// 	event.MsgListenerFunc(
-	// 		func(m wrp.Message) {
-	// 			mocktr181Handler.HandleWrp(m)
-	// 		},
-	// 	),
-	// )
-
 
 	return mockTr181Out{
 		Cancel: mocktr,

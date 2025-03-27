@@ -6,48 +6,22 @@ package main
 import (
 	"context"
 	"errors"
-	"net/url"
 	"time"
 
 	"github.com/xmidt-org/wrp-go/v3"
-	"github.com/xmidt-org/xmidt-agent/internal/credentials"
-	"github.com/xmidt-org/xmidt-agent/internal/jwtxt"
-	"github.com/xmidt-org/xmidt-agent/internal/metadata"
-	"github.com/xmidt-org/xmidt-agent/internal/websocket"
-	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
-	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
-	"go.uber.org/fx"
 	"go.uber.org/zap"
+
+	"github.com/xmidt-org/xmidt-agent/internal/event"
+	"github.com/xmidt-org/xmidt-agent/internal/websocket"
 )
 
 var (
 	ErrWebsocketConfig = errors.New("websocket configuration error")
 )
 
-type wsIn struct {
-	fx.In
-	Identity  Identity
-	Logger    *zap.Logger
-	CLI       *CLI
-	JWTXT     *jwtxt.Instructions
-	Cred      *credentials.Credentials
-	Metadata  *metadata.MetadataProvider
-	Websocket Websocket
-}
-
-type wsOut struct {
-	fx.Out
-	WSHandler wrpkit.Handler
-	WS        *websocket.Websocket
-	Egress    websocket.Egress
-
-	// cancels
-	Cancels []func() `group:"cancels,flatten"`
-}
-
-func provideWS(in wsIn) (wsOut, error) {
+func provideWS(in CloudHandlerIn) (cloudHandlerOut, error) {
 	if in.Websocket.Disable {
-		return wsOut{}, nil
+		return cloudHandlerOut{}, nil
 	}
 
 	var fetchURLFunc func(context.Context) (string, error)
@@ -124,28 +98,9 @@ func provideWS(in wsIn) (wsOut, error) {
 		cancels = append(cancels, msg, con, discon, heartbeat)
 	}
 
-	return wsOut{
-		WS:      ws,
+	return cloudHandlerOut{
+		Handler: ws,
 		Egress:  ws,
 		Cancels: cancels,
 	}, err
-}
-
-func fetchURL(path, backUpURL string, f func(context.Context) (string, error)) func(context.Context) (string, error) {
-	return func(ctx context.Context) (string, error) {
-		if f == nil {
-			return url.JoinPath(backUpURL, path)
-		}
-
-		baseURL, err := f(ctx)
-		if err != nil {
-			if backUpURL != "" {
-				return url.JoinPath(backUpURL, path)
-			}
-
-			return "", err
-		}
-
-		return url.JoinPath(baseURL, path)
-	}
 }

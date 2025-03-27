@@ -10,8 +10,8 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/xmidt-agent/internal/event"
 	"github.com/xmidt-org/xmidt-agent/internal/quic"
-	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
 )
 
 // CLI is the structure that is used to capture the command line arguments.
@@ -23,14 +23,13 @@ type CLI struct {
 	Once bool   `optional:""                                                    help:"Only attempt to connect once."`
 }
 
-
 type MessageListenerFunc func(wrp.Message)
 
 func (f MessageListenerFunc) OnMessage(m wrp.Message) {
 	f(m)
 }
 
-// Run this and then run a server... otherwise I don't know what the point of this is because it runs in the same 
+// Run this and then run a server... otherwise I don't know what the point of this is because it runs in the same
 // process as the quic client
 func main() {
 	var cli CLI
@@ -71,16 +70,8 @@ func main() {
 		quic.AddMessageListener(
 			MessageListenerFunc(
 				func(m wrp.Message) {
-					fmt.Println(m)  // send a message back
+					fmt.Println(m) // send a message back
 				})),
-	}
-
-	if cli.V4 {
-		opts = append(opts, quic.WithIPv6(false))
-	}
-
-	if cli.V6 {
-		opts = append(opts, quic.WithIPv4(false))
 	}
 
 	if cli.Once {

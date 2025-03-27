@@ -13,7 +13,7 @@ import (
 	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v3"
-	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
+	"github.com/xmidt-org/xmidt-agent/internal/event"
 )
 
 // DeviceID sets the device ID for the WS connection.
