@@ -348,30 +348,8 @@ type cloudHandlerOut struct {
 	Cancels []func() `group:"cancels,flatten"`
 }
 
-// type CloudHandlerInCopy struct {
-// 	Identity  Identity
-// 	Logger    *zap.Logger
-// 	CLI       *CLI
-// 	JWTXT     *jwtxt.Instructions
-// 	Cred      *credentials.Credentials
-// 	Metadata  *metadata.MetadataProvider
-// 	Quic      Quic
-// 	Websocket Websocket
-// }
-
 func provideCloudHandler(in CloudHandlerIn) (cloudHandlerOut, error) {
 	cloudHandlerOut := cloudHandlerOut{}
-
-	// cloudHandlerInCopy := CloudHandlerInCopy{
-	// 	Identity: in.Identity,
-	// 	Logger: in.Logger,
-	// 	CLI: in.CLI,
-	// 	JWTXT: in.JWTXT,
-	// 	Cred: in.Cred,
-	// 	Metadata: in.Metadata,
-	// 	Quic: in.Quic,
-	// 	Websocket: in.Websocket,
-	// }
 
 	if in.Websocket.Disable && !in.Quic.Disable {
 		quicOut, err := provideQuic(in)
