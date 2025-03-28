@@ -6,7 +6,7 @@ package cloud
 import (
 	"context"
 
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/event"
 )
 

@@ -4,7 +4,7 @@
 package cloud
 
 import (
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v5"
 )
 
 // Egress interface is the egress route used to handle wrp messages that

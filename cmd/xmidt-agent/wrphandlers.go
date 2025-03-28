@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/cloud"
 	"github.com/xmidt-org/xmidt-agent/internal/event"
 	"github.com/xmidt-org/xmidt-agent/internal/loglevel"
@@ -75,46 +75,6 @@ func provideEventorToHandlerAdapter(in eventorAdapterIn) (eventorAdapterOut, err
 				})),
 		}}, nil
 }
-
-// type quicAdapterIn struct {
-// 	fx.In
-
-// 	QuicClient *quic.QuicClient
-// 	Logger     *zap.Logger
-
-// 	// wrphandlers
-// 	AuthHandler *auth.Handler
-// }
-
-// type quicAdapterOut struct {
-// 	fx.Out
-
-// 	Cancels []func() `group:"cancels,flatten"`
-// }
-
-// func provideQuicEventorToHandlerAdapter(in quicAdapterIn) (quicAdapterOut, error) {
-// 	lh, err := loghandler.New(in.AuthHandler,
-// 		in.Logger.With(
-// 			zap.String("stage", "ingress"),
-// 			zap.String("handler", "quic")))
-
-// 	if err != nil {
-// 		return quicAdapterOut{}, err
-// 	}
-
-// 	if in.QuicClient == nil {
-// 		return quicAdapterOut{}, err
-// 	}
-
-// 	return quicAdapterOut{
-// 		Cancels: []func(){
-// 			in.QuicClient.AddMessageListener(
-// 				event.MsgListenerFunc(func(m wrp.Message) {
-// 					fmt.Println("REMOVE in quicAdapter message listener")
-// 					_ = lh.HandleWrp(m)
-// 				})),
-// 		}}, nil
-// }
 
 type qosIn struct {
 	fx.In

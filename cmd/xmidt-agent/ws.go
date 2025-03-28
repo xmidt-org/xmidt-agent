@@ -8,10 +8,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/xmidt-org/wrp-go/v3"
-	"go.uber.org/zap"
-
+	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/event"
+	"go.uber.org/zap"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
 )
 

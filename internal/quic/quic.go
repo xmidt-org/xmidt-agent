@@ -20,7 +20,7 @@ import (
 	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/eventor"
 	"github.com/xmidt-org/retry"
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/event"
 )
 
@@ -462,7 +462,7 @@ func (qc *QuicClient) run(ctx context.Context) {
 				}
 
 				if err == nil {
-					decoder.Reset(bytes.NewReader(data))
+					//decoder.Reset(bytes.NewReader(data)) // TODO
 					err = decoder.Decode(&msg)
 				}
 

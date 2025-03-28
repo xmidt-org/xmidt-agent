@@ -16,7 +16,7 @@ import (
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/xmidt-org/retry"
-	"github.com/xmidt-org/wrp-go/v3"
+	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/event"
 	mockevent "github.com/xmidt-org/xmidt-agent/internal/mocks/event"
 	"github.com/xmidt-org/xmidt-agent/internal/nhooyr.io/websocket"
