@@ -398,7 +398,7 @@ func (qc *QuicClient) run(ctx context.Context) {
 	qc.wg.Add(1)
 	defer qc.wg.Done()
 
-	decoder := wrp.NewDecoder(nil, wrp.Msgpack)
+	//decoder := wrp.NewDecoder(nil, wrp.Msgpack)
 
 	policy := qc.retryPolicyFactory.NewPolicy(ctx)
 
@@ -457,18 +457,19 @@ func (qc *QuicClient) run(ctx context.Context) {
 				err = errors.Join(err, ctxErr)
 				// If ctxErr is context.Canceled then the parent context has been canceled.
 				if errors.Is(ctxErr, context.Canceled) {
-					//cancel(nil)
+					fmt.Println("context has error")
 					break
 				}
 
 				if err == nil {
-					//decoder.Reset(bytes.NewReader(data)) // TODO
+					decoder := wrp.NewDecoder(bytes.NewReader(data), wrp.Msgpack)
 					err = decoder.Decode(&msg)
 				}
 
 				// Cancel ws.conn.Reader()'s context after wrp decoding.
 				//cancel(nil) // what is this doing?
 				if err != nil {
+					fmt.Println("REMOVE decoder had error " + err.Error())
 					// The connection gave us an unexpected message, or a message
 					// that could not be decoded.  Close & reconnect.
 					defer qc.conn.CloseWithError(quic.ApplicationErrorCode(quic.StreamStateError), "unable to decode wrp message")

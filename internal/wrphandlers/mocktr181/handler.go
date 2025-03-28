@@ -115,7 +115,7 @@ func (h Handler) Enabled() bool {
 // HandleWrp is called to process a tr181 command
 func (h Handler) HandleWrp(msg wrp.Message) error {
 	fmt.Println("REMOVE mocktr181 is handling wrp message")
-	statusCode, payloadResponse, err := h.proccessCommand(msg.Payload)
+	_, payloadResponse, err := h.proccessCommand(msg.Payload)
 	if err != nil {
 		return errors.Join(err, wrpkit.ErrNotHandled)
 	}
@@ -125,7 +125,6 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 	response.Source = h.source
 	response.ContentType = "application/json"
 	response.Payload = payloadResponse
-	response.Status = &statusCode
 	if err = h.egress.HandleWrp(response); err != nil {
 		return errors.Join(err, wrpkit.ErrNotHandled)
 	}
