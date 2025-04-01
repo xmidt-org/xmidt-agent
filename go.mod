@@ -3,7 +3,7 @@ module github.com/xmidt-org/xmidt-agent
 go 1.23
 
 require (
-	github.com/alecthomas/kong v1.9.0
+	github.com/alecthomas/kong v1.10.0
 	github.com/foxcpp/go-mockdns v1.1.0
 	github.com/google/uuid v1.6.0
 	github.com/goschtalt/goschtalt v0.26.1
