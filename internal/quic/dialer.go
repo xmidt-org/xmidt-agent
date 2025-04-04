@@ -1,0 +1,95 @@
+// SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
+// SPDX-License-Identifier: Apache-2.0
+
+package quic
+
+import (
+	"bytes"
+	"context"
+	"crypto/tls"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+
+	"github.com/quic-go/quic-go"
+	"github.com/quic-go/quic-go/http3"
+)
+
+type Dialer interface {
+	DialQuic(ctx context.Context, url *url.URL) (quic.Connection, error)
+}
+
+type QuicDialer struct {
+	tlsConfig       *tls.Config
+	quicConfig      quic.Config
+	credDecorator   func(http.Header) error
+	conveyDecorator func(http.Header) error
+}
+
+// NOTE - when using a straight http.Client, the quic connection seemed to always
+// get re-created and the client no longer had access to the current quic connection.  The below
+// "dialer" uses the http3.ClientConn api directly and that api uses the passed in connection.
+func (qd *QuicDialer) DialQuic(ctx context.Context, url *url.URL) (quic.Connection, error) {
+
+	conn, err := quic.DialAddr(ctx, url.Host, qd.tlsConfig, &qd.quicConfig)
+	if err != nil {
+		fmt.Println("REMOVE error dialing")
+		return nil, err
+	}
+
+	roundTripper := &http3.Transport{
+		TLSClientConfig: qd.tlsConfig,
+		QUICConfig:      &qd.quicConfig,
+	}
+
+	h3Conn := roundTripper.NewClientConn(conn)
+
+	reqStream, err := h3Conn.OpenRequestStream(ctx)
+	if err != nil {
+		fmt.Printf("REMOVE error opening request stream %s", err)
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, url.String(), bytes.NewBuffer([]byte{}))
+	if err != nil {
+		roundTripper.Close()
+		return nil, err
+	}
+
+	req.Header.Set("Content-Type", "application/msgpack")
+	qd.credDecorator(req.Header)
+	qd.conveyDecorator(req.Header)
+
+	fmt.Println(req)
+
+	err = reqStream.SendRequestHeader(req)
+	if err != nil {
+		fmt.Printf("REMOVE error sending request %s", err) // TODO create a specific error and wrap
+		return nil, err
+	}
+
+	fmt.Println("REMOVE sent request")
+
+	resp, err := reqStream.ReadResponse()
+	if err != nil {
+		fmt.Println("error reading http3 response from server")
+		return nil, err
+	}
+
+	fmt.Println("REMOVE read response")
+
+	_, err = io.Copy(io.Discard, resp.Body)
+	if (err != nil) && !errors.Is(err, io.EOF) {
+		fmt.Printf("error reading body %s", err)
+	}
+
+	fmt.Println("REMOVE before closing response")
+	resp.Body.Close()
+
+	fmt.Println("REMOVE after closing response")
+	dumpContext(conn.Context())
+
+	return conn, err
+}
