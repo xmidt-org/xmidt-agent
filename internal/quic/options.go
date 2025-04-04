@@ -34,7 +34,7 @@ func DeviceID(id wrp.DeviceID) Option {
 		})
 }
 
-// URL sets the URL for the WS connection.
+// URL sets the URL for the quic connection.
 func URL(url string) Option {
 	return optionFunc(
 		func(ws *QuicClient) error {

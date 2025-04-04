@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/quic-go/quic-go"
-	"github.com/quic-go/quic-go/http3"
 	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/eventor"
 	"github.com/xmidt-org/retry"
@@ -69,7 +68,7 @@ type QuicClient struct {
 
 	// inactivityTimeout is the inactivity timeout for the Quic connection.
 	// Defaults to 1 minute.
-	inactivityTimeout time.Duration
+	//inactivityTimeout time.Duration
 
 	// sendTimeout is the send timeout for the Quic connection.
 	sendTimeout time.Duration
@@ -118,6 +117,8 @@ type QuicClient struct {
 	shutdown context.CancelFunc
 
 	conn quic.Connection
+
+	qd Dialer
 }
 
 // Option is a functional option type for WS.
@@ -138,15 +139,13 @@ func emptyDecorator(http.Header) error {
 // New creates a new http3 connection with the given options.
 func New(opts ...Option) (*QuicClient, error) {
 	qc := QuicClient{
-		inactivityTimeout: time.Minute,
-		credDecorator:     emptyDecorator,
-		conveyDecorator:   emptyDecorator,
+		credDecorator:   emptyDecorator,
+		conveyDecorator: emptyDecorator,
 	}
 
 	opts = append(opts,
 		validateDeviceID(),
 		validateURL(),
-		//validateIPMode(),
 		validateFetchURL(),
 		validateCredentialsDecorator(),
 		validateConveyDecorator(),
@@ -161,6 +160,15 @@ func New(opts ...Option) (*QuicClient, error) {
 			}
 		}
 	}
+
+	// separating for test purposes but introduces tramp data
+	dialer := &QuicDialer{
+		tlsConfig:       &qc.http3ClientConfig.TlsConfig,
+		quicConfig:      qc.http3ClientConfig.QuicConfig,
+		credDecorator:   qc.credDecorator,
+		conveyDecorator: qc.conveyDecorator,
+	}
+	qc.qd = dialer
 
 	return &qc, nil
 }
@@ -219,7 +227,6 @@ func (qc *QuicClient) AddMessageListener(listener event.MsgListener) event.Cance
 
 // Send sends the provided WRP message through the existing quic connection.
 func (qc *QuicClient) Send(ctx context.Context, msg wrp.Message) error {
-	fmt.Println("REMOVE sending wrp response")
 	stream, err := qc.conn.OpenStream()
 	if err != nil {
 		fmt.Printf("error opening stream to client %s", err)
@@ -229,7 +236,7 @@ func (qc *QuicClient) Send(ctx context.Context, msg wrp.Message) error {
 
 	_, err = stream.Write(wrp.MustEncode(&msg, wrp.Msgpack))
 	if err != nil {
-		fmt.Printf("error writing to client %s", err)
+		fmt.Printf("error writing to server %s", err)
 		return err
 	}
 
@@ -239,6 +246,7 @@ func (qc *QuicClient) Send(ctx context.Context, msg wrp.Message) error {
 func (qc *QuicClient) dial(ctx context.Context) (quic.Connection, error) {
 	fetchCtx, cancel := context.WithTimeout(ctx, qc.urlFetchingTimeout)
 	defer cancel()
+
 	fetchUrl, err := qc.urlFetcher(fetchCtx)
 	if err != nil {
 		return nil, err
@@ -257,73 +265,7 @@ func (qc *QuicClient) dial(ctx context.Context) (quic.Connection, error) {
 		}
 	}
 
-	fmt.Println("in dial")
-
-	// tlsConf := &tls.Config{
-	// 	InsecureSkipVerify: true, // TODO - configure
-	// 	NextProtos:         []string{"h3"},
-	// }
-
-	// quicConf := &quic.Config{
-	// 	KeepAlivePeriod:      10 * time.Second,
-	// 	HandshakeIdleTimeout: 1 * time.Minute,
-	// 	MaxIdleTimeout:       1 * time.Minute,
-	// }
-
-	conn, err := quic.DialAddr(ctx, redirectedUrl.Host, &qc.http3ClientConfig.TlsConfig, &qc.http3ClientConfig.QuicConfig)
-	if err != nil {
-		fmt.Println("REMOVE error dialing")
-		return nil, err
-	}
-
-	roundTripper := &http3.Transport{
-		TLSClientConfig: &qc.http3ClientConfig.TlsConfig,
-		QUICConfig:      &qc.http3ClientConfig.QuicConfig,
-	}
-
-	h3Conn := roundTripper.NewClientConn(conn)
-
-	reqStream, err := h3Conn.OpenRequestStream(ctx)
-	if err != nil {
-		fmt.Printf("REMOVE error opening request stream %s", err)
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, redirectedUrl.String(), bytes.NewBuffer([]byte{}))
-	if err != nil {
-		roundTripper.Close()
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/msgpack")
-	qc.credDecorator(req.Header)
-	qc.conveyDecorator(req.Header)
-
-	err = reqStream.SendRequestHeader(req)
-	if err != nil {
-		fmt.Printf("REMOVE error sending request %s", err) // TODO create a specific error and wrap
-		return nil, err
-	}
-
-	fmt.Println("REMOVE sent request")
-
-	resp, err := reqStream.ReadResponse()
-	if err != nil {
-		fmt.Println("error reading http3 response from server")
-		return nil, err
-	}
-
-	fmt.Println("REMOVE read response")
-
-	if resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusPermanentRedirect {
-	}
-
-	_, err = io.Copy(io.Discard, resp.Body)
-	if (err != nil) && !errors.Is(err, io.EOF) {
-		fmt.Printf("error reading body %s", err)
-	}
-
-	resp.Body.Close()
+	conn, err := qc.qd.DialQuic(ctx, redirectedUrl)
 
 	return conn, err
 }
@@ -340,17 +282,8 @@ func (qc *QuicClient) redirect(redirectUrl *url.URL) (*url.URL, error) {
 		return nil, err
 	}
 	httpClient.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		fmt.Println("REMOVE Redirected to:", req.URL.String())
 		return http.ErrUseLastResponse
 	}
-
-	// httpClient := &http.Client{
-	// 	Timeout: client.httpClientConfig.Timeout,
-	// 	CheckRedirect: func(req *http.Request, via []*http.Request) error {
-	// 		fmt.Println("REMOVE Redirected to:", req.URL.String())
-	// 		return http.ErrUseLastResponse
-	// 	},
-	// }
 
 	req, err := http.NewRequest(http.MethodPost, redirectUrl.String(), bytes.NewBuffer([]byte{}))
 	if err != nil {
@@ -363,7 +296,6 @@ func (qc *QuicClient) redirect(redirectUrl *url.URL) (*url.URL, error) {
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		fmt.Println("REMOVE Error dialing redirect host:", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
@@ -371,7 +303,6 @@ func (qc *QuicClient) redirect(redirectUrl *url.URL) (*url.URL, error) {
 	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
 		redirectedUrl, err := url.Parse(resp.Header.Get("Location"))
 		if err != nil {
-			fmt.Println("REMOVE Error parsing redirected URL:", err)
 			return nil, err
 		}
 		returnUrl = redirectedUrl
@@ -380,7 +311,6 @@ func (qc *QuicClient) redirect(redirectUrl *url.URL) (*url.URL, error) {
 		return nil, fmt.Errorf("%s: %w", errString, ErrFromRedirectServer)
 	}
 
-	fmt.Println("REMOVE Final URL:", returnUrl)
 	return returnUrl, nil
 }
 
@@ -394,11 +324,8 @@ func dumpContext(ctx context.Context, keys ...interface{}) {
 }
 
 func (qc *QuicClient) run(ctx context.Context) {
-	fmt.Println("in run")
 	qc.wg.Add(1)
 	defer qc.wg.Done()
-
-	//decoder := wrp.NewDecoder(nil, wrp.Msgpack)
 
 	policy := qc.retryPolicyFactory.NewPolicy(ctx)
 
@@ -416,7 +343,6 @@ func (qc *QuicClient) run(ctx context.Context) {
 		conn, dialErr := qc.dial(ctx) //nolint:bodyclose
 		cEvent.At = qc.nowFunc()
 
-		fmt.Printf("in run after dial %s", dialErr)
 		if dialErr == nil {
 			qc.connectListeners.Visit(func(l event.ConnectListener) {
 				l.OnConnect(cEvent)
@@ -432,47 +358,15 @@ func (qc *QuicClient) run(ctx context.Context) {
 
 			// Read loop
 			for {
-				fmt.Println("in read loop")
 				var msg wrp.Message
-				//_, cancel := context.WithCancelCause(ctx)
-
-				fmt.Println("listening for messages")
+				ctx, cancel := context.WithCancelCause(ctx)
 
 				stream, err := conn.AcceptStream(ctx)
 				if err != nil {
-					fmt.Println("error accepting stream")
-					break
-				}
+					cancel(nil)
 
-				data, err := readBytes(stream)
-				if err != nil {
-					fmt.Println("Error reading from stream", err)
-					break
-				}
-
-				fmt.Println("Client received:", string(data))
-				stream.Close()
-
-				ctxErr := context.Cause(ctx)
-				err = errors.Join(err, ctxErr)
-				// If ctxErr is context.Canceled then the parent context has been canceled.
-				if errors.Is(ctxErr, context.Canceled) {
-					fmt.Println("context has error")
-					break
-				}
-
-				if err == nil {
-					decoder := wrp.NewDecoder(bytes.NewReader(data), wrp.Msgpack)
-					err = decoder.Decode(&msg)
-				}
-
-				// Cancel ws.conn.Reader()'s context after wrp decoding.
-				//cancel(nil) // what is this doing?
-				if err != nil {
-					fmt.Println("REMOVE decoder had error " + err.Error())
-					// The connection gave us an unexpected message, or a message
-					// that could not be decoded.  Close & reconnect.
-					defer qc.conn.CloseWithError(quic.ApplicationErrorCode(quic.StreamStateError), "unable to decode wrp message")
+					// how to print error
+					qc.conn.CloseWithError(quic.ApplicationErrorCode(quic.StreamStateError), "error accepting stream")
 
 					dEvent := event.Disconnect{
 						At:  qc.nowFunc(),
@@ -486,14 +380,47 @@ func (qc *QuicClient) run(ctx context.Context) {
 
 					break
 				}
+				defer stream.Close()
+
+				ctxErr := context.Cause(ctx)
+				// If ctxErr is context.Canceled then the parent context has been canceled.
+				if errors.Is(ctxErr, context.Canceled) {
+					cancel(nil)
+					break
+				}
+
+				data, err := readBytes(stream)
+				if err == nil {
+					decoder := wrp.NewDecoder(bytes.NewReader(data), wrp.Msgpack)
+					err = decoder.Decode(&msg)
+				}
+
+				// Cancel stream context after wrp decoding.
+				cancel(nil)
+				if err != nil {
+					// The connection gave us an unexpected message, or a message
+					// that could not be decoded.  Close & reconnect.
+					defer qc.conn.CloseWithError(quic.ApplicationErrorCode(quic.StreamStateError), "unable to decode wrp message")
+
+					dEvent := event.Disconnect{
+						At:  qc.nowFunc(),
+						Err: err,
+					}
+					qc.disconnectListeners.Visit(func(l event.DisconnectListener) {
+						l.OnDisconnect(dEvent)
+					})
+
+					break
+				}
 
 				qc.msgListeners.Visit(func(l event.MsgListener) {
 					l.OnMessage(msg)
 				})
+
+				// close stream since we are staying in the read loop
+				stream.Close()
 			}
 		}
-
-		fmt.Println("REMOVE out of read loop")
 
 		if qc.once {
 			return
@@ -502,7 +429,6 @@ func (qc *QuicClient) run(ctx context.Context) {
 		next, _ = policy.Next()
 
 		if dialErr != nil {
-			fmt.Printf("dial error %s", dialErr)
 			cEvent.Err = dialErr
 			cEvent.RetryingAt = qc.nowFunc().Add(next)
 			qc.connectListeners.Visit(func(l event.ConnectListener) {

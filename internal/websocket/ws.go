@@ -225,6 +225,7 @@ func (ws *Websocket) Send(ctx context.Context, msg wrp.Message) error {
 	return err
 }
 
+// neither this or websocket code logs errors, this needs to be rectified.
 func (ws *Websocket) run(ctx context.Context) {
 	ws.wg.Add(1)
 	defer ws.wg.Done()

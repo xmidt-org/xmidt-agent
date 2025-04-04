@@ -79,6 +79,7 @@ quic:
     quic_config:
       keep_alive_period: 10s
       max_idle_timeout: 20s
+      max_stream_read_buffer_size: 262144 # 256 * 1024
     tls_config:
       insecure_skip_verify: true
       next_protos:

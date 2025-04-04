@@ -5,121 +5,304 @@ package quic
 
 import (
 	"context"
-	"errors"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
+	"log"
+
 	"fmt"
-	"io"
+	"math/big"
 	"net"
 	"net/http"
-	"net/http/httptest"
-	"sync"
+
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/quic-go/quic-go"
+	"github.com/quic-go/quic-go/http3"
+	"github.com/stretchr/testify/suite"
+
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/event"
-	"github.com/xmidt-org/xmidt-agent/internal/nhooyr.io/websocket"
-	ws "github.com/xmidt-org/xmidt-agent/internal/websocket"
 )
 
-func TestEndToEnd(t *testing.T) {
-	var finished bool
+type key string
 
-	assert := assert.New(t)
-	require := require.New(t)
+const (
+	QuicConnectionKey key = "quicConnection"
+	SuiteKey          key = "suite"
+)
 
-	s := httptest.NewServer(
-		http.HandlerFunc(
-			func(w http.ResponseWriter, r *http.Request) {
-				c, err := websocket.Accept(w, r, nil)
-				require.NoError(err)
-				defer c.CloseNow()
+type myHandler struct{}
 
-				ctx, cancel := context.WithTimeout(r.Context(), 200*time.Millisecond)
-				defer cancel()
+var remoteAddr = "https://127.0.0.1:8080"
 
-				msg := wrp.Message{
-					Type:   wrp.SimpleEventMessageType,
-					Source: "server",
-				}
-				err = c.Write(ctx, websocket.MessageBinary, wrp.MustEncode(&msg, wrp.Msgpack))
-				require.NoError(err)
+func (h myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	conn := r.Context().Value(QuicConnectionKey).(quic.Connection)
+	suite := r.Context().Value(SuiteKey).(*EToESuite)
 
-				mt, got, err := c.Read(ctx)
-				// server will halt until the websocket closes resulting in a EOF
-				var closeErr websocket.CloseError
-				if finished && errors.As(err, &closeErr) {
-					assert.Equal(closeErr.Code, websocket.StatusNormalClosure)
-					return
-				}
+	suite.serverReceivedPostFromClient = true
 
-				require.NoError(err)
-				require.Equal(websocket.MessageBinary, mt)
-				require.NotEmpty(got)
+	w.WriteHeader(http.StatusOK)
 
-				err = wrp.NewDecoderBytes(got, wrp.Msgpack).Decode(&msg)
-				require.NoError(err)
-				require.Equal(wrp.SimpleEventMessageType, msg.Type)
-				require.Equal("client", msg.Source)
+	w.Header().Set("Content-Type", "text/plain")
 
-				c.Close(websocket.StatusNormalClosure, "")
-			}))
-	defer s.Close()
+	_, err := fmt.Fprint(w, "Thanks for the post, love the server!")
+	if err != nil {
+		http.Error(w, "Failed to write response", http.StatusInternalServerError)
+		return
+	}
+
+	go sendMessageFromServer(conn, suite, context.Background())
+	go listenForMessageFromClient(conn, suite, context.Background())
+}
+
+func sendMessageFromServer(conn quic.Connection, suite *EToESuite, ctx context.Context) {
+	msg := GetWrpMessage("server")
+
+	fmt.Println("sending message from server")
+	stream, err := conn.OpenStream()
+	if err != nil {
+		log.Println("Stream open error:", err)
+		return
+	}
+
+	_, err = stream.Write(wrp.MustEncode(&msg, wrp.Msgpack))
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Println("sent message from server")
+
+	stream.Close()
+
+}
+
+func listenForMessageFromClient(conn quic.Connection, suite *EToESuite, ctx context.Context) error {
+
+	fmt.Println("listening for messages from the client")
+	stream, err := conn.AcceptStream(ctx)
+	if err != nil {
+		fmt.Printf("error accepting stream  %s", err)
+		fmt.Println(err)
+	}
+	defer stream.Close()
+
+	buf, err := readBytes(stream)
+	if err != nil {
+		fmt.Println("Error reading:", err)
+		return err
+	}
+
+	fmt.Println("stream handled got: " + string(buf))
+
+	suite.serverReceivedMessageFromClient = true
+
+	return nil
+}
+
+func GetWrpMessage(origin string) wrp.Message {
+	// note - this works off the the xmidt-agent/local-quic.yaml config
+	return wrp.Message{
+		//ServiceName: "service:mock_config",
+		Type:        wrp.SimpleEventMessageType,
+		Source:      fmt.Sprintf("event:test.com/%s", origin),
+		Destination: "mac:4ca161000109/mock_config",
+		PartnerIDs:  []string{"foobar"},
+	}
+}
+
+func (suite *EToESuite) StartRemoteServer() {
+	tlsConf := generateTLSConfig()
+	tlsConf = http3.ConfigureTLSConfig(tlsConf)
+	quicConf := &quic.Config{
+		KeepAlivePeriod:      500 * time.Millisecond,
+		HandshakeIdleTimeout: 1 * time.Minute,
+		MaxIdleTimeout:       2 * time.Minute,
+	}
+
+	h := myHandler{}
+
+	server := &http3.Server{
+		Addr:       ":0",
+		TLSConfig:  tlsConf,
+		Handler:    h,
+		QUICConfig: quicConf,
+		ConnContext: func(ctx context.Context, c quic.Connection) context.Context {
+			ctx = context.WithValue(ctx, QuicConnectionKey, c)
+			ctx = context.WithValue(ctx, SuiteKey, suite)
+			return ctx
+		},
+	}
+	udpAddr, err := net.ResolveUDPAddr("udp", "0.0.0.0:8080")
+	if err != nil {
+		fmt.Println("error resolving udp address")
+		log.Fatal(err)
+	}
+
+	remoteAddr = udpAddr.String()
+
+	fmt.Println(remoteAddr)
+
+	conn, err := net.ListenUDP("udp", udpAddr)
+	if err != nil {
+		fmt.Println("error dialing udp")
+		log.Fatal(err)
+	}
+
+	tr := quic.Transport{
+		Conn: conn,
+	}
+
+	ln, err := tr.ListenEarly(tlsConf, quicConf)
+	if err != nil {
+		fmt.Printf("error listening early %s", err)
+		log.Fatal(err)
+	}
+
+	fmt.Println("listened early")
+
+	for {
+		fmt.Println("about to wait for connections")
+		c, err := ln.Accept(context.Background())
+		if err != nil {
+			fmt.Printf("error accepting connection %s", err)
+			continue
+		}
+
+		fmt.Println("accepted connection")
+
+		switch c.ConnectionState().TLS.NegotiatedProtocol {
+		case http3.NextProtoH3:
+			fmt.Println("got http3 request")
+			server.ServeQUICConn(c)
+			fmt.Println("handled connection")
+			fmt.Println(c.Context())
+		}
+	}
+}
+
+func generateTLSConfig() *tls.Config {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		panic(err)
+	}
+	template := x509.Certificate{SerialNumber: big.NewInt(1)}
+	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
+	if err != nil {
+		panic(err)
+	}
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+
+	tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		panic(err)
+	}
+	return &tls.Config{
+		Certificates: []tls.Certificate{tlsCert},
+		NextProtos:   []string{"h3"},
+	}
+}
+
+type EToESuite struct {
+	suite.Suite
+	serverReceivedPostFromClient    bool
+	serverReceivedMessageFromClient bool
+}
+
+func TestEToESuite(t *testing.T) {
+	suite.Run(t, new(EToESuite))
+}
+
+func (suite *EToESuite) SetupSuite() {
+	go suite.StartRemoteServer()
+	time.Sleep(1 * time.Second)
+}
+
+func (suite *EToESuite) TestEndToEnd() {
 
 	var msgCnt, connectCnt, disconnectCnt atomic.Int64
 
-	got, err := ws.New(
-		ws.URL(s.URL),
-		ws.DeviceID("mac:112233445566"),
-		ws.AddMessageListener(
+	got, err := New(
+		URL("https://127.0.0.1:8080"),
+		DeviceID("mac:112233445566"),
+		HTTP3Client(&Http3ClientConfig{
+			QuicConfig: quic.Config{
+				KeepAlivePeriod: 500 * time.Millisecond,
+			},
+			TlsConfig: tls.Config{
+				NextProtos:         []string{"h3"},
+				InsecureSkipVerify: true,
+			},
+		}),
+		AddMessageListener(
 			event.MsgListenerFunc(
 				func(m wrp.Message) {
-					require.Equal(wrp.SimpleEventMessageType, m.Type)
-					require.Equal("server", m.Source)
+					fmt.Println("xmidt-agent got message")
+					suite.Equal(wrp.SimpleEventMessageType, m.Type)
+					suite.Equal("event:test.com/server", m.Source)
 					msgCnt.Add(1)
 				})),
-		ws.AddConnectListener(
+		AddConnectListener(
 			event.ConnectListenerFunc(
 				func(event.Connect) {
 					connectCnt.Add(1)
 				})),
-		ws.AddDisconnectListener(
+		AddDisconnectListener(
 			event.DisconnectListenerFunc(
 				func(event.Disconnect) {
 					disconnectCnt.Add(1)
 				})),
-		ws.RetryPolicy(&retry.Config{
+		RetryPolicy(&retry.Config{
 			Interval:    time.Second,
 			Multiplier:  2.0,
 			Jitter:      1.0 / 3.0,
 			MaxInterval: 341*time.Second + 333*time.Millisecond,
 		}),
-		ws.WithIPv4(),
-		ws.NowFunc(time.Now),
-		ws.SendTimeout(90*time.Second),
-		ws.FetchURLTimeout(30*time.Second),
-		ws.MaxMessageBytes(256*1024),
-		ws.CredentialsDecorator(func(h http.Header) error {
+		NowFunc(time.Now),
+		SendTimeout(90*time.Second),
+		FetchURLTimeout(30*time.Second),
+		MaxMessageBytes(256*1024),
+		CredentialsDecorator(func(h http.Header) error {
 			return nil
 		}),
-		ws.ConveyDecorator(func(h http.Header) error {
+		ConveyDecorator(func(h http.Header) error {
 			return nil
 		}),
 	)
-	require.NoError(err)
-	require.NotNil(got)
+	suite.NoError(err)
+	suite.NotNil(got)
 
 	got.Start()
 
-	// Allow multiple calls to start.
-	got.Start()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	for {
+		if connectCnt.Load() < 1 {
+			time.Sleep(10 * time.Millisecond)
+		} else {
+			break
+		}
+		if ctx.Err() != nil {
+			suite.Fail("timed out waiting to connect")
+			return
+		}
+	}
+
+	suite.True(suite.serverReceivedPostFromClient)
+
+	got.Send(context.Background(), GetWrpMessage("client")) // TODO - first one is not received
+	time.Sleep(10 * time.Millisecond)
+	got.Send(context.Background(), GetWrpMessage("client"))
+
+	// verify client receives message from server
 	for {
 		if msgCnt.Load() < 1 {
 			time.Sleep(10 * time.Millisecond)
@@ -127,378 +310,25 @@ func TestEndToEnd(t *testing.T) {
 			break
 		}
 		if ctx.Err() != nil {
-			assert.Fail("timed out waiting for messages")
+			suite.Fail("timed out waiting for message from server")
 			return
 		}
 	}
 
-	got.Send(context.Background(),
-		wrp.Message{
-			Type:   wrp.SimpleEventMessageType,
-			Source: "client",
-		})
-
-	for {
-		if msgCnt.Load() > 0 && connectCnt.Load() > 0 && disconnectCnt.Load() > 0 {
-			break
-		}
-		select {
-		case <-ctx.Done():
-			assert.Fail("timed out waiting for messages")
-			return
-		default:
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
 	time.Sleep(10 * time.Millisecond)
-	finished = true
+	suite.True(suite.serverReceivedMessageFromClient)
+
 	got.Stop()
-}
 
-func TestEndToEndBadData(t *testing.T) {
-	tests := []struct {
-		description string
-		typ         websocket.MessageType
-		data        []byte
-	}{
-		{
-			description: "invalid data",
-			typ:         websocket.MessageBinary,
-			data:        []byte{0x99, 0x86},
-		}, {
-			description: "invalid data type",
-			typ:         websocket.MessageText,
-			data:        []byte{0x99, 0x86},
-		},
-	}
-	for _, tc := range tests {
-		t.Run(tc.description, func(t *testing.T) {
-
-			assert := assert.New(t)
-			require := require.New(t)
-
-			s := httptest.NewServer(
-				http.HandlerFunc(
-					func(w http.ResponseWriter, r *http.Request) {
-						c, err := websocket.Accept(w, r, nil)
-						require.NoError(err)
-						defer c.CloseNow()
-
-						ctx, cancel := context.WithTimeout(r.Context(), 200*time.Millisecond)
-						defer cancel()
-
-						err = c.Write(ctx, tc.typ, tc.data)
-						require.NoError(err)
-
-						_, _, err = c.Read(ctx)
-						require.Error(err)
-					}))
-			defer s.Close()
-
-			var msgCnt, connectCnt, disconnectCnt atomic.Int64
-
-			got, err := ws.New(
-				ws.URL(s.URL),
-				ws.DeviceID("mac:112233445566"),
-				ws.Once(),
-				ws.AddMessageListener(
-					event.MsgListenerFunc(
-						func(m wrp.Message) {
-							require.Equal(wrp.SimpleEventMessageType, m.Type)
-							require.Equal("server", m.Source)
-							msgCnt.Add(1)
-						})),
-				ws.AddConnectListener(
-					event.ConnectListenerFunc(
-						func(event.Connect) {
-							connectCnt.Add(1)
-						})),
-				ws.AddDisconnectListener(
-					event.DisconnectListenerFunc(
-						func(event.Disconnect) {
-							disconnectCnt.Add(1)
-						})),
-				ws.RetryPolicy(&retry.Config{
-					Interval:       50 * time.Millisecond,
-					Multiplier:     2.0,
-					MaxElapsedTime: 300 * time.Millisecond,
-				}),
-				ws.WithIPv4(),
-				ws.NowFunc(time.Now),
-				ws.SendTimeout(90*time.Second),
-				ws.FetchURLTimeout(30*time.Second),
-				ws.MaxMessageBytes(256*1024),
-				ws.CredentialsDecorator(func(h http.Header) error {
-					return nil
-				}),
-				ws.ConveyDecorator(func(h http.Header) error {
-					return nil
-				}),
-			)
-			require.NoError(err)
-			require.NotNil(got)
-
-			got.Start()
-
-			ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-			defer cancel()
-
-			for {
-				if connectCnt.Load() > 0 && disconnectCnt.Load() > 0 {
-					break
-				}
-				select {
-				case <-ctx.Done():
-					assert.Fail("timed out waiting for messages")
-					return
-				default:
-				}
-				time.Sleep(10 * time.Millisecond)
-			}
-			time.Sleep(10 * time.Millisecond)
-			got.Stop()
-		})
-	}
-}
-
-func TestEndToEndConnectionIssues(t *testing.T) {
-	assert := assert.New(t)
-	require := require.New(t)
-
-	// don't start the server until after the 3rd attempt.
-
-	s := httptest.NewUnstartedServer(
-		http.HandlerFunc(
-			func(w http.ResponseWriter, r *http.Request) {
-				c, err := websocket.Accept(w, r, nil)
-				require.NoError(err)
-				defer c.CloseNow()
-
-				ctx, cancel := context.WithTimeout(r.Context(), 200*time.Millisecond)
-				defer cancel()
-
-				msg := wrp.Message{
-					Type:   wrp.SimpleEventMessageType,
-					Source: "server",
-				}
-				err = c.Write(ctx, websocket.MessageBinary, wrp.MustEncode(&msg, wrp.Msgpack))
-				require.NoError(err)
-			}))
-
-	var msgCnt, connectCnt, disconnectCnt atomic.Int64
-
-	var mutex sync.Mutex
-
-	got, err := ws.New(
-		ws.FetchURL(func(context.Context) (string, error) {
-			mutex.Lock()
-			defer mutex.Unlock()
-			if s.URL == "" {
-				return "", fmt.Errorf("no url")
-			}
-			return s.URL, nil
-		}),
-		ws.DeviceID("mac:112233445566"),
-		ws.AddMessageListener(
-			event.MsgListenerFunc(
-				func(m wrp.Message) {
-					msgCnt.Add(1)
-				})),
-		ws.AddConnectListener(
-			event.ConnectListenerFunc(
-				func(e event.Connect) {
-					connectCnt.Add(1)
-				})),
-		ws.AddDisconnectListener(
-			event.DisconnectListenerFunc(
-				func(event.Disconnect) {
-					disconnectCnt.Add(1)
-				})),
-		ws.RetryPolicy(&retry.Config{
-			Interval:       50 * time.Millisecond,
-			Multiplier:     2.0,
-			MaxElapsedTime: 300 * time.Millisecond,
-		}),
-		ws.WithIPv4(),
-		ws.NowFunc(time.Now),
-		ws.SendTimeout(90*time.Second),
-		ws.FetchURLTimeout(30*time.Second),
-		ws.MaxMessageBytes(256*1024),
-		ws.CredentialsDecorator(func(h http.Header) error {
-			return nil
-		}),
-		ws.ConveyDecorator(func(h http.Header) error {
-			return nil
-		}),
-	)
-	require.NoError(err)
-	require.NotNil(got)
-
-	got.Start()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5000*time.Millisecond)
-	defer cancel()
-
-	var started bool
 	for {
-		if connectCnt.Load() >= 3 && !started {
-			mutex.Lock()
-			s.Start()
-			mutex.Unlock()
-			defer func() {
-				mutex.Lock()
-				s.Close()
-				mutex.Unlock()
-			}()
-			started = true
-		}
-		if disconnectCnt.Load() > 0 {
+		if disconnectCnt.Load() < 1 {
+			time.Sleep(10 * time.Millisecond)
+		} else {
 			break
 		}
-
-		select {
-		case <-ctx.Done():
-			assert.Fail("timed out waiting for messages")
+		if ctx.Err() != nil {
+			suite.Fail("timed out waiting to disconnect")
 			return
-		default:
-			time.Sleep(20 * time.Millisecond)
 		}
 	}
-	got.Stop()
-
-	assert.True(started)
-	assert.True(msgCnt.Load() > 0, "got message")
-}
-
-func TestEndToEndPingWriteTimeout(t *testing.T) {
-	assert := assert.New(t)
-	require := require.New(t)
-
-	s := httptest.NewServer(
-		http.HandlerFunc(
-			func(w http.ResponseWriter, r *http.Request) {
-				c, err := websocket.Accept(w, r, nil)
-				require.NoError(err)
-				defer c.CloseNow()
-
-				assert.Error(c.Ping(context.Background()))
-			}))
-	defer s.Close()
-
-	var (
-		connectCnt, disconnectCnt, heartbeatCnt atomic.Int64
-		got                                     *ws.Websocket
-		err                                     error
-		disconnectErrs                          []error
-	)
-	got, err = ws.New(
-		ws.URL(s.URL),
-		ws.DeviceID("mac:112233445566"),
-		ws.AddHeartbeatListener(
-			event.HeartbeatListenerFunc(
-				func(event.Heartbeat) {
-					heartbeatCnt.Add(1)
-				})),
-		ws.AddConnectListener(
-			event.ConnectListenerFunc(
-				func(event.Connect) {
-					connectCnt.Add(1)
-				})),
-		ws.AddDisconnectListener(
-			event.DisconnectListenerFunc(
-				func(e event.Disconnect) {
-					disconnectErrs = append(disconnectErrs, e.Err)
-					disconnectCnt.Add(1)
-				})),
-		ws.RetryPolicy(&retry.Config{
-			Interval:    time.Second,
-			Multiplier:  2.0,
-			Jitter:      1.0 / 3.0,
-			MaxInterval: 341*time.Second + 333*time.Millisecond,
-		}),
-		ws.WithIPv4(),
-		ws.NowFunc(time.Now),
-		ws.FetchURLTimeout(30*time.Second),
-		ws.MaxMessageBytes(256*1024),
-		ws.CredentialsDecorator(func(h http.Header) error {
-			return nil
-		}),
-		ws.ConveyDecorator(func(h http.Header) error {
-			return nil
-		}),
-		// Triggers ping timeouts
-		ws.PingWriteTimeout(time.Nanosecond),
-	)
-	require.NoError(err)
-	require.NotNil(got)
-
-	got.Start()
-	time.Sleep(500 * time.Millisecond)
-	got.Stop()
-	// heartbeatCnt should be zero due ping timeouts
-	assert.Equal(int64(0), heartbeatCnt.Load())
-	assert.Greater(connectCnt.Load(), int64(0))
-	assert.Greater(disconnectCnt.Load(), int64(0))
-	assert.NotEmpty(disconnectErrs)
-	// disconnectErrs should only contain context.DeadlineExceeded errors
-	for _, err := range disconnectErrs {
-		if errors.Is(err, net.ErrClosed) {
-			// net.ErrClosed may occur during tests, don't count them
-			continue
-		}
-
-		assert.ErrorIs(err, context.DeadlineExceeded)
-	}
-
-}
-
-func TestEndToEndInactivityTimeout(t *testing.T) {
-	assert := assert.New(t)
-	require := require.New(t)
-
-	s := httptest.NewServer(
-		http.HandlerFunc(
-			func(w http.ResponseWriter, r *http.Request) {
-				c, err := websocket.Accept(w, r, nil)
-				require.NoError(err)
-				defer c.CloseNow()
-
-				ctx, cancel := context.WithTimeout(r.Context(), 100*time.Millisecond)
-				defer cancel()
-				mt, got, err := c.Read(ctx)
-
-				assert.ErrorIs(err, io.EOF)
-				assert.Equal(websocket.MessageType(0), mt)
-				assert.Nil(got)
-			}))
-	defer s.Close()
-
-	got, err := ws.New(
-		ws.URL(s.URL),
-		ws.DeviceID("mac:112233445566"),
-		ws.RetryPolicy(&retry.Config{
-			Interval:    time.Second,
-			Multiplier:  2.0,
-			Jitter:      1.0 / 3.0,
-			MaxInterval: 341*time.Second + 333*time.Millisecond,
-		}),
-		ws.WithIPv4(),
-		ws.NowFunc(time.Now),
-		ws.FetchURLTimeout(30*time.Second),
-		ws.MaxMessageBytes(256*1024),
-		ws.CredentialsDecorator(func(h http.Header) error {
-			return nil
-		}),
-		ws.ConveyDecorator(func(h http.Header) error {
-			return nil
-		}),
-		// Triggers inactivity timeouts
-		ws.InactivityTimeout(10*time.Millisecond),
-	)
-	require.NoError(err)
-	require.NotNil(got)
-
-	got.Start()
-	time.Sleep(400 * time.Millisecond)
-	got.Stop()
 }

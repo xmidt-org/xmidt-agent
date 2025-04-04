@@ -59,6 +59,7 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
 	github.com/goccy/go-json v0.10.4 // indirect
 	github.com/goschtalt/approx v1.0.0 // indirect
+	github.com/k0kubun/pp/v3 v3.4.1
 	github.com/leodido/go-urn v1.1.0 // indirect
 	github.com/lestrrat-go/blackmagic v1.0.2 // indirect
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
