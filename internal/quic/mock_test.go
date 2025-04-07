@@ -6,6 +6,7 @@ package quic
 
 import (
 	"context"
+	"io"
 	"net"
 	"net/url"
 	"time"
@@ -27,7 +28,8 @@ func (m *MockDialer) DialQuic(ctx context.Context, url *url.URL) (quic.Connectio
 
 type MockStream struct {
 	mock.Mock
-	buf []byte
+	buf       []byte
+	readCount int
 }
 
 func NewMockStream(buf []byte) *MockStream {
@@ -56,8 +58,17 @@ func (m *MockStream) Write(buf []byte) (int, error) {
 
 func (m *MockStream) Read(buf []byte) (int, error) {
 	args := m.Called(buf)
-	copy(buf, m.buf)
-	return args.Get(0).(int), args.Error(1)
+	if args.Error(1) != nil {
+		return 0, args.Error(1)
+	}
+
+	if m.readCount >= len(m.buf) {
+		return 0, io.EOF
+	}
+
+	n := copy(buf, m.buf[m.readCount:])
+	m.readCount += n
+	return n, nil
 }
 
 func (m *MockStream) SetReadDeadline(t time.Time) error {

@@ -230,6 +230,7 @@ func (suite *EToESuite) TestEndToEnd() {
 	var msgCnt, connectCnt, disconnectCnt atomic.Int64
 
 	got, err := New(
+		Enabled(true),
 		URL("https://127.0.0.1:8080"),
 		DeviceID("mac:112233445566"),
 		HTTP3Client(&Http3ClientConfig{
@@ -268,7 +269,6 @@ func (suite *EToESuite) TestEndToEnd() {
 		NowFunc(time.Now),
 		SendTimeout(90*time.Second),
 		FetchURLTimeout(30*time.Second),
-		MaxMessageBytes(256*1024),
 		CredentialsDecorator(func(h http.Header) error {
 			return nil
 		}),

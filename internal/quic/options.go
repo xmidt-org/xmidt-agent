@@ -222,19 +222,6 @@ func RetryPolicy(pf retry.PolicyFactory) Option {
 		})
 }
 
-// MaxMessageBytes sets the maximum message size sent or received in bytes.
-func MaxMessageBytes(bytes int64) Option {
-	return optionFunc(
-		func(ws *QuicClient) error {
-			if bytes < 0 {
-				return fmt.Errorf("%w: negative MaxMessageBytes", ErrMisconfiguredWS)
-			}
-
-			ws.maxMessageBytes = bytes
-			return nil
-		})
-}
-
 // AddMessageListener adds a message listener to the WS connection.
 // The listener will be called for every message received from the WS.
 func AddMessageListener(listener event.MsgListener, cancel ...*event.CancelFunc) Option {

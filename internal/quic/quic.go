@@ -85,9 +85,6 @@ type QuicClient struct {
 	// additionalHeaders are any additional headers for the WS connection.
 	additionalHeaders http.Header
 
-	// maxMessageBytes is the largest allowable message to send or receive.
-	maxMessageBytes int64
-
 	// whether or not to connect directly to a quic server or redirect first
 	withRedirect bool
 
@@ -375,8 +372,6 @@ func (qc *QuicClient) run(ctx context.Context) {
 					qc.disconnectListeners.Visit(func(l event.DisconnectListener) {
 						l.OnDisconnect(dEvent)
 					})
-
-					stream.Close()
 
 					break
 				}

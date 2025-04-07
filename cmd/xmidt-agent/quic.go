@@ -47,7 +47,6 @@ func provideQuic(in CloudHandlerIn) (cloudHandlerOut, error) {
 		quic.SendTimeout(in.Quic.SendTimeout),
 		quic.HTTP3Client(&in.Quic.QuicClient),
 		quic.HTTPClient(in.Quic.HttpClient),
-		quic.MaxMessageBytes(in.Quic.MaxMessageBytes),
 		quic.ConveyDecorator(in.Metadata.Decorate),
 		quic.AdditionalHeaders(in.Quic.AdditionalHeaders),
 		quic.NowFunc(time.Now),
