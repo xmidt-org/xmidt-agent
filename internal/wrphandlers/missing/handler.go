@@ -54,13 +54,11 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 	}
 
 	if !msg.Type.RequiresTransaction() {
-		fmt.Println("REMOVE does not require transaction " + err.Error())
 		return err
 	}
 
 	// If the error is not ErrNotHandled, return the error.
 	if !errors.Is(err, wrpkit.ErrNotHandled) {
-		fmt.Println("REMOVE error not handled " + err.Error())
 		return err
 	}
 

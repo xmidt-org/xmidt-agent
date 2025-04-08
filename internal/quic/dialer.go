@@ -8,7 +8,6 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -35,7 +34,6 @@ func (qd *QuicDialer) DialQuic(ctx context.Context, url *url.URL) (quic.Connecti
 
 	conn, err := quic.DialAddr(ctx, url.Host, qd.tlsConfig, &qd.quicConfig)
 	if err != nil {
-		fmt.Println("REMOVE error dialing")
 		return nil, err
 	}
 
@@ -48,7 +46,6 @@ func (qd *QuicDialer) DialQuic(ctx context.Context, url *url.URL) (quic.Connecti
 
 	reqStream, err := h3Conn.OpenRequestStream(ctx)
 	if err != nil {
-		fmt.Printf("REMOVE error opening request stream %s", err)
 		return nil, err
 	}
 
@@ -62,34 +59,22 @@ func (qd *QuicDialer) DialQuic(ctx context.Context, url *url.URL) (quic.Connecti
 	qd.credDecorator(req.Header)
 	qd.conveyDecorator(req.Header)
 
-	fmt.Println(req)
-
 	err = reqStream.SendRequestHeader(req)
 	if err != nil {
-		fmt.Printf("REMOVE error sending request %s", err) // TODO create a specific error and wrap
 		return nil, err
 	}
-
-	fmt.Println("REMOVE sent request")
 
 	resp, err := reqStream.ReadResponse()
 	if err != nil {
-		fmt.Println("error reading http3 response from server")
 		return nil, err
 	}
 
-	fmt.Println("REMOVE read response")
-
 	_, err = io.Copy(io.Discard, resp.Body)
-	if (err != nil) && !errors.Is(err, io.EOF) {
-		fmt.Printf("error reading body %s", err)
+	if (err != nil) && errors.Is(err, io.EOF) {
+		err = nil
 	}
 
-	fmt.Println("REMOVE before closing response")
 	resp.Body.Close()
-
-	fmt.Println("REMOVE after closing response")
-	dumpContext(conn.Context())
 
 	return conn, err
 }

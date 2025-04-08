@@ -212,7 +212,6 @@ func (qc *QuicClient) IsEnabled() bool {
 }
 
 func (qc *QuicClient) HandleWrp(m wrp.Message) error {
-	fmt.Println("REMOVE sending a message")
 	return qc.Send(context.Background(), m)
 }
 
@@ -226,14 +225,12 @@ func (qc *QuicClient) AddMessageListener(listener event.MsgListener) event.Cance
 func (qc *QuicClient) Send(ctx context.Context, msg wrp.Message) error {
 	stream, err := qc.conn.OpenStream()
 	if err != nil {
-		fmt.Printf("error opening stream to client %s", err)
 		return err
 	}
 	defer stream.Close()
 
 	_, err = stream.Write(wrp.MustEncode(&msg, wrp.Msgpack))
 	if err != nil {
-		fmt.Printf("error writing to server %s", err)
 		return err
 	}
 
@@ -312,7 +309,6 @@ func (qc *QuicClient) redirect(redirectUrl *url.URL) (*url.URL, error) {
 }
 
 func dumpContext(ctx context.Context, keys ...interface{}) {
-	fmt.Println("Context Values:")
 	for _, key := range keys {
 		if value := ctx.Value(key); value != nil {
 			fmt.Printf("  %v: %v\n", key, value)

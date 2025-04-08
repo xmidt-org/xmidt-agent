@@ -4,7 +4,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/cloud"
@@ -219,7 +218,6 @@ type pubsubOut struct {
 }
 
 func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
-	fmt.Println("REMOVE providing pubsubhandler")
 	var cancel pubsub.CancelFunc
 
 	lh, err := loghandler.New(in.Egress,
@@ -270,7 +268,6 @@ type mockTr181Out struct {
 
 func provideMockTr181Handler(in mockTr181In) (mockTr181Out, error) {
 	if !in.MockTr181.Enabled {
-		fmt.Println("REMOVE mocktr181 is not enabled")
 		return mockTr181Out{}, nil
 	}
 
@@ -280,7 +277,6 @@ func provideMockTr181Handler(in mockTr181In) (mockTr181Out, error) {
 			zap.String("handler", "mockTR181"),
 		))
 	if err != nil {
-		fmt.Println(err)
 		return mockTr181Out{}, err
 	}
 	mockDefaults := []mocktr181.Option{
@@ -306,7 +302,6 @@ func provideMockTr181Handler(in mockTr181In) (mockTr181Out, error) {
 
 	mocktr, err := in.PubSub.SubscribeService(in.MockTr181.ServiceName, loggerIn)
 	if err != nil {
-		fmt.Println("error subscribing mocktr1i1  service")
 		return mockTr181Out{}, errors.Join(ErrWRPHandlerConfig, err)
 	}
 

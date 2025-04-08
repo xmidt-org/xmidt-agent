@@ -56,8 +56,6 @@ func New(self wrp.DeviceID, opts ...Option) (*PubSub, error) {
 		return nil, fmt.Errorf("%w: self is invalid", ErrInvalidInput)
 	}
 
-	fmt.Println("REMOVE " + self)
-
 	ps := PubSub{
 		routes: make(map[string]*eventor.Eventor[wrpkit.Handler]),
 		self:   self,
@@ -104,11 +102,9 @@ func (ps *PubSub) SubscribeService(service string, h wrpkit.Handler) (CancelFunc
 // cancel any future events sent to that listener.
 func (ps *PubSub) SubscribeEvent(event string, h wrpkit.Handler) (CancelFunc, error) {
 	if err := validateString(event, "event"); err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 
-	fmt.Println("REMOVE about to subscribe to events " + event)
 	return ps.subscribe(eventRoute(event), h)
 }
 

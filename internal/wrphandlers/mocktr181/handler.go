@@ -80,7 +80,6 @@ type Parameter struct {
 // the handler that will be called to send the response.  The parameter source is the source to use in
 // the response message.
 func New(egress wrpkit.Handler, source string, opts ...Option) (*Handler, error) {
-	fmt.Println("creating mocktr181 service")
 	h := Handler{
 		egress: egress,
 		source: source,
@@ -114,7 +113,6 @@ func (h Handler) Enabled() bool {
 
 // HandleWrp is called to process a tr181 command
 func (h Handler) HandleWrp(msg wrp.Message) error {
-	fmt.Println("REMOVE mocktr181 is handling wrp message")
 	_, payloadResponse, err := h.proccessCommand(msg.Payload)
 	if err != nil {
 		return errors.Join(err, wrpkit.ErrNotHandled)

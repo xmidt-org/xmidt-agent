@@ -64,13 +64,11 @@ func New(next, egress wrpkit.Handler, source string, partners ...string) (*Handl
 // HandleWrp is called to process a message.  If the message is not from an allowed
 // partner, a response is sent to the source of the message if applicable.
 func (h Handler) HandleWrp(msg wrp.Message) error {
-	fmt.Println("REMOVE in auth handler")
 	for _, allowed := range h.partners {
 		for _, got := range msg.PartnerIDs {
 			got = strings.TrimSpace(got)
 			if allowed == got || allowed == wildcard {
 				// We found a match, so continue processing the message.
-				fmt.Println("REMOVE partner matched, continue processing")
 				return h.next.HandleWrp(msg)
 			}
 		}
@@ -80,7 +78,6 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 	// response if needed.  Otherwise, return an error.
 
 	if !msg.Type.RequiresTransaction() {
-		fmt.Println("REMOVE unauthorized")
 		return ErrUnauthorized
 	}
 
@@ -98,6 +95,5 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 
 	sendErr := h.egress.HandleWrp(response)
 
-	fmt.Println("REMOVE unauthorized")
 	return errors.Join(ErrUnauthorized, sendErr)
 }
