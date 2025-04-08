@@ -51,7 +51,7 @@ func (h myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/plain")
 
-	_, err := fmt.Fprint(w, "Thanks for the post, love the server!")
+	_, err := fmt.Fprint(w, "Thanks for the post! Love, the server.")
 	if err != nil {
 		http.Error(w, "Failed to write response", http.StatusInternalServerError)
 		return
@@ -64,7 +64,6 @@ func (h myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func sendMessageFromServer(conn quic.Connection, suite *EToESuite, ctx context.Context) {
 	msg := GetWrpMessage("server")
 
-	fmt.Println("sending message from server")
 	stream, err := conn.OpenStream()
 	if err != nil {
 		log.Println("Stream open error:", err)
@@ -77,15 +76,10 @@ func sendMessageFromServer(conn quic.Connection, suite *EToESuite, ctx context.C
 		return
 	}
 
-	fmt.Println("sent message from server")
-
 	stream.Close()
-
 }
 
 func listenForMessageFromClient(conn quic.Connection, suite *EToESuite, ctx context.Context) error {
-
-	fmt.Println("listening for messages from the client")
 	stream, err := conn.AcceptStream(ctx)
 	if err != nil {
 		fmt.Printf("error accepting stream  %s", err)
@@ -107,9 +101,7 @@ func listenForMessageFromClient(conn quic.Connection, suite *EToESuite, ctx cont
 }
 
 func GetWrpMessage(origin string) wrp.Message {
-	// note - this works off the the xmidt-agent/local-quic.yaml config
 	return wrp.Message{
-		//ServiceName: "service:mock_config",
 		Type:        wrp.SimpleEventMessageType,
 		Source:      fmt.Sprintf("event:test.com/%s", origin),
 		Destination: "mac:4ca161000109/mock_config",

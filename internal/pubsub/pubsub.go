@@ -144,7 +144,6 @@ func (ps *PubSub) subscribe(route string, h wrpkit.Handler) (CancelFunc, error) 
 // if there was at least one handler that accepted the message.  The error
 // wrpkit.ErrNotHandled is returned if no listeners were found for the message.
 func (ps *PubSub) HandleWrp(msg wrp.Message) error {
-	fmt.Println("REMOVE pubSub handling WRP")
 	normalized, dest, err := ps.normalize(&msg)
 	if err != nil {
 		return errors.Join(err, wrpkit.ErrNotHandled)
