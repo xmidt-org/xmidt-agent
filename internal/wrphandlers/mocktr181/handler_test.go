@@ -71,7 +71,6 @@ func TestHandler_HandleWrp(t *testing.T) {
 			},
 			validate: func(a *assert.Assertions, msg wrp.Message, h *Handler) error {
 				a.True(h.Enabled())
-
 				return nil
 			},
 		}, {
@@ -98,7 +97,6 @@ func TestHandler_HandleWrp(t *testing.T) {
 				Payload:     []byte("{\"command\":\"FOOBAR\",\"parameters\":[{\"name\":\"Device.Bridging.MaxBridgeEntries\",\"dataType\":0,\"value\":\"anothername\",\"attributes\":{\"notify\":0}}]}"),
 			},
 			validate: func(a *assert.Assertions, msg wrp.Message, h *Handler) error {
-				//a.Equal(int64(520), *msg.Status)
 				a.True(h.Enabled())
 
 				return nil
@@ -112,7 +110,6 @@ func TestHandler_HandleWrp(t *testing.T) {
 				Destination: "event:event_1/ignored",
 			},
 			validate: func(a *assert.Assertions, msg wrp.Message, h *Handler) error {
-				//a.Equal(int64(520), *msg.Status)
 				a.True(h.Enabled())
 
 				return nil

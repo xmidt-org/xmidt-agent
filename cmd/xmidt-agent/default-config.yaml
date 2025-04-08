@@ -71,11 +71,8 @@ quic:
   # used if xmidt_service section is empty or xmdit_service connection fails
   back_up_url:        "https://localhost:4433"  
   fetch_url_timeout:  30s
-  # inactivity_timeout:      1m
-  # ping_write_timeout:       90s
   send_timeout:       90s
-  #keep_alive_interval: 30s
-  quic_client:
+  http3_client:
     quic_config:
       keep_alive_period: 10s
       max_idle_timeout: 20s

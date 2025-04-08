@@ -137,7 +137,7 @@ type Quic struct {
 	// The client to used to connect to the redirect server
 	HttpClient arrangehttp.ClientConfig
 	// Config for quic connection
-	QuicClient myquic.Http3ClientConfig
+	Http3Client myquic.Http3ClientConfig
 	// MaxMessageBytes is the largest allowable message to send or receive. (TODO
 	MaxMessageBytes int64
 	// (optional) Whether or not to use a redirect server like petasos or connect

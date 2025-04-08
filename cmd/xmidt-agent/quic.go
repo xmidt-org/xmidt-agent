@@ -45,7 +45,7 @@ func provideQuic(in CloudHandlerIn) (cloudHandlerOut, error) {
 			fetchURL(in.Quic.URLPath, in.Quic.BackUpURL,
 				fetchURLFunc)),
 		quic.SendTimeout(in.Quic.SendTimeout),
-		quic.HTTP3Client(&in.Quic.QuicClient),
+		quic.HTTP3Client(&in.Quic.Http3Client),
 		quic.HTTPClient(in.Quic.HttpClient),
 		quic.ConveyDecorator(in.Metadata.Decorate),
 		quic.AdditionalHeaders(in.Quic.AdditionalHeaders),

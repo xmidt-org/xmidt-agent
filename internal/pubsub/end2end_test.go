@@ -49,7 +49,7 @@ var messages = []msgWithExpectations{
 			TransactionUUID: "1234",
 		},
 	}, {
-		name: "successful with dns dest", // can't find destination on this message... WHY?  It's failing index 6, but this isn't index 6?
+		name: "successful with dns dest", 
 		msg: wrp.Message{
 			Type:            wrp.SimpleRequestResponseMessageType,
 			Source:          "mac:112233445566/service/ignored",
