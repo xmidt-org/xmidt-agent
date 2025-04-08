@@ -150,7 +150,7 @@ storage:
   # temporary: "~/local-rdk-testing/temporary"
   # durable: "~/local-rdk-testing/durable"
 mock_tr_181:
-  enabled: true
+  enabled: false
   file_path: "mock_tr181.json"
   service_name: "mock_config"
 xmidt_agent_crud:
