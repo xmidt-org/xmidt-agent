@@ -27,4 +27,5 @@ jobs:
       release-custom-file:  true
       release-docker:       true
       yaml-lint-skip:       false
+      sonarcloud-exclusions: 'internal/quic/cmd/example/main.go'
     secrets: inherit

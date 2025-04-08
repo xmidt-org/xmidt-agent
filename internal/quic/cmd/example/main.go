@@ -4,14 +4,16 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"os"
 	"time"
 
 	"github.com/alecthomas/kong"
+	"github.com/quic-go/quic-go"
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/event"
-	"github.com/xmidt-org/xmidt-agent/internal/quic"
+	myquic "github.com/xmidt-org/xmidt-agent/internal/quic"
 )
 
 // CLI is the structure that is used to capture the command line arguments.
@@ -54,20 +56,27 @@ func main() {
 		panic(err)
 	}
 
-	opts := []quic.Option{
-		quic.DeviceID(id),
-		quic.URL(cli.URL),
-		quic.AddConnectListener(
+	opts := []myquic.Option{
+		myquic.DeviceID(id),
+		myquic.URL(cli.URL),
+		myquic.HTTP3Client(
+			&myquic.Http3ClientConfig{
+				QuicConfig: quic.Config{},
+				TlsConfig: tls.Config{},
+			},
+			
+		),
+		myquic.AddConnectListener(
 			event.ConnectListenerFunc(
 				func(e event.Connect) {
 					fmt.Println(e)
 				})),
-		quic.AddDisconnectListener(
+		myquic.AddDisconnectListener(
 			event.DisconnectListenerFunc(
 				func(e event.Disconnect) {
 					fmt.Println(e)
 				})),
-		quic.AddMessageListener(
+		myquic.AddMessageListener(
 			MessageListenerFunc(
 				func(m wrp.Message) {
 					fmt.Println(m) // send a message back
@@ -75,10 +84,10 @@ func main() {
 	}
 
 	if cli.Once {
-		opts = append(opts, quic.Once())
+		opts = append(opts, myquic.Once())
 	}
 
-	q, err := quic.New(opts...)
+	q, err := myquic.New(opts...)
 	if err != nil {
 		panic(err)
 	}
