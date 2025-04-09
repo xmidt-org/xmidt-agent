@@ -50,7 +50,7 @@ func TestNew(t *testing.T) {
 				Enabled(true),
 				FetchURL(fetcher),
 				DeviceID("mac:112233445566"),
-				WithRedirect(false),
+				//WithRedirect(false),
 				AdditionalHeaders(map[string][]string{
 					"some-other-header": {"vAlUE"},
 				}),
@@ -77,7 +77,7 @@ func TestNew(t *testing.T) {
 				u, err := c.urlFetcher(context.Background())
 				assert.NoError(err)
 				assert.Equal("http://example.com/url", u)
-				assert.False(c.withRedirect)
+				//assert.False(c.withRedirect)
 
 				// Headers
 				assert.NotNil(c.additionalHeaders)
@@ -129,7 +129,7 @@ func TestNew(t *testing.T) {
 			opts: []Option{
 				FetchURLTimeout(-1),
 			},
-			expectedErr: ErrMisconfiguredWS,
+			expectedErr: ErrMisconfiguredQuic,
 		},
 
 		// Test the now func option
@@ -164,7 +164,7 @@ func TestNew(t *testing.T) {
 			opts: []Option{
 				NowFunc(nil),
 			},
-			expectedErr: ErrMisconfiguredWS,
+			expectedErr: ErrMisconfiguredQuic,
 		},
 	}
 	for _, tc := range tests {

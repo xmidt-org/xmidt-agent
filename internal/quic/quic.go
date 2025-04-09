@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/quic-go/quic-go"
+	"github.com/quic-go/quic-go/http3"
 	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/eventor"
 	"github.com/xmidt-org/retry"
@@ -28,10 +29,10 @@ const (
 )
 
 var (
-	ErrMisconfiguredWS    = errors.New("misconfigured WS")
-	ErrClosed             = errors.New("websocket closed")
+	ErrMisconfiguredQuic  = errors.New("misconfigured Quic")
+	ErrClosed             = errors.New("quic connection closed")
 	ErrInvalidMsgType     = errors.New("invalid message type")
-	ErrFromRedirectServer = errors.New("non-200 response from redirect server")
+	ErrFromRedirectServer = errors.New("non-300 response from redirect server")
 	ErrSendTimeout        = errors.New("wrp message send timed out")
 )
 
@@ -86,7 +87,7 @@ type QuicClient struct {
 	additionalHeaders http.Header
 
 	// whether or not to connect directly to a quic server or redirect first
-	withRedirect bool
+	//withRedirect bool
 
 	// connectListeners are the connect listeners for the WS connection.
 	connectListeners eventor.Eventor[event.ConnectListener]
@@ -251,12 +252,9 @@ func (qc *QuicClient) dial(ctx context.Context) (quic.Connection, error) {
 		return nil, err
 	}
 
-	redirectedUrl := parsedFetchUrl
-	if qc.withRedirect {
-		redirectedUrl, err = qc.redirect(parsedFetchUrl)
-		if err != nil {
-			return nil, err
-		}
+	redirectedUrl, err := qc.getUrl(parsedFetchUrl)
+	if err != nil {
+		return nil, err
 	}
 
 	conn, err := qc.qd.DialQuic(ctx, redirectedUrl)
@@ -264,22 +262,23 @@ func (qc *QuicClient) dial(ctx context.Context) (quic.Connection, error) {
 	return conn, err
 }
 
-// Retrieve the url after the redirect from petasos and stop the redirect.
+// Retrieve the url from the redirect server, if there is one.  Stop the redirect.
 // Possibly temporary solution until we figure
 // out how to retrieve the new connection in the client after a seamless redirect.
-func (qc *QuicClient) redirect(redirectUrl *url.URL) (*url.URL, error) {
-	returnUrl := redirectUrl
+func (qc *QuicClient) getUrl(inUrl *url.URL) (*url.URL, error) {
+	outUrl := inUrl
 
-	config := qc.httpClientConfig
-	httpClient, err := config.NewClient()
-	if err != nil {
-		return nil, err
+	client := &http.Client{
+		Transport: &http3.Transport{
+			TLSClientConfig: &qc.http3ClientConfig.TlsConfig,
+		},
 	}
-	httpClient.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 		return http.ErrUseLastResponse
 	}
 
-	req, err := http.NewRequest(http.MethodPost, redirectUrl.String(), bytes.NewBuffer([]byte{}))
+	req, err := http.NewRequest(http.MethodPost, inUrl.String(), bytes.NewBuffer([]byte{}))
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +287,7 @@ func (qc *QuicClient) redirect(redirectUrl *url.URL) (*url.URL, error) {
 	qc.credDecorator(req.Header)
 	qc.conveyDecorator(req.Header)
 
-	resp, err := httpClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -299,13 +298,13 @@ func (qc *QuicClient) redirect(redirectUrl *url.URL) (*url.URL, error) {
 		if err != nil {
 			return nil, err
 		}
-		returnUrl = redirectedUrl
+		outUrl = redirectedUrl
 	} else if resp.StatusCode >= 400 {
 		errString := fmt.Sprintf("redirectServer returned status %d", resp.StatusCode)
 		return nil, fmt.Errorf("%s: %w", errString, ErrFromRedirectServer)
 	}
 
-	return returnUrl, nil
+	return outUrl, nil
 }
 
 func dumpContext(ctx context.Context, keys ...interface{}) {

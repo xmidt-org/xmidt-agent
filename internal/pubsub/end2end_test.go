@@ -49,7 +49,7 @@ var messages = []msgWithExpectations{
 			TransactionUUID: "1234",
 		},
 	}, {
-		name: "successful with dns dest", 
+		name: "successful with dns dest",
 		msg: wrp.Message{
 			Type:            wrp.SimpleRequestResponseMessageType,
 			Source:          "mac:112233445566/service/ignored",

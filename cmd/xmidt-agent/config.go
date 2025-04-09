@@ -135,14 +135,11 @@ type Quic struct {
 	// FetchURLTimeout is the timeout for the fetching the Quic url. If this is not set, the default is 30 seconds.
 	FetchURLTimeout time.Duration
 	// The client to used to connect to the redirect server
-	HttpClient arrangehttp.ClientConfig
-	// Config for quic connection
-	Http3Client myquic.Http3ClientConfig
+	// HttpClient arrangehttp.ClientConfig
+	// // Config for quic connection
+	QuicClient myquic.Http3ClientConfig
 	// MaxMessageBytes is the largest allowable message to send or receive. (TODO
 	MaxMessageBytes int64
-	// (optional) Whether or not to use a redirect server like petasos or connect
-	// directly to a specific server.  Defaults to true.
-	UseRedirectServer bool
 	// RetryPolicy sets the retry policy factory used for delaying between retry attempts for reconnection.
 	RetryPolicy retry.Config
 	// Once sets whether or not to only attempt to connect once.

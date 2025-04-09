@@ -34,16 +34,24 @@ type key string
 
 const (
 	QuicConnectionKey key = "quicConnection"
+	ShouldRedirectKey key = "shouldRedirect"
 	SuiteKey          key = "suite"
 )
 
 type myHandler struct{}
 
-var remoteAddr = "https://127.0.0.1:8080"
+var remoteServerPort = "4433"
+var redirectServerPort = "4432"
 
 func (h myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	conn := r.Context().Value(QuicConnectionKey).(quic.Connection)
 	suite := r.Context().Value(SuiteKey).(*EToESuite)
+	shouldRedirect := r.Context().Value(ShouldRedirectKey).(bool)
+
+	if shouldRedirect {
+		http.Redirect(w, r, fmt.Sprintf("https://127.0.0.1:%s", remoteServerPort), http.StatusMovedPermanently)
+		return
+	}
 
 	suite.serverReceivedPostFromClient = true
 
@@ -109,7 +117,7 @@ func GetWrpMessage(origin string) wrp.Message {
 	}
 }
 
-func (suite *EToESuite) StartRemoteServer() {
+func (suite *EToESuite) StartRemoteServer(port string, redirect bool) {
 	tlsConf := generateTLSConfig()
 	tlsConf = http3.ConfigureTLSConfig(tlsConf)
 	quicConf := &quic.Config{
@@ -121,23 +129,24 @@ func (suite *EToESuite) StartRemoteServer() {
 	h := myHandler{}
 
 	server := &http3.Server{
-		Addr:       ":0",
+		Addr:       fmt.Sprintf(":%s", port),
 		TLSConfig:  tlsConf,
 		Handler:    h,
 		QUICConfig: quicConf,
 		ConnContext: func(ctx context.Context, c quic.Connection) context.Context {
 			ctx = context.WithValue(ctx, QuicConnectionKey, c)
 			ctx = context.WithValue(ctx, SuiteKey, suite)
+			ctx = context.WithValue(ctx, ShouldRedirectKey, redirect)
 			return ctx
 		},
 	}
-	udpAddr, err := net.ResolveUDPAddr("udp", "0.0.0.0:8080")
+	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("0.0.0.0:%s", port))
 	if err != nil {
 		fmt.Println("error resolving udp address")
 		log.Fatal(err)
 	}
 
-	remoteAddr = udpAddr.String()
+	remoteAddr := udpAddr.String()
 
 	fmt.Println(remoteAddr)
 
@@ -213,7 +222,8 @@ func TestEToESuite(t *testing.T) {
 }
 
 func (suite *EToESuite) SetupSuite() {
-	go suite.StartRemoteServer()
+	go suite.StartRemoteServer(redirectServerPort, true)
+	go suite.StartRemoteServer(remoteServerPort, false)
 	time.Sleep(1 * time.Second)
 }
 
@@ -223,7 +233,7 @@ func (suite *EToESuite) TestEndToEnd() {
 
 	got, err := New(
 		Enabled(true),
-		URL("https://127.0.0.1:8080"),
+		URL(fmt.Sprintf("https://127.0.0.1:%s", redirectServerPort)),
 		DeviceID("mac:112233445566"),
 		HTTP3Client(&Http3ClientConfig{
 			QuicConfig: quic.Config{

@@ -21,7 +21,7 @@ func DeviceID(id wrp.DeviceID) Option {
 	return optionFunc(
 		func(ws *QuicClient) error {
 			if id == "" {
-				return fmt.Errorf("%w: empty DeviceID", ErrMisconfiguredWS)
+				return fmt.Errorf("%w: empty DeviceID", ErrMisconfiguredQuic)
 			}
 
 			ws.id = id
@@ -39,7 +39,7 @@ func URL(url string) Option {
 	return optionFunc(
 		func(ws *QuicClient) error {
 			if url == "" {
-				return fmt.Errorf("%w: empty URL", ErrMisconfiguredWS)
+				return fmt.Errorf("%w: empty URL", ErrMisconfiguredQuic)
 			}
 
 			ws.urlFetcher = func(context.Context) (string, error) {
@@ -54,7 +54,7 @@ func FetchURL(f func(context.Context) (string, error)) Option {
 	return optionFunc(
 		func(ws *QuicClient) error {
 			if f == nil {
-				return fmt.Errorf("%w: nil FetchURL", ErrMisconfiguredWS)
+				return fmt.Errorf("%w: nil FetchURL", ErrMisconfiguredQuic)
 			}
 
 			ws.urlFetcher = f
@@ -68,7 +68,7 @@ func FetchURLTimeout(d time.Duration) Option {
 	return optionFunc(
 		func(ws *QuicClient) error {
 			if d < 0 {
-				return fmt.Errorf("%w: negative FetchURLTimeout", ErrMisconfiguredWS)
+				return fmt.Errorf("%w: negative FetchURLTimeout", ErrMisconfiguredQuic)
 			}
 
 			ws.urlFetchingTimeout = d
@@ -81,7 +81,7 @@ func CredentialsDecorator(f func(http.Header) error) Option {
 	return optionFunc(
 		func(ws *QuicClient) error {
 			if f == nil {
-				return fmt.Errorf("%w: nil CredentialsDecorator", ErrMisconfiguredWS)
+				return fmt.Errorf("%w: nil CredentialsDecorator", ErrMisconfiguredQuic)
 			}
 
 			ws.credDecorator = f
@@ -93,7 +93,7 @@ func ConveyDecorator(f func(http.Header) error) Option {
 	return optionFunc(
 		func(ws *QuicClient) error {
 			if f == nil {
-				return fmt.Errorf("%w: nil ConveyDecorator", ErrMisconfiguredWS)
+				return fmt.Errorf("%w: nil ConveyDecorator", ErrMisconfiguredQuic)
 			}
 
 			ws.conveyDecorator = f
@@ -107,7 +107,7 @@ func KeepAliveInterval(d time.Duration) Option {
 	return optionFunc(
 		func(ws *QuicClient) error {
 			if d < 0 {
-				return fmt.Errorf("%w: negative KeepAliveInterval", ErrMisconfiguredWS)
+				return fmt.Errorf("%w: negative KeepAliveInterval", ErrMisconfiguredQuic)
 			}
 
 			ws.keepAliveInterval = d
@@ -116,20 +116,20 @@ func KeepAliveInterval(d time.Duration) Option {
 }
 
 // whether or not we are using a redirect server (e.g. petasos)
-func WithRedirect(with bool) Option {
-	return optionFunc(
-		func(qc *QuicClient) error {
-			qc.withRedirect = with
-			return nil
-		})
-}
+// func WithRedirect(with bool) Option {
+// 	return optionFunc(
+// 		func(qc *QuicClient) error {
+// 			qc.withRedirect = with
+// 			return nil
+// 		})
+// }
 
 // SendTimeout sets the send timeout for the WS connection.
 func SendTimeout(d time.Duration) Option {
 	return optionFunc(
 		func(ws *QuicClient) error {
 			if d < 0 {
-				return fmt.Errorf("%w: negative SendTimeout", ErrMisconfiguredWS)
+				return fmt.Errorf("%w: negative SendTimeout", ErrMisconfiguredQuic)
 			}
 
 			ws.sendTimeout = d
@@ -142,7 +142,7 @@ func HTTPClient(c arrangehttp.ClientConfig) Option {
 	return optionFunc(
 		func(qc *QuicClient) error {
 			if _, err := c.NewClient(); err != nil {
-				return errors.Join(err, ErrMisconfiguredWS)
+				return errors.Join(err, ErrMisconfiguredQuic)
 			}
 
 			qc.httpClientConfig = c
@@ -200,7 +200,7 @@ func NowFunc(f func() time.Time) Option {
 	return optionFunc(
 		func(ws *QuicClient) error {
 			if f == nil {
-				return fmt.Errorf("%w: nil NowFunc", ErrMisconfiguredWS)
+				return fmt.Errorf("%w: nil NowFunc", ErrMisconfiguredQuic)
 			}
 
 			ws.nowFunc = f
@@ -214,7 +214,7 @@ func RetryPolicy(pf retry.PolicyFactory) Option {
 	return optionFunc(
 		func(ws *QuicClient) error {
 			if pf == nil {
-				return fmt.Errorf("%w: nil RetryPolicy", ErrMisconfiguredWS)
+				return fmt.Errorf("%w: nil RetryPolicy", ErrMisconfiguredQuic)
 			}
 
 			ws.retryPolicyFactory = pf

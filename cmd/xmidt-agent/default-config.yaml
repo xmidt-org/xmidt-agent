@@ -48,7 +48,7 @@ xmidt_service:
 #     -----END PUBLIC KEY-----
 #   timeout: 10s
 websocket:
-  disable: false
+  disable: true
   url_path:           "/api/v2/device"
   # used if xmidt_service section is empty or xmdit_service connection fails
   back_up_url:        "http://localhost:8080"
@@ -65,14 +65,13 @@ websocket:
       expect_continue_timeout: 1s
   max_message_bytes: 262144 # 256 * 1024
 quic:
-  disable: true
-  use_redirect_server: false
+  disable: false
   url_path:           "/api/v2/device"
   # used if xmidt_service section is empty or xmdit_service connection fails
-  back_up_url:        "https://localhost:4433"  
+  back_up_url:        "https://localhost:4432"  
   fetch_url_timeout:  30s
   send_timeout:       90s
-  http3_client:
+  quic_client:
     quic_config:
       keep_alive_period: 10s
       max_idle_timeout: 20s
@@ -82,12 +81,6 @@ quic:
       insecure_skip_verify: true
       next_protos:
         - h3
-  http_client:
-    timeout: 30s
-    transport:
-      idle_conn_timeout:       10s
-      tls_handshake_timeout:   10s
-      expect_continue_timeout: 1s
   #
   #	This retry policy gives us a very good approximation of the prior
   #	policy.  The important things about this policy are:
@@ -147,7 +140,7 @@ storage:
   # temporary: "~/local-rdk-testing/temporary"
   # durable: "~/local-rdk-testing/durable"
 mock_tr_181:
-  enabled: false
+  enabled: true
   file_path: "mock_tr181.json"
   service_name: "mock_config"
 xmidt_agent_crud:
