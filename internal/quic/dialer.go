@@ -23,7 +23,7 @@ type Dialer interface {
 type QuicDialer struct {
 	tlsConfig       *tls.Config
 	quicConfig      quic.Config
-	credDecorator   func(http.Header) error
+	credDecorator   func(http.Header) error // TODO - these may need to be inline
 	conveyDecorator func(http.Header) error
 }
 

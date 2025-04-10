@@ -21,9 +21,20 @@ type MockDialer struct {
 
 func NewMockDialer() *MockDialer { return &MockDialer{} }
 
-func (m *MockDialer) DialQuic(ctx context.Context, url *url.URL) (quic.Connection, error) {
-	args := m.Called(ctx, url)
+func (m *MockDialer) DialQuic(ctx context.Context, inUrl *url.URL) (quic.Connection, error) {
+	args := m.Called(ctx, inUrl)
 	return args.Get(0).(quic.Connection), args.Error(1)
+}
+
+type MockRedirector struct {
+	mock.Mock
+}
+
+func NewMockRedirector() *MockRedirector { return &MockRedirector{} }
+
+func (m *MockRedirector) GetUrl(ctx context.Context, inUrl *url.URL) (*url.URL, error) {
+	args := m.Called(ctx, inUrl)
+	return args.Get(0).(*url.URL), args.Error(1)
 }
 
 type MockStream struct {

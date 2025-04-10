@@ -67,10 +67,6 @@ type QuicClient struct {
 	// credDecorator is the credentials decorator for the Quic connection.
 	conveyDecorator func(http.Header) error
 
-	// inactivityTimeout is the inactivity timeout for the Quic connection.
-	// Defaults to 1 minute.
-	//inactivityTimeout time.Duration
-
 	// sendTimeout is the send timeout for the Quic connection.
 	sendTimeout time.Duration
 
@@ -85,9 +81,6 @@ type QuicClient struct {
 
 	// additionalHeaders are any additional headers for the WS connection.
 	additionalHeaders http.Header
-
-	// whether or not to connect directly to a quic server or redirect first
-	//withRedirect bool
 
 	// connectListeners are the connect listeners for the WS connection.
 	connectListeners eventor.Eventor[event.ConnectListener]
@@ -117,6 +110,7 @@ type QuicClient struct {
 	conn quic.Connection
 
 	qd Dialer
+	rd Redirector
 }
 
 // Option is a functional option type for WS.
@@ -159,6 +153,9 @@ func New(opts ...Option) (*QuicClient, error) {
 		}
 	}
 
+	qc.credDecorator(qc.additionalHeaders)
+	qc.conveyDecorator(qc.additionalHeaders)
+
 	// separating for test purposes but introduces tramp data
 	dialer := &QuicDialer{
 		tlsConfig:       &qc.http3ClientConfig.TlsConfig,
@@ -166,7 +163,15 @@ func New(opts ...Option) (*QuicClient, error) {
 		credDecorator:   qc.credDecorator,
 		conveyDecorator: qc.conveyDecorator,
 	}
+
+	redirector := &UrlRedirector{
+		tlsConfig:       &qc.http3ClientConfig.TlsConfig,
+		quicConfig:      qc.http3ClientConfig.QuicConfig,
+		credDecorator:   qc.credDecorator,
+		conveyDecorator: qc.conveyDecorator,
+	}
 	qc.qd = dialer
+	qc.rd = redirector
 
 	return &qc, nil
 }
@@ -252,7 +257,7 @@ func (qc *QuicClient) dial(ctx context.Context) (quic.Connection, error) {
 		return nil, err
 	}
 
-	redirectedUrl, err := qc.getUrl(parsedFetchUrl)
+	redirectedUrl, err := qc.rd.GetUrl(ctx, parsedFetchUrl)
 	if err != nil {
 		return nil, err
 	}
@@ -271,6 +276,7 @@ func (qc *QuicClient) getUrl(inUrl *url.URL) (*url.URL, error) {
 	client := &http.Client{
 		Transport: &http3.Transport{
 			TLSClientConfig: &qc.http3ClientConfig.TlsConfig,
+			QUICConfig:      &quic.Config{},
 		},
 	}
 
@@ -289,6 +295,7 @@ func (qc *QuicClient) getUrl(inUrl *url.URL) (*url.URL, error) {
 
 	resp, err := client.Do(req)
 	if err != nil {
+		fmt.Println(err)
 		return nil, err
 	}
 	defer resp.Body.Close()
@@ -329,8 +336,6 @@ func (qc *QuicClient) run(ctx context.Context) {
 		}
 
 		// If auth fails, then continue with no credentials.
-		qc.credDecorator(qc.additionalHeaders)
-		qc.conveyDecorator(qc.additionalHeaders)
 
 		conn, dialErr := qc.dial(ctx) //nolint:bodyclose
 		cEvent.At = qc.nowFunc()
@@ -357,7 +362,6 @@ func (qc *QuicClient) run(ctx context.Context) {
 				if err != nil {
 					cancel(nil)
 
-					// how to print error
 					qc.conn.CloseWithError(quic.ApplicationErrorCode(quic.StreamStateError), "error accepting stream")
 
 					dEvent := event.Disconnect{
