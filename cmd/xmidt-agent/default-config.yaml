@@ -68,7 +68,7 @@ quic:
   disable: true
   url_path:           "/api/v2/device"
   # used if xmidt_service section is empty or xmdit_service connection fails
-  back_up_url:        "https://localhost:4432"  
+  back_up_url:        "https://localhost:4432"
   fetch_url_timeout:  30s
   send_timeout:       90s
   quic_client:
