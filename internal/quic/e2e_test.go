@@ -4,7 +4,6 @@
 //go:build !race
 
 // go is complaining about accessing a global map of test values during the test
-//
 package quic
 
 import (
