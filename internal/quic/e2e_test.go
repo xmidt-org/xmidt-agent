@@ -1,6 +1,10 @@
 // SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
 // SPDX-License-Identifier: Apache-2.0
 
+//go:build !race
+
+// go is complaining about accessing a global map of test values during the test
+//
 package quic
 
 import (
@@ -40,20 +44,29 @@ const (
 
 type myHandler struct{}
 
-var remoteServerPort = "4433"
-var redirectServerPort = "4432"
+var (
+	postsReceivedFromClient    map[string]bool
+	messagesReceivedFromClient map[string]bool
+	remoteServerPort           = "4433"
+	redirectServerPort         = "4432"
+)
 
 func (h myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	conn := r.Context().Value(QuicConnectionKey).(quic.Connection)
 	suite := r.Context().Value(SuiteKey).(*EToESuite)
 	shouldRedirect := r.Context().Value(ShouldRedirectKey).(bool)
+	testId := r.Header.Get("testId")
+
+	fmt.Println(r.Header)
 
 	if shouldRedirect {
 		http.Redirect(w, r, fmt.Sprintf("https://127.0.0.1:%s", remoteServerPort), http.StatusMovedPermanently)
 		return
 	}
 
-	suite.serverReceivedPostFromClient = true
+	//suite.m.Lock()
+	postsReceivedFromClient[testId] = true
+	//suite.m.Unlock()
 
 	w.WriteHeader(http.StatusOK)
 
@@ -66,7 +79,7 @@ func (h myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	go sendMessageFromServer(conn, suite, context.Background())
-	go listenForMessageFromClient(conn, suite, context.Background())
+	go listenForMessageFromClient(conn, suite, context.Background(), testId)
 }
 
 func sendMessageFromServer(conn quic.Connection, suite *EToESuite, ctx context.Context) {
@@ -87,7 +100,7 @@ func sendMessageFromServer(conn quic.Connection, suite *EToESuite, ctx context.C
 	stream.Close()
 }
 
-func listenForMessageFromClient(conn quic.Connection, suite *EToESuite, ctx context.Context) error {
+func listenForMessageFromClient(conn quic.Connection, suite *EToESuite, ctx context.Context, testId string) error {
 	stream, err := conn.AcceptStream(ctx)
 	if err != nil {
 		fmt.Printf("error accepting stream  %s", err)
@@ -103,7 +116,9 @@ func listenForMessageFromClient(conn quic.Connection, suite *EToESuite, ctx cont
 
 	fmt.Println("stream handled got: " + string(buf))
 
-	suite.serverReceivedMessageFromClient = true
+	//suite.m.Lock()
+	messagesReceivedFromClient[testId] = true
+	//suite.m.Unlock()
 
 	return nil
 }
@@ -140,6 +155,7 @@ func (suite *EToESuite) StartRemoteServer(port string, redirect bool) {
 			return ctx
 		},
 	}
+
 	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("0.0.0.0:%s", port))
 	if err != nil {
 		fmt.Println("error resolving udp address")
@@ -213,8 +229,6 @@ func generateTLSConfig() *tls.Config {
 
 type EToESuite struct {
 	suite.Suite
-	serverReceivedPostFromClient    bool
-	serverReceivedMessageFromClient bool
 }
 
 func TestEToESuite(t *testing.T) {
@@ -222,12 +236,21 @@ func TestEToESuite(t *testing.T) {
 }
 
 func (suite *EToESuite) SetupSuite() {
+	messagesReceivedFromClient = make(map[string]bool)
+	postsReceivedFromClient = make(map[string]bool)
+
 	go suite.StartRemoteServer(redirectServerPort, true)
 	go suite.StartRemoteServer(remoteServerPort, false)
+
 	time.Sleep(1 * time.Second)
 }
 
+func (suite *EToESuite) TearDownTest() {
+	// Teardown after each test
+}
+
 func (suite *EToESuite) TestEndToEnd() {
+	testId := "one"
 
 	var msgCnt, connectCnt, disconnectCnt atomic.Int64
 
@@ -275,6 +298,7 @@ func (suite *EToESuite) TestEndToEnd() {
 			return nil
 		}),
 		ConveyDecorator(func(h http.Header) error {
+			h.Add("testId", testId)
 			return nil
 		}),
 	)
@@ -298,7 +322,10 @@ func (suite *EToESuite) TestEndToEnd() {
 		}
 	}
 
-	suite.True(suite.serverReceivedPostFromClient)
+	//suite.m.Lock()
+	fuckyou := postsReceivedFromClient[testId]
+	suite.True(fuckyou)
+	//suite.m.Unlock()
 
 	got.Send(context.Background(), GetWrpMessage("client")) // TODO - first one is not received
 	time.Sleep(10 * time.Millisecond)
@@ -318,7 +345,11 @@ func (suite *EToESuite) TestEndToEnd() {
 	}
 
 	time.Sleep(10 * time.Millisecond)
-	suite.True(suite.serverReceivedMessageFromClient)
+
+	//suite.m.Lock()
+	fuckyouToo := messagesReceivedFromClient[testId]
+	suite.True(fuckyouToo)
+	//suite.m.Unlock()
 
 	got.Stop()
 

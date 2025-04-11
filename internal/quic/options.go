@@ -165,10 +165,10 @@ func HTTP3Client(c *Http3ClientConfig) Option {
 // AdditionalHeaders sets the additional headers for the WS connection.
 func AdditionalHeaders(headers http.Header) Option {
 	return optionFunc(
-		func(ws *QuicClient) error {
+		func(qc *QuicClient) error {
 			for k, values := range headers {
 				for _, value := range values {
-					ws.additionalHeaders.Add(k, value)
+					qc.additionalHeaders.Add(k, value)
 				}
 			}
 

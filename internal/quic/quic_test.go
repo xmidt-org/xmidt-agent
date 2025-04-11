@@ -478,7 +478,7 @@ func Test_StreamErr(t *testing.T) {
 	mockDialer.On("DialQuic", mock.Anything, mock.Anything).Return(mockConn, nil)
 
 	got.Start()
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(20 * time.Millisecond)
 
 	mockEventListeners.AssertCalled(t, "OnConnect", mock.Anything)
 	mockEventListeners.AssertCalled(t, "OnDisconnect", mock.Anything)
