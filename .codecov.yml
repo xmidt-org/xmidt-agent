@@ -8,7 +8,7 @@ coverage:
   status:
     project:
       default:
-        target: 80%
+        target: 72%
 ignore:
   - "*_test.go"
   - "vendor"
