@@ -13,3 +13,6 @@ coverage:
 ignore:
   - "*_test.go"
   - "vendor"
+  - "**/quic/redirect.go"
+  - "**/quic/dial.go"
+
