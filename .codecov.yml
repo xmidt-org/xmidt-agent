@@ -9,10 +9,8 @@ coverage:
     project:
       default:
         target: 80%
-
 ignore:
   - "*_test.go"
   - "vendor"
   - "**/quic/redirect.go"
   - "**/quic/dial.go"
-
