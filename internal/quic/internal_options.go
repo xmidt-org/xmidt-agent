@@ -27,16 +27,6 @@ func validateURL() Option {
 		})
 }
 
-func validateFetchURL() Option {
-	return optionFunc(
-		func(ws *QuicClient) error {
-			if ws.urlFetcher == nil {
-				return fmt.Errorf("%w: nil FetchURL", ErrMisconfiguredQuic)
-			}
-			return nil
-		})
-}
-
 func validateCredentialsDecorator() Option {
 	return optionFunc(
 		func(ws *QuicClient) error {
@@ -72,6 +62,16 @@ func validRetryPolicy() Option {
 		func(ws *QuicClient) error {
 			if ws.retryPolicyFactory == nil {
 				return fmt.Errorf("%w: nil RetryPolicy", ErrMisconfiguredQuic)
+			}
+			return nil
+		})
+}
+
+func validHttp3() Option {
+	return optionFunc(
+		func(qc *QuicClient) error {
+			if qc.http3ClientConfig == nil {
+				return fmt.Errorf("%w: nil Http3 Client Config", ErrMisconfiguredQuic)
 			}
 			return nil
 		})

@@ -8,7 +8,6 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -16,7 +15,6 @@ import (
 	"time"
 
 	"github.com/quic-go/quic-go"
-	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/eventor"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v5"
@@ -71,9 +69,6 @@ type QuicClient struct {
 
 	// keepAliveInterval is the keep alive interval for the Quic connection.
 	keepAliveInterval time.Duration
-
-	// httpClientConfig is the configuration and factory for the HTTP client.
-	httpClientConfig arrangehttp.ClientConfig
 
 	// httpClientConfig is the configuration and factory for the HTTP3 client.
 	http3ClientConfig *Http3ClientConfig
@@ -137,7 +132,7 @@ func New(opts ...Option) (*QuicClient, error) {
 	opts = append(opts,
 		validateDeviceID(),
 		validateURL(),
-		validateFetchURL(),
+		//validateFetchURL(),
 		validateCredentialsDecorator(),
 		validateConveyDecorator(),
 		validateNowFunc(),
@@ -264,14 +259,6 @@ func (qc *QuicClient) dial(ctx context.Context) (quic.Connection, error) {
 	conn, err := qc.qd.DialQuic(ctx, redirectedUrl)
 
 	return conn, err
-}
-
-func dumpContext(ctx context.Context, keys ...interface{}) {
-	for _, key := range keys {
-		if value := ctx.Value(key); value != nil {
-			fmt.Printf("  %v: %v\n", key, value)
-		}
-	}
 }
 
 func (qc *QuicClient) run(ctx context.Context) {

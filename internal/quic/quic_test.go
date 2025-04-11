@@ -14,7 +14,7 @@ import (
 	"github.com/quic-go/quic-go"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/event"
@@ -22,13 +22,13 @@ import (
 )
 
 var (
-	errUnknown = errors.New("unknown error")
-	Url        = "https://example.com"
+	errUnknown      = errors.New("unknown error")
+	RemoteServerUrl = "https://127.0.0.1:4433"
 )
 
 func TestNew(t *testing.T) {
 	fetcher := func(context.Context) (string, error) {
-		return Url, nil
+		return RemoteServerUrl, nil
 	}
 
 	opts := []Option{}
@@ -79,7 +79,7 @@ func TestNew(t *testing.T) {
 				assert.NotNil(c.urlFetcher)
 				u, err := c.urlFetcher(context.Background())
 				assert.NoError(err)
-				assert.Equal(Url, u)
+				assert.Equal(RemoteServerUrl, u)
 				//assert.False(c.withRedirect)
 
 				// Headers
@@ -122,7 +122,7 @@ func TestNew(t *testing.T) {
 			check: func(assert *assert.Assertions, c *QuicClient) {
 				u, err := c.urlFetcher(context.Background())
 				assert.NoError(err)
-				assert.Equal(Url, u)
+				assert.Equal(RemoteServerUrl, u)
 			},
 		},
 
@@ -140,7 +140,7 @@ func TestNew(t *testing.T) {
 			description: "custom now func",
 			opts: append(
 				opts,
-				URL(Url),
+				URL(RemoteServerUrl),
 				DeviceID("mac:112233445566"),
 				NowFunc(func() time.Time {
 					return time.Unix(1234, 0)
@@ -207,7 +207,7 @@ func TestMessageListener(t *testing.T) {
 	m.On("OnMessage", mock.Anything).Return()
 
 	got, err := New(
-		URL(Url),
+		URL(RemoteServerUrl),
 		DeviceID("mac:112233445566"),
 		AddMessageListener(&m),
 		CredentialsDecorator(func(h http.Header) error {
@@ -241,7 +241,7 @@ func TestConnectListener(t *testing.T) {
 	m.On("OnConnect", mock.Anything).Return()
 
 	got, err := New(
-		URL(Url),
+		URL(RemoteServerUrl),
 		DeviceID("mac:112233445566"),
 		AddConnectListener(&m),
 		CredentialsDecorator(func(h http.Header) error {
@@ -275,7 +275,7 @@ func TestDisconnectListener(t *testing.T) {
 	m.On("OnDisconnect", mock.Anything).Return()
 
 	got, err := New(
-		URL(Url),
+		URL(RemoteServerUrl),
 		DeviceID("mac:112233445566"),
 		AddDisconnectListener(&m),
 		CredentialsDecorator(func(h http.Header) error {
@@ -309,7 +309,7 @@ func TestHeartbeatListener(t *testing.T) {
 	m.On("OnHeartbeat", mock.Anything).Return()
 
 	got, err := New(
-		URL(Url),
+		URL(RemoteServerUrl),
 		DeviceID("mac:112233445566"),
 		AddHeartbeatListener(&m),
 		CredentialsDecorator(func(h http.Header) error {
@@ -339,103 +339,23 @@ func Test_emptyDecorator(t *testing.T) {
 	assert.NoError(t, emptyDecorator(http.Header{}))
 }
 
-func Test_CancelCtx(t *testing.T) {
-	require := require.New(t)
-
-	got, err := New(
-		Enabled(true),
-		URL(Url),
-		DeviceID("mac:112233445566"),
-		RetryPolicy(&retry.Config{
-			Interval:    time.Second,
-			Multiplier:  2.0,
-			Jitter:      1.0 / 3.0,
-			MaxInterval: 341*time.Second + 333*time.Millisecond,
-		}),
-		NowFunc(time.Now),
-		FetchURLTimeout(30*time.Second),
-		CredentialsDecorator(func(h http.Header) error {
-			return nil
-		}),
-		ConveyDecorator(func(h http.Header) error {
-			return nil
-		}),
-		HTTP3Client(&Http3ClientConfig{
-			QuicConfig: quic.Config{},
-			TlsConfig:  tls.Config{},
-		}),
-	)
-	require.NoError(err)
-	require.NotNil(got)
-	mockDialer := NewMockDialer()
-
-	got.qd = mockDialer
-	mockConn := NewMockConnection()
-
-	mockDialer.On("DialQuic", mock.Anything, mock.Anything).Return(mockConn, nil)
-
-	got.Start()
-	time.Sleep(500 * time.Millisecond)
-	got.shutdown()
-	time.Sleep(500 * time.Millisecond)
-	got.Stop()
+type QuicSuite struct {
+	suite.Suite
+	got                *QuicClient
+	mockRedirector     *MockRedirector
+	mockDialer         *MockDialer
+	mockEventListeners *mockevent.MockListeners
 }
 
-func Test_DialErr(t *testing.T) {
-	require := require.New(t)
+func TestQuicSuite(t *testing.T) {
+	suite.Run(t, new(QuicSuite))
+}
 
+func (suite *QuicSuite) SetupTest() {
 	mockEventListeners := &mockevent.MockListeners{}
 	got, err := New(
 		Enabled(true),
-		URL("http://test.com"),
-		DeviceID("mac:112233445566"),
-		RetryPolicy(&retry.Config{
-			Interval:    time.Second,
-			Multiplier:  2.0,
-			Jitter:      1.0 / 3.0,
-			MaxInterval: 341*time.Second + 333*time.Millisecond,
-		}),
-		NowFunc(time.Now),
-		FetchURLTimeout(30*time.Second),
-		CredentialsDecorator(func(h http.Header) error {
-			return nil
-		}),
-		ConveyDecorator(func(h http.Header) error {
-			return nil
-		}),
-		HTTP3Client(&Http3ClientConfig{
-			QuicConfig: quic.Config{},
-			TlsConfig:  tls.Config{},
-		}),
-		AddDisconnectListener(mockEventListeners),
-	)
-	require.NoError(err)
-	require.NotNil(got)
-	mockDialer := NewMockDialer()
-	mockRedirector := NewMockRedirector()
-
-	got.qd = mockDialer
-	got.rd = mockRedirector
-	mockConn := NewMockConnection()
-
-	remoteServerUrl, err := url.Parse("https://127.0.0.1:4433")
-	require.NoError(err)
-	mockRedirector.On("GetUrl", mock.Anything, mock.Anything).Return(remoteServerUrl, nil)
-	mockDialer.On("DialQuic", mock.Anything, mock.Anything).Return(mockConn, errors.New("dial error"))
-
-	got.Start()
-	time.Sleep(10 * time.Millisecond)
-
-	mockEventListeners.AssertNotCalled(t, "OnConnect", mock.Anything)
-}
-
-func Test_StreamErr(t *testing.T) {
-	require := require.New(t)
-
-	mockEventListeners := &mockevent.MockListeners{}
-	got, err := New(
-		Enabled(true),
-		URL("https://127.0.0.1:4432"),
+		URL(RemoteServerUrl),
 		DeviceID("mac:112233445566"),
 		RetryPolicy(&retry.Config{
 			Interval:    time.Second,
@@ -458,75 +378,112 @@ func Test_StreamErr(t *testing.T) {
 		AddConnectListener(mockEventListeners),
 		AddDisconnectListener(mockEventListeners),
 	)
-	require.NoError(err)
-	require.NotNil(got)
-	mockDialer := NewMockDialer()
-	mockRedirector := NewMockRedirector()
 
+	suite.NoError(err)
+	suite.NotNil(got)
+
+	mockDialer := NewMockDialer()
 	got.qd = mockDialer
+
+	mockRedirector := NewMockRedirector()
 	got.rd = mockRedirector
+	got.qd = mockDialer
+
+	suite.got = got
+	suite.mockRedirector = mockRedirector
+	suite.mockDialer = mockDialer
+	suite.mockEventListeners = mockEventListeners
+}
+
+func (suite *QuicSuite) Test_CancelCtx() {
 	mockConn := NewMockConnection()
 	mockStr := NewMockStream([]byte("xxxx"))
 	mockStr.On("Close").Return(nil)
 	mockConn.On("AcceptStream", mock.Anything).Return(mockStr, errors.New("some error"))
 	mockConn.On("CloseWithError", mock.Anything, mock.Anything).Return(nil)
 
-	mockEventListeners.On("OnConnect", mock.Anything).Return()
-	mockEventListeners.On("OnDisconnect", mock.Anything).Return()
+	remoteServerUrl, err := url.Parse("RemoteServerUrl")
+	suite.NoError(err)
+	suite.mockRedirector.On("GetUrl", mock.Anything, mock.Anything).Return(remoteServerUrl, nil)
+	suite.mockDialer.On("DialQuic", mock.Anything, mock.Anything).Return(mockConn, nil)
 
-	remoteServerUrl, err := url.Parse("https://127.0.0.1:4433")
-	require.NoError(err)
-	mockRedirector.On("GetUrl", mock.Anything, mock.Anything).Return(remoteServerUrl, nil)
-	mockDialer.On("DialQuic", mock.Anything, mock.Anything).Return(mockConn, nil)
+	suite.mockEventListeners.On("OnConnect", mock.Anything).Return()
+	suite.mockEventListeners.On("OnDisconnect", mock.Anything).Return()
 
-	got.Start()
-	time.Sleep(20 * time.Millisecond)
+	suite.got.Start()
 
-	//mockEventListeners.AssertCalled(t, "OnConnect", mock.Anything)
-	mockEventListeners.AssertCalled(t, "OnDisconnect", mock.Anything)
-	mockConn.AssertCalled(t, "AcceptStream", mock.Anything)
-	mockConn.AssertCalled(t, "CloseWithError", mock.Anything, mock.Anything)
-	mockRedirector.AssertCalled(t, "GetUrl", mock.Anything, mock.Anything)
+	time.Sleep(500 * time.Millisecond)
+	suite.got.shutdown()
+	time.Sleep(500 * time.Millisecond)
+	suite.got.Stop()
 }
 
-func Test_DecodeErr(t *testing.T) {
-	require := require.New(t)
+func (suite *QuicSuite) Test_DialErr() {
+	remoteServerUrl, err := url.Parse("RemoteServerUrl")
+	suite.NoError(err)
+	suite.mockRedirector.On("GetUrl", mock.Anything, mock.Anything).Return(remoteServerUrl, errors.New("some error"))
+	suite.mockEventListeners.On("OnConnect", mock.Anything)
+	suite.got.Start()
 
-	mockEventListeners := &mockevent.MockListeners{}
-	got, err := New(
-		Enabled(true),
-		URL(Url),
-		DeviceID("mac:112233445566"),
-		RetryPolicy(&retry.Config{
-			Interval:    time.Second,
-			Multiplier:  2.0,
-			Jitter:      1.0 / 3.0,
-			MaxInterval: 341*time.Second + 333*time.Millisecond,
-		}),
-		NowFunc(time.Now),
-		FetchURLTimeout(30*time.Second),
-		CredentialsDecorator(func(h http.Header) error {
-			return nil
-		}),
-		ConveyDecorator(func(h http.Header) error {
-			return nil
-		}),
-		HTTP3Client(&Http3ClientConfig{
-			QuicConfig: quic.Config{},
-			TlsConfig:  tls.Config{},
-		}),
+	time.Sleep(10 * time.Millisecond)
 
-		AddConnectListener(mockEventListeners),
-		AddDisconnectListener(mockEventListeners),
-	)
-	require.NoError(err)
-	require.NotNil(got)
+	suite.mockEventListeners.AssertCalled(suite.T(), "OnConnect", mock.Anything)
+}
 
-	mockDialer := NewMockDialer()
-	mockRedirector := NewMockRedirector()
-	got.qd = mockDialer
-	got.rd = mockRedirector
+func (suite *QuicSuite) Test_Send() {
+	mockConn := NewMockConnection()
 
+	mockStr := NewMockStream([]byte(""))
+
+	mockStr.On("Write", mock.Anything).Return(0, nil)
+	mockStr.On("Close").Return(nil)
+
+	mockConn.On("OpenStream").Return(mockStr, nil)
+
+	suite.got.conn = mockConn
+
+	msg := GetWrpMessage("client")
+	suite.got.Send(context.Background(), msg)
+
+	mockConn.AssertCalled(suite.T(), "OpenStream")
+	mockStr.AssertCalled(suite.T(), "Write", mock.Anything)
+	mockStr.AssertCalled(suite.T(), "Close")
+}
+
+func (suite *QuicSuite) TestGetName() {
+	suite.Equal("quic", suite.got.Name())
+}
+
+func (suite *QuicSuite) TestEnabled() {
+	suite.Equal(true, suite.got.IsEnabled())
+}
+
+func (suite *QuicSuite) Test_StreamErr() {
+	mockConn := NewMockConnection()
+	mockStr := NewMockStream([]byte("xxxx"))
+	mockStr.On("Close").Return(nil)
+	mockConn.On("AcceptStream", mock.Anything).Return(mockStr, errors.New("some error"))
+	mockConn.On("CloseWithError", mock.Anything, mock.Anything).Return(nil)
+
+	suite.mockEventListeners.On("OnConnect", mock.Anything).Return()
+	suite.mockEventListeners.On("OnDisconnect", mock.Anything).Return()
+
+	remoteServerUrl, err := url.Parse("RemoteServerUrl")
+	suite.NoError(err)
+	suite.mockRedirector.On("GetUrl", mock.Anything, mock.Anything).Return(remoteServerUrl, nil)
+	suite.mockDialer.On("DialQuic", mock.Anything, mock.Anything).Return(mockConn, nil)
+
+	suite.got.Start()
+	time.Sleep(20 * time.Millisecond)
+
+	suite.mockEventListeners.AssertCalled(suite.T(), "OnConnect", mock.Anything)
+	suite.mockEventListeners.AssertCalled(suite.T(), "OnDisconnect", mock.Anything)
+	mockConn.AssertCalled(suite.T(), "AcceptStream", mock.Anything)
+	mockConn.AssertCalled(suite.T(), "CloseWithError", mock.Anything, mock.Anything)
+	suite.mockRedirector.AssertCalled(suite.T(), "GetUrl", mock.Anything, mock.Anything)
+}
+
+func (suite *QuicSuite) Test_DecodeErr() {
 	mockConn := NewMockConnection()
 	mockStr := NewMockStream([]byte("xxxx"))
 	mockConn.On("AcceptStream", mock.Anything).Return(mockStr, nil)
@@ -534,20 +491,20 @@ func Test_DecodeErr(t *testing.T) {
 	mockStr.On("Read", mock.Anything).Return(5, nil)
 	mockStr.On("Close").Return(nil)
 
-	mockEventListeners.On("OnConnect", mock.Anything).Return()
-	mockEventListeners.On("OnDisconnect", mock.Anything).Return()
+	suite.mockEventListeners.On("OnConnect", mock.Anything).Return()
+	suite.mockEventListeners.On("OnDisconnect", mock.Anything).Return()
 
-	remoteServerUrl, err := url.Parse("https://127.0.0.1:4433")
-	require.NoError(err)
-	mockRedirector.On("GetUrl", mock.Anything, mock.Anything).Return(remoteServerUrl, nil)
-	mockDialer.On("DialQuic", mock.Anything, mock.Anything).Return(mockConn, nil)
+	remoteServerUrl, err := url.Parse("RemoteServerUrl")
+	suite.NoError(err)
+	suite.mockRedirector.On("GetUrl", mock.Anything, mock.Anything).Return(remoteServerUrl, nil)
+	suite.mockDialer.On("DialQuic", mock.Anything, mock.Anything).Return(mockConn, nil)
 
-	got.Start()
+	suite.got.Start()
 	time.Sleep(10 * time.Millisecond)
 
-	mockEventListeners.AssertCalled(t, "OnConnect", mock.Anything)
-	mockConn.AssertCalled(t, "AcceptStream", mock.Anything)
-	mockEventListeners.AssertCalled(t, "OnDisconnect", mock.Anything)
-	//mockConn.AssertCalled(t, "CloseWithError", mock.Anything, mock.Anything) - in the debugger, this gets called
-	mockRedirector.AssertCalled(t, "GetUrl", mock.Anything, mock.Anything)
+	suite.mockEventListeners.AssertCalled(suite.T(), "OnConnect", mock.Anything)
+	mockConn.AssertCalled(suite.T(), "AcceptStream", mock.Anything)
+	suite.mockEventListeners.AssertCalled(suite.T(), "OnDisconnect", mock.Anything)
+	//mockConn.AssertCalled(suite.T(), "CloseWithError", mock.Anything)  - this gets called in the debugger
+	suite.mockRedirector.AssertCalled(suite.T(), "GetUrl", mock.Anything, mock.Anything)
 }

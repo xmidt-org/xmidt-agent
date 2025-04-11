@@ -20,9 +20,9 @@ var (
 )
 
 func provideQuic(in CloudHandlerIn) (cloudHandlerOut, error) {
-	if in.Quic.Disable {
-		return cloudHandlerOut{}, nil
-	}
+	// if in.Quic.Disable {
+	// 	return cloudHandlerOut{}, nil
+	// }
 
 	var fetchURLFunc func(context.Context) (string, error)
 	// JWTXT is not required
