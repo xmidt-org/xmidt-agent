@@ -351,12 +351,17 @@ type cloudHandlerOut struct {
 func provideCloudHandler(in CloudHandlerIn) (cloudHandlerOut, error) {
 	cloudHandlerOut := cloudHandlerOut{}
 
-	if in.Websocket.Disable && !in.Quic.Disable {
-		quicOut, err := provideQuic(in)
-		if err != nil {
-			return cloudHandlerOut, err
-		}
+	quicOut, err := provideQuic(in)
+	if err != nil {
+		return cloudHandlerOut, err
+	}
 
+	wsOut, err := provideWS(in)
+	if err != nil {
+		return cloudHandlerOut, err
+	}
+
+	if in.Websocket.Disable && !in.Quic.Disable {
 		cloudHandlerOut.Cancels = quicOut.Cancels
 		cloudHandlerOut.Egress = quicOut.Egress
 		cloudHandlerOut.Handler = quicOut.Handler
@@ -364,11 +369,6 @@ func provideCloudHandler(in CloudHandlerIn) (cloudHandlerOut, error) {
 	}
 
 	if !in.Websocket.Disable {
-		wsOut, err := provideWS(in)
-		if err != nil {
-			return cloudHandlerOut, err
-		}
-
 		cloudHandlerOut.Cancels = wsOut.Cancels
 		cloudHandlerOut.Egress = wsOut.Egress
 		cloudHandlerOut.Handler = wsOut.Handler
