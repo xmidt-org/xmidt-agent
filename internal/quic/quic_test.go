@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"testing"
@@ -442,7 +443,12 @@ func (suite *QuicSuite) Test_Send() {
 
 	suite.got.conn = mockConn
 
-	msg := GetWrpMessage("client")
+	msg := wrp.Message{
+		Type:        wrp.SimpleEventMessageType,
+		Source:      fmt.Sprintf("event:test.com/%s", "client"),
+		Destination: "mac:4ca161000109/mock_config",
+		PartnerIDs:  []string{"foobar"},
+	}
 	suite.got.Send(context.Background(), msg)
 
 	mockConn.AssertCalled(suite.T(), "OpenStream")

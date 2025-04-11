@@ -13,6 +13,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/quic-go/quic-go"
+	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/event"
 	myquic "github.com/xmidt-org/xmidt-agent/internal/quic"
@@ -59,6 +60,8 @@ func main() {
 	opts := []myquic.Option{
 		myquic.DeviceID(id),
 		myquic.URL(cli.URL),
+		myquic.NowFunc(time.Now),
+		myquic.RetryPolicy(retry.Config{}),
 		myquic.HTTP3Client(
 			&myquic.Http3ClientConfig{
 				QuicConfig: quic.Config{},
