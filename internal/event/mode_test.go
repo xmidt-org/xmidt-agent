@@ -1,29 +1,28 @@
 // SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
 // SPDX-License-Identifier: Apache-2.0
 
-package websocket
+package event
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
 )
 
 func Test_ipMode_ToEvent(t *testing.T) {
 	tests := []struct {
 		description string
-		m           ipMode
-		want        event.IPMode
+		m           IpMode
+		want        IPMode
 	}{
 		{
 			description: "ipv4",
-			m:           ipv4,
-			want:        event.IPv4,
+			m:           Ipv4,
+			want:        IPv4,
 		}, {
 			description: "ipv6",
-			m:           ipv6,
-			want:        event.IPv6,
+			m:           Ipv6,
+			want:        IPv6,
 		},
 	}
 	for _, tc := range tests {

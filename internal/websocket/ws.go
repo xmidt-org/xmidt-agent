@@ -15,8 +15,12 @@ import (
 	"github.com/xmidt-org/eventor"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v5"
+	"github.com/xmidt-org/xmidt-agent/internal/event"
 	nhws "github.com/xmidt-org/xmidt-agent/internal/nhooyr.io/websocket"
-	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
+)
+
+const (
+	Name = "websocket"
 )
 
 var (
@@ -191,6 +195,10 @@ func (ws *Websocket) Stop() {
 	ws.wg.Wait()
 }
 
+func (ws *Websocket) Name() string {
+	return Name
+}
+
 func (ws *Websocket) HandleWrp(m wrp.Message) error {
 	return ws.Send(context.Background(), m)
 }
@@ -217,11 +225,12 @@ func (ws *Websocket) Send(ctx context.Context, msg wrp.Message) error {
 	return err
 }
 
+// neither this or websocket code logs errors, this needs to be rectified.
 func (ws *Websocket) run(ctx context.Context) {
 	ws.wg.Add(1)
 	defer ws.wg.Done()
 
-	mode := ws.nextMode(ipv4)
+	mode := ws.nextMode(event.Ipv4)
 
 	policy := ws.retryPolicyFactory.NewPolicy(ctx)
 
@@ -374,7 +383,7 @@ func (ws *Websocket) run(ctx context.Context) {
 	}
 }
 
-func (ws *Websocket) dial(ctx context.Context, mode ipMode) (*nhws.Conn, *http.Response, error) {
+func (ws *Websocket) dial(ctx context.Context, mode event.IpMode) (*nhws.Conn, *http.Response, error) {
 	fetchCtx, cancel := context.WithTimeout(ctx, ws.urlFetchingTimeout)
 	defer cancel()
 	url, err := ws.urlFetcher(fetchCtx)
@@ -411,7 +420,7 @@ func (rt *custRT) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 // newHTTPClient returns a HTTP client using the provided `mode` as its named network.
-func (ws *Websocket) newHTTPClient(mode ipMode) (*http.Client, error) {
+func (ws *Websocket) newHTTPClient(mode event.IpMode) (*http.Client, error) {
 	config := ws.httpClientConfig
 	client, err := config.NewClient()
 	if err != nil {
@@ -447,13 +456,13 @@ func (ws *Websocket) newHTTPClient(mode ipMode) (*http.Client, error) {
 	return client, nil
 }
 
-func (ws *Websocket) nextMode(mode ipMode) ipMode {
-	if mode == ipv4 && ws.withIPv6 {
-		return ipv6
+func (ws *Websocket) nextMode(mode event.IpMode) event.IpMode {
+	if mode == event.Ipv4 && ws.withIPv6 {
+		return event.Ipv6
 	}
 
-	if mode == ipv6 && ws.withIPv4 {
-		return ipv4
+	if mode == event.Ipv6 && ws.withIPv4 {
+		return event.Ipv4
 	}
 
 	return mode

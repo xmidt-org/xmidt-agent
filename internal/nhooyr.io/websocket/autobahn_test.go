@@ -95,7 +95,7 @@ func TestAutobahn(t *testing.T) {
 		}
 	})
 
-	c, _, err := websocket.Dial(ctx, fmt.Sprintf(wstestURL+"/updateReports?agent=main"), nil)
+	c, _, err := websocket.Dial(ctx, fmt.Sprintf("%s/updateReports?agent=main", wstestURL), nil)
 	assert.Success(t, err)
 	c.Close(websocket.StatusNormalClosure, "")
 

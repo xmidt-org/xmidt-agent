@@ -48,6 +48,7 @@ xmidt_service:
 #     -----END PUBLIC KEY-----
 #   timeout: 10s
 websocket:
+  disable: false
   url_path:           "/api/v2/device"
   # used if xmidt_service section is empty or xmdit_service connection fails
   back_up_url:        "http://localhost:8080"
@@ -63,6 +64,23 @@ websocket:
       tls_handshake_timeout:   10s
       expect_continue_timeout: 1s
   max_message_bytes: 262144 # 256 * 1024
+quic:
+  disable: true
+  url_path:           "/api/v2/device"
+  # used if xmidt_service section is empty or xmdit_service connection fails
+  back_up_url:        "https://localhost:4432"
+  fetch_url_timeout:  30s
+  send_timeout:       90s
+  quic_client:
+    quic_config:
+      keep_alive_period: 10s
+      max_idle_timeout: 20s
+      initial_stream_receive_window: 262144 # 256 * 1024
+      max_stream_receive_window: 262144 # 256 * 1024
+    tls_config:
+      insecure_skip_verify: true
+      next_protos:
+        - h3
   #
   #	This retry policy gives us a very good approximation of the prior
   #	policy.  The important things about this policy are:

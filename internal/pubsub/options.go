@@ -58,6 +58,7 @@ func WithServiceHandler(service string, handler wrpkit.Handler, cancel ...*Cance
 func WithEventHandler(event string, handler wrpkit.Handler, cancel ...*CancelFunc) Option {
 	return optionFunc(func(ps *PubSub) error {
 		c, err := ps.SubscribeEvent(event, handler)
+
 		if err != nil {
 			return err
 		}

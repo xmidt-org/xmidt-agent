@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"time"
 
@@ -13,10 +14,13 @@ import (
 	"github.com/goschtalt/goschtalt"
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/xmidt-agent/internal/adapters/libparodus"
+	"github.com/xmidt-org/xmidt-agent/internal/cloud"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials"
+	"github.com/xmidt-org/xmidt-agent/internal/jwtxt"
 	"github.com/xmidt-org/xmidt-agent/internal/loglevel"
-	"github.com/xmidt-org/xmidt-agent/internal/websocket"
+	"github.com/xmidt-org/xmidt-agent/internal/metadata"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/qos"
+	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -49,7 +53,7 @@ type LifeCycleIn struct {
 	Logger           *zap.Logger
 	LC               fx.Lifecycle
 	Shutdowner       fx.Shutdowner
-	WS               *websocket.Websocket
+	CloudHandler     cloud.Handler
 	LibParodus       *libparodus.Adapter
 	QOS              *qos.Handler
 	Cred             *credentials.Credentials
@@ -96,7 +100,7 @@ func provideAppOptions(args []string) fx.Option {
 			provideConfig,
 			provideCredentials,
 			provideInstructions,
-			provideWS,
+			provideCloudHandler,
 			provideLibParodus,
 
 			goschtalt.UnmarshalFunc[sallust.Config]("logger", goschtalt.Optional()),
@@ -106,6 +110,7 @@ func provideAppOptions(args []string) fx.Option {
 			goschtalt.UnmarshalFunc[XmidtService]("xmidt_service"),
 			goschtalt.UnmarshalFunc[Storage]("storage"),
 			goschtalt.UnmarshalFunc[Websocket]("websocket"),
+			goschtalt.UnmarshalFunc[Quic]("quic"),
 			goschtalt.UnmarshalFunc[MockTr181]("mock_tr_181"),
 			goschtalt.UnmarshalFunc[Pubsub]("pubsub"),
 			goschtalt.UnmarshalFunc[Metadata]("metadata"),
@@ -241,16 +246,11 @@ func provideLogger(in LoggerIn) (*zap.AtomicLevel, *zap.Logger, error) {
 	return &zcfg.Level, logger, err
 }
 
-func onStart(cred *credentials.Credentials, ws *websocket.Websocket, libParodus *libparodus.Adapter, qos *qos.Handler, waitUntilFetched time.Duration, logger *zap.Logger) func(context.Context) error {
+func onStart(cred *credentials.Credentials, cloudHandler cloud.Handler, libParodus *libparodus.Adapter, qos *qos.Handler, waitUntilFetched time.Duration, logger *zap.Logger) func(context.Context) error {
 	logger = logger.Named("on_start")
 
 	return func(ctx context.Context) (err error) {
 		if err = ctx.Err(); err != nil {
-			return err
-		}
-
-		if ws == nil {
-			logger.Debug("websocket disabled")
 			return err
 		}
 
@@ -262,7 +262,13 @@ func onStart(cred *credentials.Credentials, ws *websocket.Websocket, libParodus 
 			cred.WaitUntilFetched(ctx)
 		}
 
-		ws.Start()
+		if cloudHandler == nil {
+			logger.Info("cloudHandler disabled")
+			return err
+		}
+
+		cloudHandler.Start()
+
 		err = libParodus.Start()
 		qos.Start()
 
@@ -270,16 +276,13 @@ func onStart(cred *credentials.Credentials, ws *websocket.Websocket, libParodus 
 	}
 }
 
-func onStop(ws *websocket.Websocket, libParodus *libparodus.Adapter, qos *qos.Handler, shutdowner fx.Shutdowner, cancels []func(), logger *zap.Logger) func(context.Context) error {
-	logger = logger.Named("on_stop")
+func onStop(cloudHandler cloud.Handler, libParodus *libparodus.Adapter, qos *qos.Handler, shutdowner fx.Shutdowner, cancels []func(), logger *zap.Logger) func(context.Context) error {
 
 	return func(context.Context) (err error) {
-		if ws == nil {
-			logger.Debug("websocket disabled")
-			return nil
+		if cloudHandler != nil {
+			cloudHandler.Stop()
 		}
 
-		ws.Stop()
 		libParodus.Stop()
 		qos.Stop()
 		for _, c := range cancels {
@@ -298,8 +301,79 @@ func lifeCycle(in LifeCycleIn) {
 	logger := in.Logger.Named("fx_lifecycle")
 	in.LC.Append(
 		fx.Hook{
-			OnStart: onStart(in.Cred, in.WS, in.LibParodus, in.QOS, in.WaitUntilFetched, logger),
-			OnStop:  onStop(in.WS, in.LibParodus, in.QOS, in.Shutdowner, in.Cancels, logger),
+			OnStart: onStart(in.Cred, in.CloudHandler, in.LibParodus, in.QOS, in.WaitUntilFetched, logger),
+			OnStop:  onStop(in.CloudHandler, in.LibParodus, in.QOS, in.Shutdowner, in.Cancels, logger),
 		},
 	)
+}
+
+func fetchURL(path, backUpURL string, f func(context.Context) (string, error)) func(context.Context) (string, error) {
+	return func(ctx context.Context) (string, error) {
+		if f == nil {
+			return url.JoinPath(backUpURL, path)
+		}
+
+		baseURL, err := f(ctx)
+		if err != nil {
+			if backUpURL != "" {
+				return url.JoinPath(backUpURL, path)
+			}
+
+			return "", err
+		}
+
+		return url.JoinPath(baseURL, path)
+	}
+}
+
+type CloudHandlerIn struct {
+	fx.In
+	Identity  Identity
+	Logger    *zap.Logger
+	CLI       *CLI
+	JWTXT     *jwtxt.Instructions
+	Cred      *credentials.Credentials
+	Metadata  *metadata.MetadataProvider
+	Quic      Quic
+	Websocket Websocket
+}
+
+type cloudHandlerOut struct {
+	fx.Out
+	Handler    cloud.Handler
+	Egress     cloud.Egress
+	WrpHandler wrpkit.Handler
+
+	// cancels
+	Cancels []func() `group:"cancels,flatten"`
+}
+
+func provideCloudHandler(in CloudHandlerIn) (cloudHandlerOut, error) {
+	cloudHandlerOut := cloudHandlerOut{}
+
+	quicOut, err := provideQuic(in)
+	if err != nil {
+		return cloudHandlerOut, err
+	}
+
+	wsOut, err := provideWS(in)
+	if err != nil {
+		return cloudHandlerOut, err
+	}
+
+	if in.Websocket.Disable && !in.Quic.Disable {
+		cloudHandlerOut.Cancels = quicOut.Cancels
+		cloudHandlerOut.Egress = quicOut.Egress
+		cloudHandlerOut.Handler = quicOut.Handler
+		cloudHandlerOut.WrpHandler = quicOut.Handler.(wrpkit.Handler)
+	}
+
+	if !in.Websocket.Disable {
+		cloudHandlerOut.Cancels = wsOut.Cancels
+		cloudHandlerOut.Egress = wsOut.Egress
+		cloudHandlerOut.Handler = wsOut.Handler
+		cloudHandlerOut.WrpHandler = wsOut.Handler.(wrpkit.Handler)
+	}
+
+	return cloudHandlerOut, nil
 }

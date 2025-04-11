@@ -80,8 +80,6 @@ type Parameter struct {
 // the handler that will be called to send the response.  The parameter source is the source to use in
 // the response message.
 func New(egress wrpkit.Handler, source string, opts ...Option) (*Handler, error) {
-	// TODO - load config from file system
-
 	h := Handler{
 		egress: egress,
 		source: source,
@@ -115,7 +113,7 @@ func (h Handler) Enabled() bool {
 
 // HandleWrp is called to process a tr181 command
 func (h Handler) HandleWrp(msg wrp.Message) error {
-	statusCode, payloadResponse, err := h.proccessCommand(msg.Payload)
+	_, payloadResponse, err := h.proccessCommand(msg.Payload)
 	if err != nil {
 		return errors.Join(err, wrpkit.ErrNotHandled)
 	}
@@ -125,7 +123,6 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 	response.Source = h.source
 	response.ContentType = "application/json"
 	response.Payload = payloadResponse
-	response.Status = &statusCode
 	if err = h.egress.HandleWrp(response); err != nil {
 		return errors.Join(err, wrpkit.ErrNotHandled)
 	}

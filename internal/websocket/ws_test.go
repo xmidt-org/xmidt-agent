@@ -17,8 +17,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v5"
+	"github.com/xmidt-org/xmidt-agent/internal/event"
+	mockevent "github.com/xmidt-org/xmidt-agent/internal/mocks/event"
 	"github.com/xmidt-org/xmidt-agent/internal/nhooyr.io/websocket"
-	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
 )
 
 var (
@@ -208,7 +209,7 @@ func TestNew(t *testing.T) {
 func TestMessageListener(t *testing.T) {
 	assert := assert.New(t)
 
-	var m MockListeners
+	var m mockevent.MockListeners
 
 	m.On("OnMessage", mock.Anything).Return()
 
@@ -239,7 +240,7 @@ func TestMessageListener(t *testing.T) {
 func TestConnectListener(t *testing.T) {
 	assert := assert.New(t)
 
-	var m MockListeners
+	var m mockevent.MockListeners
 
 	m.On("OnConnect", mock.Anything).Return()
 
@@ -270,7 +271,7 @@ func TestConnectListener(t *testing.T) {
 func TestDisconnectListener(t *testing.T) {
 	assert := assert.New(t)
 
-	var m MockListeners
+	var m mockevent.MockListeners
 
 	m.On("OnDisconnect", mock.Anything).Return()
 
@@ -301,7 +302,7 @@ func TestDisconnectListener(t *testing.T) {
 func TestHeartbeatListener(t *testing.T) {
 	assert := assert.New(t)
 
-	var m MockListeners
+	var m mockevent.MockListeners
 
 	m.On("OnHeartbeat", mock.Anything).Return()
 
@@ -343,21 +344,21 @@ func TestNextMode(t *testing.T) {
 	tests := []struct {
 		description string
 		opts        []Option
-		mode        ipMode
-		expected    ipMode
+		mode        event.IpMode
+		expected    event.IpMode
 	}{
 		{
 			description: "IPv4 to IPv6",
-			mode:        ipv4,
-			expected:    ipv6,
+			mode:        event.Ipv4,
+			expected:    event.Ipv6,
 			opts: append(defaults,
 				WithIPv6(true),
 				WithIPv4(true),
 			),
 		}, {
 			description: "IPv6 to IPv4",
-			mode:        ipv6,
-			expected:    ipv4,
+			mode:        event.Ipv6,
+			expected:    event.Ipv4,
 			opts: append(defaults,
 				WithIPv6(true),
 				WithIPv4(true),
@@ -368,16 +369,16 @@ func TestNextMode(t *testing.T) {
 				WithIPv4(true),
 				WithIPv6(false),
 			),
-			mode:     ipv4,
-			expected: ipv4,
+			mode:     event.Ipv4,
+			expected: event.Ipv4,
 		}, {
 			description: "IPv6 to IPv6",
 			opts: append(defaults,
 				WithIPv4(false),
 				WithIPv6(true),
 			),
-			mode:     ipv6,
-			expected: ipv6,
+			mode:     event.Ipv6,
+			expected: event.Ipv6,
 		},
 	}
 	for _, tc := range tests {

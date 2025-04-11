@@ -1,17 +1,22 @@
 // SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
 // SPDX-License-Identifier: Apache-2.0
 
+//go:build !coverage
+
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"os"
 	"time"
 
 	"github.com/alecthomas/kong"
+	"github.com/quic-go/quic-go"
+	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/event"
-	"github.com/xmidt-org/xmidt-agent/internal/websocket"
+	myquic "github.com/xmidt-org/xmidt-agent/internal/quic"
 )
 
 // CLI is the structure that is used to capture the command line arguments.
@@ -23,12 +28,18 @@ type CLI struct {
 	Once bool   `optional:""                                                    help:"Only attempt to connect once."`
 }
 
+type MessageListenerFunc func(wrp.Message)
+
+func (f MessageListenerFunc) OnMessage(m wrp.Message) {
+	f(m)
+}
+
 func main() {
 	var cli CLI
 
 	parser, err := kong.New(&cli,
 		kong.Name("example"),
-		kong.Description("The test agent for websocket service.\n"),
+		kong.Description("The test agent for quic service.\n"),
 		kong.UsageOnError(),
 	)
 	if err != nil {
@@ -46,40 +57,45 @@ func main() {
 		panic(err)
 	}
 
-	opts := []websocket.Option{
-		websocket.DeviceID(id),
-		websocket.URL(cli.URL),
-		websocket.AddConnectListener(
+	opts := []myquic.Option{
+		myquic.DeviceID(id),
+		myquic.URL(cli.URL),
+		myquic.NowFunc(time.Now),
+		myquic.RetryPolicy(retry.Config{}),
+		myquic.HTTP3Client(
+			&myquic.Http3ClientConfig{
+				QuicConfig: quic.Config{},
+				TlsConfig:  tls.Config{},
+			},
+		),
+		myquic.AddConnectListener(
 			event.ConnectListenerFunc(
 				func(e event.Connect) {
 					fmt.Println(e)
 				})),
-		websocket.AddDisconnectListener(
+		myquic.AddDisconnectListener(
 			event.DisconnectListenerFunc(
 				func(e event.Disconnect) {
 					fmt.Println(e)
 				})),
-	}
-
-	if cli.V4 {
-		opts = append(opts, websocket.WithIPv6(false))
-	}
-
-	if cli.V6 {
-		opts = append(opts, websocket.WithIPv4(false))
+		myquic.AddMessageListener(
+			MessageListenerFunc(
+				func(m wrp.Message) {
+					fmt.Println(m) // send a message back
+				})),
 	}
 
 	if cli.Once {
-		opts = append(opts, websocket.Once())
+		opts = append(opts, myquic.Once())
 	}
 
-	ws, err := websocket.New(opts...)
+	q, err := myquic.New(opts...)
 	if err != nil {
 		panic(err)
 	}
 
-	ws.Start()
-	defer ws.Stop()
+	q.Start()
+	defer q.Stop()
 
 	time.Sleep(time.Minute)
 }

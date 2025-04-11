@@ -6,16 +6,18 @@ import (
 	"errors"
 
 	"github.com/xmidt-org/wrp-go/v5"
+	"github.com/xmidt-org/xmidt-agent/internal/cloud"
+	"github.com/xmidt-org/xmidt-agent/internal/event"
 	"github.com/xmidt-org/xmidt-agent/internal/loglevel"
 	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
-	"github.com/xmidt-org/xmidt-agent/internal/websocket/event"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/auth"
 	loghandler "github.com/xmidt-org/xmidt-agent/internal/wrphandlers/logging"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/missing"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/mocktr181"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/qos"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/xmidt_agent_crud"
+	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
@@ -32,41 +34,41 @@ func provideWRPHandlers() fx.Option {
 			provideAuthHandler,
 			provideCrudHandler,
 			provideQOSHandler,
-			provideWSEventorToHandlerAdapter,
+			provideEventorToHandlerAdapter,
 			provideMockTr181Handler,
 		),
 	)
 }
 
-type wsAdapterIn struct {
+type eventorAdapterIn struct {
 	fx.In
 
-	WS     *websocket.Websocket
-	Logger *zap.Logger
+	CloudHandler cloud.Handler
+	Logger       *zap.Logger
 
 	// wrphandlers
 	AuthHandler *auth.Handler
 }
 
-type wsAdapterOut struct {
+type eventorAdapterOut struct {
 	fx.Out
 
 	Cancels []func() `group:"cancels,flatten"`
 }
 
-func provideWSEventorToHandlerAdapter(in wsAdapterIn) (wsAdapterOut, error) {
+func provideEventorToHandlerAdapter(in eventorAdapterIn) (eventorAdapterOut, error) {
 	lh, err := loghandler.New(in.AuthHandler,
 		in.Logger.With(
 			zap.String("stage", "ingress"),
-			zap.String("handler", "websocket")))
+			zap.String("handler", in.CloudHandler.Name())))
 
 	if err != nil {
-		return wsAdapterOut{}, err
+		return eventorAdapterOut{}, err
 	}
 
-	return wsAdapterOut{
+	return eventorAdapterOut{
 		Cancels: []func(){
-			in.WS.AddMessageListener(
+			in.CloudHandler.AddMessageListener(
 				event.MsgListenerFunc(func(m wrp.Message) {
 					_ = lh.HandleWrp(m)
 				})),
@@ -76,21 +78,31 @@ func provideWSEventorToHandlerAdapter(in wsAdapterIn) (wsAdapterOut, error) {
 type qosIn struct {
 	fx.In
 
-	QOS    QOS
-	Logger *zap.Logger
-	WS     *websocket.Websocket
+	QOS     QOS
+	Logger  *zap.Logger
+	Handler wrpkit.Handler
 }
 
-func provideQOSHandler(in qosIn) (*qos.Handler, error) {
-	lh, err := loghandler.New(in.WS,
+type qosOut struct {
+	fx.Out
+
+	Handler *qos.Handler
+}
+
+func provideQOSHandler(in qosIn) (qosOut, error) {
+	cloudHandler, ok := in.Handler.(cloud.Handler)
+	if !ok {
+		return qosOut{}, errors.New("invalid cloud handler passed to QOS service")
+	}
+	lh, err := loghandler.New(in.Handler,
 		in.Logger.With(
 			zap.String("stage", "egress"),
-			zap.String("handler", "websocket")))
+			zap.String("handler", cloudHandler.Name())))
 	if err != nil {
-		return nil, err
+		return qosOut{}, err
 	}
 
-	return qos.New(
+	handler, err := qos.New(
 		lh,
 		qos.MaxQueueBytes(in.QOS.MaxQueueBytes),
 		qos.MaxMessageBytes(in.QOS.MaxMessageBytes),
@@ -100,6 +112,10 @@ func provideQOSHandler(in qosIn) (*qos.Handler, error) {
 		qos.HighExpires(in.QOS.HighExpires),
 		qos.CriticalExpires(in.QOS.CriticalExpires),
 	)
+
+	return qosOut{
+		Handler: handler,
+	}, err
 }
 
 type missingIn struct {
@@ -172,8 +188,6 @@ func provideCrudHandler(in crudIn) (*xmidt_agent_crud.Handler, error) {
 		return nil, err
 	}
 
-	// what do we do with the return value?  Does this have to be passed to pubSub somehow? Seems
-	// fishy if it does
 	_, err = in.PubSub.SubscribeService(in.XmidtAgentCrud.ServiceName, h)
 	if err != nil {
 		return nil, errors.Join(ErrWRPHandlerConfig, err)
@@ -192,7 +206,8 @@ type pubsubIn struct {
 	Logger   *zap.Logger
 
 	// wrphandlers
-	Egress *qos.Handler
+	Egress   *qos.Handler
+	Producer wrpkit.Handler
 }
 
 type pubsubOut struct {
@@ -216,7 +231,9 @@ func providePubSubHandler(in pubsubIn) (pubsubOut, error) {
 	opts := []pubsub.Option{
 		pubsub.WithPublishTimeout(in.Pubsub.PublishTimeout),
 		pubsub.WithEgressHandler(lh, &cancel),
+		pubsub.WithEventHandler("*", in.Producer, &cancel),
 	}
+
 	ps, err := pubsub.New(
 		in.Identity.DeviceID,
 		opts...,
@@ -240,7 +257,8 @@ type mockTr181In struct {
 	MockTr181 MockTr181
 	Logger    *zap.Logger
 
-	PubSub *pubsub.PubSub
+	PubSub   *pubsub.PubSub // TODO - this doesn't work
+	Producer wrpkit.Handler
 }
 
 type mockTr181Out struct {
@@ -281,6 +299,7 @@ func provideMockTr181Handler(in mockTr181In) (mockTr181Out, error) {
 	if err != nil {
 		return mockTr181Out{}, err
 	}
+
 	mocktr, err := in.PubSub.SubscribeService(in.MockTr181.ServiceName, loggerIn)
 	if err != nil {
 		return mockTr181Out{}, errors.Join(ErrWRPHandlerConfig, err)

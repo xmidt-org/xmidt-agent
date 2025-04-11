@@ -18,6 +18,7 @@ import (
 )
 
 type msgWithExpectations struct {
+	name      string
 	msg       wrp.Message
 	expectErr error
 }
@@ -26,18 +27,21 @@ var errUnknown = errors.New("unknown")
 
 var messages = []msgWithExpectations{
 	{
+		name: "successful with event dest",
 		msg: wrp.Message{
 			Type:        wrp.SimpleEventMessageType,
 			Source:      "self:/service/ignored",
 			Destination: "event:event_1/ignored",
 		},
 	}, {
+		name: "successful with event_2 dest",
 		msg: wrp.Message{
 			Type:        wrp.SimpleEventMessageType,
 			Source:      "self:/service/ignored",
 			Destination: "event:event_2/ignored",
 		},
 	}, {
+		name: "successful with mac dest",
 		msg: wrp.Message{
 			Type:            wrp.SimpleRequestResponseMessageType,
 			Source:          "dns:tr1d1um.example.com/service/ignored",
@@ -45,14 +49,17 @@ var messages = []msgWithExpectations{
 			TransactionUUID: "1234",
 		},
 	}, {
+		name: "successful with dns dest",
 		msg: wrp.Message{
 			Type:            wrp.SimpleRequestResponseMessageType,
 			Source:          "mac:112233445566/service/ignored",
 			Destination:     "dns:tr1d1um.example.com/service/ignored",
 			TransactionUUID: "5678",
 		},
-	}, {
+	},
+	{
 		// invalid message - no src
+		name: "invalid message - no src",
 		msg: wrp.Message{
 			Type:        wrp.SimpleRequestResponseMessageType,
 			Destination: "dns:tr1d1um.example.com/service/ignored",
@@ -60,6 +67,7 @@ var messages = []msgWithExpectations{
 		expectErr: errUnknown,
 	}, {
 		// invalid message - no dest
+		name: "invalid message - no dest",
 		msg: wrp.Message{
 			Type:   wrp.SimpleRequestResponseMessageType,
 			Source: "mac:112233445566/service/ignored",
@@ -67,6 +75,7 @@ var messages = []msgWithExpectations{
 		expectErr: errUnknown,
 	}, {
 		// invalid message - invalid msg type (empty)
+		name: "invalid message - no msg type",
 		msg: wrp.Message{
 			Source:      "mac:112233445566/service/ignored",
 			Destination: "dns:tr1d1um.example.com/service/ignored",
@@ -74,6 +83,7 @@ var messages = []msgWithExpectations{
 		expectErr: errUnknown,
 	}, {
 		// invalid message - a string field is not valid UTF-8
+		name: "invalid message - a string field is not a valid UTF-8",
 		msg: wrp.Message{
 			Type:            wrp.SimpleRequestResponseMessageType,
 			Source:          "self:/service/ignored",
@@ -85,6 +95,7 @@ var messages = []msgWithExpectations{
 		expectErr: wrp.ErrNotUTF8,
 	}, {
 		// no handlers for this message
+		name: "no handlers for this message",
 		msg: wrp.Message{
 			Type:        wrp.SimpleEventMessageType,
 			Source:      "self:/ignore-me",
@@ -188,7 +199,7 @@ func TestEndToEnd(t *testing.T) {
 		expect: []wrp.Locator{
 			{Scheme: "event", Authority: "event_1", Ignored: "/ignored"},
 			{Scheme: "event", Authority: "event_2", Ignored: "/ignored"},
-			{Scheme: "dns", Authority: "tr1d1um.example.com", Service: "service", Ignored: "/ignored"},
+			{Scheme: "dns", Authority: "tr1d1um.example.com", Service: "", Ignored: "/service/ignored"},
 		},
 	}
 	egressListener.WG(&wg)
@@ -239,6 +250,8 @@ func TestEndToEnd(t *testing.T) {
 	require.NotNil(egressCancel)
 
 	for idx, m := range messages {
+		fmt.Println("message is " + m.msg.TransactionUUID)
+		fmt.Println("message name is " + m.name)
 		msg := m.msg
 
 		if idx == 8 {

@@ -22,6 +22,7 @@ import (
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/configuration"
 	"github.com/xmidt-org/xmidt-agent/internal/net"
+	myquic "github.com/xmidt-org/xmidt-agent/internal/quic"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/qos"
 	"gopkg.in/dealancer/validate.v2"
 )
@@ -46,6 +47,7 @@ type Config struct {
 	XmidtAgentCrud   XmidtAgentCrud
 	Metadata         Metadata
 	NetworkService   NetworkService
+	Quic             Quic
 }
 
 type LibParodus struct {
@@ -113,6 +115,31 @@ type Websocket struct {
 	// If this is not set, the default is false (IPv6 is enabled).
 	// Either V4 or V6 can be disabled, but not both.
 	DisableV6 bool
+	// RetryPolicy sets the retry policy factory used for delaying between retry attempts for reconnection.
+	RetryPolicy retry.Config
+	// Once sets whether or not to only attempt to connect once.
+	Once bool
+}
+
+type Quic struct {
+	// Disable determines whether or not to disable xmidt-agent's quic client
+	Disable bool
+	// URLPath is the device registration url path
+	URLPath string
+	// BackUpURL is the back up XMiDT service endpoint in case `XmidtCredentials.URL` fails.
+	BackUpURL string
+	// SendTimeout is the send timeout for the WS connection.
+	SendTimeout time.Duration
+	// AdditionalHeaders are any additional headers for the WS connection.
+	AdditionalHeaders http.Header
+	// FetchURLTimeout is the timeout for the fetching the Quic url. If this is not set, the default is 30 seconds.
+	FetchURLTimeout time.Duration
+	// The client to used to connect to the redirect server
+	// HttpClient arrangehttp.ClientConfig
+	// // Config for quic connection
+	QuicClient myquic.Http3ClientConfig
+	// MaxMessageBytes is the largest allowable message to send or receive. (TODO
+	MaxMessageBytes int64
 	// RetryPolicy sets the retry policy factory used for delaying between retry attempts for reconnection.
 	RetryPolicy retry.Config
 	// Once sets whether or not to only attempt to connect once.
