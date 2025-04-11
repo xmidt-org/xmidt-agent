@@ -161,7 +161,6 @@ func Once(once ...bool) Option {
 		})
 }
 
-// Once sets whether or not to only attempt to connect once.
 func Enabled(enabled bool) Option {
 	return optionFunc(
 		func(qc *QuicClient) error {

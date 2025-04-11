@@ -20,10 +20,6 @@ var (
 )
 
 func provideQuic(in CloudHandlerIn) (cloudHandlerOut, error) {
-	// if in.Quic.Disable {
-	// 	return cloudHandlerOut{}, nil
-	// }
-
 	var fetchURLFunc func(context.Context) (string, error)
 	// JWTXT is not required
 	// fetchURL() will use in.quic.BackUpURL if in.JWTXT is nil
@@ -39,6 +35,7 @@ func provideQuic(in CloudHandlerIn) (cloudHandlerOut, error) {
 
 	// Configuration options
 	opts = append(opts,
+		quic.Enabled(!in.Quic.Disable),
 		quic.DeviceID(in.Identity.DeviceID),
 		quic.FetchURLTimeout(in.Quic.FetchURLTimeout),
 		quic.FetchURL(
@@ -46,7 +43,6 @@ func provideQuic(in CloudHandlerIn) (cloudHandlerOut, error) {
 				fetchURLFunc)),
 		quic.SendTimeout(in.Quic.SendTimeout),
 		quic.HTTP3Client(&in.Quic.QuicClient),
-		//quic.HTTPClient(in.Quic.HttpClient),
 		quic.ConveyDecorator(in.Metadata.Decorate),
 		quic.AdditionalHeaders(in.Quic.AdditionalHeaders),
 		quic.NowFunc(time.Now),
