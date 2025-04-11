@@ -5,12 +5,10 @@ package quic
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/event"
@@ -115,15 +113,6 @@ func KeepAliveInterval(d time.Duration) Option {
 		})
 }
 
-// whether or not we are using a redirect server (e.g. petasos)
-// func WithRedirect(with bool) Option {
-// 	return optionFunc(
-// 		func(qc *QuicClient) error {
-// 			qc.withRedirect = with
-// 			return nil
-// 		})
-// }
-
 // SendTimeout sets the send timeout for the WS connection.
 func SendTimeout(d time.Duration) Option {
 	return optionFunc(
@@ -133,20 +122,6 @@ func SendTimeout(d time.Duration) Option {
 			}
 
 			ws.sendTimeout = d
-			return nil
-		})
-}
-
-// HTTPClient is the configuration for the HTTP client used for connection attempts.
-func HTTPClient(c arrangehttp.ClientConfig) Option {
-	return optionFunc(
-		func(qc *QuicClient) error {
-			if _, err := c.NewClient(); err != nil {
-				return errors.Join(err, ErrMisconfiguredQuic)
-			}
-
-			qc.httpClientConfig = c
-
 			return nil
 		})
 }

@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/quic-go/quic-go"
-	"github.com/quic-go/quic-go/http3"
 	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/eventor"
 	"github.com/xmidt-org/retry"
@@ -265,53 +264,6 @@ func (qc *QuicClient) dial(ctx context.Context) (quic.Connection, error) {
 	conn, err := qc.qd.DialQuic(ctx, redirectedUrl)
 
 	return conn, err
-}
-
-// Retrieve the url from the redirect server, if there is one.  Stop the redirect.
-// Possibly temporary solution until we figure
-// out how to retrieve the new connection in the client after a seamless redirect.
-func (qc *QuicClient) getUrl(inUrl *url.URL) (*url.URL, error) {
-	outUrl := inUrl
-
-	client := &http.Client{
-		Transport: &http3.Transport{
-			TLSClientConfig: &qc.http3ClientConfig.TlsConfig,
-			QUICConfig:      &quic.Config{},
-		},
-	}
-
-	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		return http.ErrUseLastResponse
-	}
-
-	req, err := http.NewRequest(http.MethodPost, inUrl.String(), bytes.NewBuffer([]byte{}))
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/msgpack")
-	qc.credDecorator(req.Header)
-	qc.conveyDecorator(req.Header)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
-		redirectedUrl, err := url.Parse(resp.Header.Get("Location"))
-		if err != nil {
-			return nil, err
-		}
-		outUrl = redirectedUrl
-	} else if resp.StatusCode >= 400 {
-		errString := fmt.Sprintf("redirectServer returned status %d", resp.StatusCode)
-		return nil, fmt.Errorf("%s: %w", errString, ErrFromRedirectServer)
-	}
-
-	return outUrl, nil
 }
 
 func dumpContext(ctx context.Context, keys ...interface{}) {
