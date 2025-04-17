@@ -10,7 +10,7 @@ require (
 	github.com/goschtalt/properties-decoder v0.1.0
 	github.com/goschtalt/yaml-decoder v0.0.1
 	github.com/goschtalt/yaml-encoder v0.0.4
-	github.com/lestrrat-go/jwx/v2 v2.1.4
+	github.com/lestrrat-go/jwx/v2 v2.1.5
 	github.com/stretchr/testify v1.10.0
 	github.com/tinylib/msgp v1.2.5
 	github.com/xmidt-org/arrange v0.5.1
@@ -41,7 +41,7 @@ require (
 	github.com/goccy/go-json v0.10.4 // indirect
 	github.com/goschtalt/approx v1.0.0 // indirect
 	github.com/leodido/go-urn v1.1.0 // indirect
-	github.com/lestrrat-go/blackmagic v1.0.2 // indirect
+	github.com/lestrrat-go/blackmagic v1.0.3 // indirect
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
 	github.com/lestrrat-go/httprc v1.0.6 // indirect
 	github.com/lestrrat-go/iter v1.0.2 // indirect
