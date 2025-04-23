@@ -209,6 +209,12 @@ func (ws *Websocket) AddMessageListener(listener event.MsgListener) event.Cancel
 	return event.CancelFunc(ws.msgListeners.Add(listener))
 }
 
+// AddMessageListener adds a message listener to the WS connection.
+// The listener will be called for every message received from the WS.
+func (ws *Websocket) AddConnectListener(listener event.ConnectListener) event.CancelFunc {
+	return event.CancelFunc(ws.connectListeners.Add(listener))
+}
+
 // Send sends the provided WRP message through the existing websocket.  This
 // call synchronously blocks until the write is complete.
 func (ws *Websocket) Send(ctx context.Context, msg wrp.Message) error {

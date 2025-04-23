@@ -16,11 +16,9 @@ import (
 	"github.com/xmidt-org/xmidt-agent/internal/adapters/libparodus"
 	"github.com/xmidt-org/xmidt-agent/internal/cloud"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials"
-	"github.com/xmidt-org/xmidt-agent/internal/jwtxt"
-	"github.com/xmidt-org/xmidt-agent/internal/loglevel"
-	"github.com/xmidt-org/xmidt-agent/internal/metadata"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/qos"
-	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
+
+	"github.com/xmidt-org/xmidt-agent/internal/loglevel"
 
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -100,6 +98,8 @@ func provideAppOptions(args []string) fx.Option {
 			provideConfig,
 			provideCredentials,
 			provideInstructions,
+			provideQuic,
+			provideWS,
 			provideCloudHandler,
 			provideLibParodus,
 
@@ -117,6 +117,7 @@ func provideAppOptions(args []string) fx.Option {
 			goschtalt.UnmarshalFunc[NetworkService]("network_service"),
 			goschtalt.UnmarshalFunc[QOS]("qos"),
 			goschtalt.UnmarshalFunc[LibParodus]("lib_parodus"),
+			goschtalt.UnmarshalFunc[Cloud]("cloud"),
 
 			provideNetworkService,
 			provideMetadataProvider,
@@ -326,54 +327,32 @@ func fetchURL(path, backUpURL string, f func(context.Context) (string, error)) f
 	}
 }
 
-type CloudHandlerIn struct {
-	fx.In
-	Identity  Identity
-	Logger    *zap.Logger
-	CLI       *CLI
-	JWTXT     *jwtxt.Instructions
-	Cred      *credentials.Credentials
-	Metadata  *metadata.MetadataProvider
-	Quic      Quic
-	Websocket Websocket
-}
+// func provideCloudHandler(in CloudHandlerIn) (cloudHandlerOut, error) {
+// 	cloudHandlerOut := cloudHandlerOut{}
 
-type cloudHandlerOut struct {
-	fx.Out
-	Handler    cloud.Handler
-	Egress     cloud.Egress
-	WrpHandler wrpkit.Handler
+// quicOut, err := provideQuic(in)
+// if err != nil {
+// 	return cloudHandlerOut, err
+// }
 
-	// cancels
-	Cancels []func() `group:"cancels,flatten"`
-}
+// wsOut, err := provideWS(in)
+// if err != nil {
+// 	return cloudHandlerOut, err
+// }
 
-func provideCloudHandler(in CloudHandlerIn) (cloudHandlerOut, error) {
-	cloudHandlerOut := cloudHandlerOut{}
+// if in.Websocket.Disable && !in.Quic.Disable {
+// 	cloudHandlerOut.Cancels = quicOut.Cancels
+// 	cloudHandlerOut.Egress = quicOut.Egress
+// 	cloudHandlerOut.Handler = quicOut.Handler
+// 	cloudHandlerOut.WrpHandler = quicOut.Handler.(wrpkit.Handler)
+// }
 
-	quicOut, err := provideQuic(in)
-	if err != nil {
-		return cloudHandlerOut, err
-	}
+// if !in.Websocket.Disable {
+// 	cloudHandlerOut.Cancels = wsOut.Cancels
+// 	cloudHandlerOut.Egress = wsOut.Egress
+// 	cloudHandlerOut.Handler = wsOut.Handler
+// 	cloudHandlerOut.WrpHandler = wsOut.Handler.(wrpkit.Handler)
+// }
 
-	wsOut, err := provideWS(in)
-	if err != nil {
-		return cloudHandlerOut, err
-	}
-
-	if in.Websocket.Disable && !in.Quic.Disable {
-		cloudHandlerOut.Cancels = quicOut.Cancels
-		cloudHandlerOut.Egress = quicOut.Egress
-		cloudHandlerOut.Handler = quicOut.Handler
-		cloudHandlerOut.WrpHandler = quicOut.Handler.(wrpkit.Handler)
-	}
-
-	if !in.Websocket.Disable {
-		cloudHandlerOut.Cancels = wsOut.Cancels
-		cloudHandlerOut.Egress = wsOut.Egress
-		cloudHandlerOut.Handler = wsOut.Handler
-		cloudHandlerOut.WrpHandler = wsOut.Handler.(wrpkit.Handler)
-	}
-
-	return cloudHandlerOut, nil
-}
+// 	return cloudHandlerOut, nil
+// }

@@ -9,9 +9,13 @@ import (
 	"time"
 
 	"github.com/xmidt-org/wrp-go/v5"
+	"go.uber.org/fx"
 	"go.uber.org/zap"
 
+	"github.com/xmidt-org/xmidt-agent/internal/credentials"
 	"github.com/xmidt-org/xmidt-agent/internal/event"
+	"github.com/xmidt-org/xmidt-agent/internal/jwtxt"
+	"github.com/xmidt-org/xmidt-agent/internal/metadata"
 	"github.com/xmidt-org/xmidt-agent/internal/quic"
 )
 
@@ -19,7 +23,28 @@ var (
 	ErrQuicConfig = errors.New("quic configuration error")
 )
 
-func provideQuic(in CloudHandlerIn) (cloudHandlerOut, error) {
+type QuicIn struct {
+	fx.In
+	Identity  Identity
+	Logger    *zap.Logger
+	CLI       *CLI
+	JWTXT     *jwtxt.Instructions
+	Cred      *credentials.Credentials
+	Metadata  *metadata.MetadataProvider
+	Cloud     Cloud
+	Quic      Quic
+	Websocket Websocket
+}
+
+type quicOut struct {
+	fx.Out
+	QuicClient *quic.QuicClient
+
+	// cancels
+	Cancels []func() `group:"cancels,flatten"`
+}
+
+func provideQuic(in QuicIn) (quicOut, error) {
 	var fetchURLFunc func(context.Context) (string, error)
 	// JWTXT is not required
 	// fetchURL() will use in.quic.BackUpURL if in.JWTXT is nil
@@ -73,10 +98,6 @@ func provideQuic(in CloudHandlerIn) (cloudHandlerOut, error) {
 					func(e event.Disconnect) {
 						logger.Info("disconnect listener", zap.Any("event", e))
 					}), &discon),
-			quic.AddHeartbeatListener(
-				event.HeartbeatListenerFunc(func(e event.Heartbeat) {
-					logger.Info("heartbeat listener", zap.Any("event", e))
-				}), &heartbeat),
 		)
 	}
 
@@ -89,9 +110,8 @@ func provideQuic(in CloudHandlerIn) (cloudHandlerOut, error) {
 		cancels = append(cancels, msg, con, discon, heartbeat)
 	}
 
-	return cloudHandlerOut{
-		Handler: quicClient,
-		Egress:  quicClient,
-		Cancels: cancels,
+	return quicOut{
+		QuicClient: quicClient,
+		Cancels:    cancels, // TODO
 	}, err
 }

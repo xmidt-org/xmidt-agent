@@ -48,6 +48,7 @@ type Config struct {
 	Metadata         Metadata
 	NetworkService   NetworkService
 	Quic             Quic
+	Cloud            Cloud
 }
 
 type LibParodus struct {
@@ -274,6 +275,10 @@ type Metadata struct {
 type NetworkService struct {
 	// list of allowed network interfaces to connect to xmidt in priority order, first is highest
 	AllowedInterfaces map[string]net.AllowedInterface
+}
+
+type Cloud struct {
+	PreferQuic bool
 }
 
 // Collect and process the configuration files and env vars and

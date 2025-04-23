@@ -302,40 +302,6 @@ func TestDisconnectListener(t *testing.T) {
 	}
 }
 
-func TestHeartbeatListener(t *testing.T) {
-	assert := assert.New(t)
-
-	var m mockevent.MockListeners
-
-	m.On("OnHeartbeat", mock.Anything).Return()
-
-	got, err := New(
-		URL(RemoteServerUrl),
-		DeviceID("mac:112233445566"),
-		AddHeartbeatListener(&m),
-		CredentialsDecorator(func(h http.Header) error {
-			return nil
-		}),
-		ConveyDecorator(func(h http.Header) error {
-			return nil
-		}),
-		HTTP3Client(&Http3ClientConfig{
-			QuicConfig: quic.Config{},
-			TlsConfig:  tls.Config{},
-		}),
-		NowFunc(time.Now),
-		RetryPolicy(retry.Config{}),
-	)
-
-	assert.NoError(err)
-	if assert.NotNil(got) {
-		got.heartbeatListeners.Visit(func(l event.HeartbeatListener) {
-			l.OnHeartbeat(event.Heartbeat{})
-		})
-		m.AssertExpectations(t)
-	}
-}
-
 func Test_emptyDecorator(t *testing.T) {
 	assert.NoError(t, emptyDecorator(http.Header{}))
 }

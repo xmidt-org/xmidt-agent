@@ -20,6 +20,6 @@ type Handler interface {
 	Send(ctx context.Context, msg wrp.Message) error
 	// any listener added will be called when the network channel receives a messages from the cloud
 	AddMessageListener(listener event.MsgListener) event.CancelFunc
-	// name of handler
+	// any listener added will be called when the network channel tries to connect
 	Name() string
 }

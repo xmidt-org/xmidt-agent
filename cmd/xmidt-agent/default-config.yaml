@@ -107,6 +107,8 @@ quic:
     multiplier: 2.0
     jitter: .33333333 #1.0 / 3.0
     max_interval: 341333ms # 341*time.Second + 333*time.Millisecond
+cloud:
+  prefer_quic: true
 lib_parodus:
   parodus_service_url: "tcp://127.0.0.1:6666"
   keep_alive_interval: 30s

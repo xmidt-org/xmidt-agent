@@ -33,9 +33,12 @@ type QuicDialer struct {
 // get re-created and the client no longer had access to the current quic connection.  The below
 // "dialer" uses the http3.ClientConn api directly and that api uses the passed in connection.
 func (qd *QuicDialer) DialQuic(ctx context.Context, url *url.URL) (quic.Connection, error) {
-
 	conn, err := quic.DialAddr(ctx, url.Host, qd.tlsConfig, &qd.quicConfig)
 	if err != nil {
+		// TODO - concerned there could be other reasons negotiatedProtocol is not populated
+		if conn != nil && conn.ConnectionState().TLS.NegotiatedProtocol != "h3" {
+			return nil, ErrHttp3NotSupported
+		}
 		return nil, err
 	}
 
@@ -48,6 +51,7 @@ func (qd *QuicDialer) DialQuic(ctx context.Context, url *url.URL) (quic.Connecti
 
 	reqStream, err := h3Conn.OpenRequestStream(ctx)
 	if err != nil {
+
 		return nil, err
 	}
 

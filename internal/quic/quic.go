@@ -31,6 +31,7 @@ var (
 	ErrInvalidMsgType     = errors.New("invalid message type")
 	ErrFromRedirectServer = errors.New("non-300 response from redirect server")
 	ErrSendTimeout        = errors.New("wrp message send timed out")
+	ErrHttp3NotSupported  = errors.New("http3 protocol not supported")
 )
 
 type Http3ClientConfig struct {
@@ -82,9 +83,6 @@ type QuicClient struct {
 	// disconnectListeners are the disconnect listeners for the WS connection.
 	disconnectListeners eventor.Eventor[event.DisconnectListener]
 
-	// heartbeatListeners are the heartbeat listeners for the WS connection.
-	heartbeatListeners eventor.Eventor[event.HeartbeatListener]
-
 	// msgListeners are the message listeners for messages from the WS.
 	msgListeners eventor.Eventor[event.MsgListener]
 
@@ -107,7 +105,7 @@ type QuicClient struct {
 	rd Redirector
 }
 
-// Option is a functional option type for WS.
+// Option is a functional option type for Quic.
 type Option interface {
 	apply(*QuicClient) error
 }
@@ -132,7 +130,6 @@ func New(opts ...Option) (*QuicClient, error) {
 	opts = append(opts,
 		validateDeviceID(),
 		validateURL(),
-		//validateFetchURL(),
 		validateCredentialsDecorator(),
 		validateConveyDecorator(),
 		validateNowFunc(),
@@ -219,6 +216,12 @@ func (qc *QuicClient) HandleWrp(m wrp.Message) error {
 // The listener will be called for every message received from the cloud.
 func (qc *QuicClient) AddMessageListener(listener event.MsgListener) event.CancelFunc {
 	return event.CancelFunc(qc.msgListeners.Add(listener))
+}
+
+// AddConnectListener adds a connect listener to the quic connection.
+// The listener will be called every time the connection succeeds or fails
+func (qc *QuicClient) AddConnectListener(listener event.ConnectListener) event.CancelFunc {
+	return event.CancelFunc(qc.connectListeners.Add(listener))
 }
 
 // Send sends the provided WRP message through the existing quic connection.

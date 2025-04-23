@@ -78,9 +78,10 @@ func provideEventorToHandlerAdapter(in eventorAdapterIn) (eventorAdapterOut, err
 type qosIn struct {
 	fx.In
 
-	QOS     QOS
-	Logger  *zap.Logger
-	Handler wrpkit.Handler
+	QOS           QOS
+	Logger        *zap.Logger
+	EgressHandler wrpkit.Handler
+	CloudHandler  cloud.Handler
 }
 
 type qosOut struct {
@@ -90,14 +91,15 @@ type qosOut struct {
 }
 
 func provideQOSHandler(in qosIn) (qosOut, error) {
-	cloudHandler, ok := in.Handler.(cloud.Handler)
-	if !ok {
-		return qosOut{}, errors.New("invalid cloud handler passed to QOS service")
-	}
-	lh, err := loghandler.New(in.Handler,
+	//
+	// cloudHandler, ok := in.CloudHandler
+	// if !ok {
+	// 	return qosOut{}, errors.New("invalid cloud handler passed to QOS service")
+	// }
+	lh, err := loghandler.New(in.EgressHandler,
 		in.Logger.With(
 			zap.String("stage", "egress"),
-			zap.String("handler", cloudHandler.Name())))
+			zap.String("handler", in.CloudHandler.Name())))
 	if err != nil {
 		return qosOut{}, err
 	}
