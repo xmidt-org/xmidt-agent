@@ -50,6 +50,14 @@ func Websocket(ws *websocket.Websocket) Option {
 		})
 }
 
+func MaxTries(maxTries int) Option {
+	return optionFunc(
+		func(p *Proxy) error {
+			p.maxTries = maxTries
+			return nil
+		})
+}
+
 // AddMessageListener adds a message listener to the WS connection.
 // The listener will be called for every message received from the WS.
 func AddMessageListener(listener event.MsgListener, cancel ...*event.CancelFunc) Option {

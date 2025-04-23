@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/xmidt-org/wrp-go/v5"
@@ -44,9 +45,9 @@ type wsOut struct {
 }
 
 func provideWS(in WsIn) (wsOut, error) {
-	if in.Websocket.Disable {
-		return wsOut{}, nil
-	}
+	// if in.Websocket.Disable {
+	// 	return wsOut{}, nil
+	// }
 
 	var fetchURLFunc func(context.Context) (string, error)
 	// JWTXT is not required
@@ -89,6 +90,7 @@ func provideWS(in WsIn) (wsOut, error) {
 		cancels                     []func()
 	)
 	if in.CLI.Dev {
+		fmt.Println("REMOVE appending dev event listeners to ws")
 		logger := in.Logger.Named("websocket")
 		opts = append(opts,
 			websocket.AddMessageListener(

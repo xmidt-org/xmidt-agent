@@ -6,6 +6,7 @@ package websocket
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"sync"
@@ -106,6 +107,8 @@ type Websocket struct {
 	shutdown context.CancelFunc
 
 	conn *nhws.Conn
+
+	triesSinceLastConnect int
 }
 
 // Option is a functional option type for WS.
@@ -165,6 +168,10 @@ func New(opts ...Option) (*Websocket, error) {
 // Start starts the websocket connection and a long running goroutine to maintain
 // the connection.
 func (ws *Websocket) Start() {
+	fmt.Println("REMOVE starting websocket")
+
+	ws.triesSinceLastConnect = 0
+
 	ws.m.Lock()
 	defer ws.m.Unlock()
 
@@ -192,7 +199,7 @@ func (ws *Websocket) Stop() {
 		shutdown()
 	}
 
-	ws.wg.Wait()
+	//ws.wg.Wait()  // TODO - this is hanging forever
 }
 
 func (ws *Websocket) Name() string {
@@ -258,6 +265,8 @@ func (ws *Websocket) run(ctx context.Context) {
 		cEvent.At = ws.nowFunc()
 
 		if dialErr == nil {
+			ws.triesSinceLastConnect = 0
+
 			ws.connectListeners.Visit(func(l event.ConnectListener) {
 				l.OnConnect(cEvent)
 			})
@@ -366,6 +375,7 @@ func (ws *Websocket) run(ctx context.Context) {
 				})
 			}
 		}
+		ws.triesSinceLastConnect++
 
 		if ws.once {
 			return
@@ -376,6 +386,7 @@ func (ws *Websocket) run(ctx context.Context) {
 		if dialErr != nil {
 			cEvent.Err = dialErr
 			cEvent.RetryingAt = ws.nowFunc().Add(next)
+			cEvent.TriesSinceLastConnect = ws.triesSinceLastConnect
 			ws.connectListeners.Visit(func(l event.ConnectListener) {
 				l.OnConnect(cEvent)
 			})

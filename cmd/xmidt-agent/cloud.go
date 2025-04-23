@@ -31,9 +31,8 @@ type CloudHandlerIn struct {
 
 type cloudHandlerOut struct {
 	fx.Out
-	Handler    cloud.Handler
-	Egress     cloud.Egress
-	WrpHandler wrpkit.Handler
+	CloudHandler cloud.Handler
+	WrpHandler   wrpkit.Handler
 
 	// cancels
 	Cancels []func() `group:"cancels,flatten"`
@@ -45,6 +44,7 @@ func provideCloudHandler(in CloudHandlerIn) (cloudHandlerOut, error) {
 		cloud.PreferQuic(in.Cloud.PreferQuic),
 		cloud.QuicClient(in.QuicClient),
 		cloud.Websocket(in.Websocket),
+		cloud.MaxTries(in.Cloud.MaxTries),
 	)
 
 	var (
@@ -63,8 +63,8 @@ func provideCloudHandler(in CloudHandlerIn) (cloudHandlerOut, error) {
 	}
 
 	return cloudHandlerOut{
-		Handler: cloudProxy,
-		Egress:  cloudProxy.(wrpkit.Handler),
-		Cancels: cancels, // TODO
+		CloudHandler: cloudProxy,
+		WrpHandler:   cloudProxy.(wrpkit.Handler),
+		Cancels:      cancels, // TODO
 	}, err
 }

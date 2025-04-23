@@ -279,6 +279,7 @@ type NetworkService struct {
 
 type Cloud struct {
 	PreferQuic bool
+	MaxTries   int
 }
 
 // Collect and process the configuration files and env vars and

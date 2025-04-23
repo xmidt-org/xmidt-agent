@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -103,6 +104,8 @@ type QuicClient struct {
 
 	qd Dialer
 	rd Redirector
+
+	triesSinceLastConnect int
 }
 
 // Option is a functional option type for Quic.
@@ -174,8 +177,13 @@ func (qc *QuicClient) Name() string {
 // Start starts the http3 connection and a long running goroutine to maintain
 // the connection.
 func (qc *QuicClient) Start() {
+	qc.triesSinceLastConnect = 0
+
+	fmt.Println("REMOVE before lock")
 	qc.m.Lock()
+	fmt.Println("REMOVE after lock")
 	defer qc.m.Unlock()
+	fmt.Println("REMOVE after unlock")
 
 	if qc.shutdown != nil {
 		return
@@ -189,19 +197,28 @@ func (qc *QuicClient) Start() {
 
 // Stop stops the quic connection.
 func (qc *QuicClient) Stop() {
+	fmt.Println("REMOVE before lock")
 	qc.m.Lock()
 	if qc.conn != nil {
 		_ = qc.conn.CloseWithError(quic.ApplicationErrorCode(quic.ApplicationErrorErrorCode), "connection stopped by application")
 	}
-
+	fmt.Println("REMOVE after lock")
 	shutdown := qc.shutdown
+	fmt.Println("REMOVE after shutdown")
 	qc.m.Unlock()
+	fmt.Println("REMOVE after unlock")
 
 	if shutdown != nil {
 		shutdown()
+	} else {
+		fmt.Println("REMOVE shutdown is nil")
 	}
 
-	qc.wg.Wait()
+	qc.shutdown = nil
+
+	fmt.Println("REMOVE before wait")
+	//qc.wg.Wait() // TODO - this is blocking forever
+	fmt.Println("REMOVE after wait")
 }
 
 func (qc *QuicClient) IsEnabled() bool {
@@ -267,6 +284,7 @@ func (qc *QuicClient) dial(ctx context.Context) (quic.Connection, error) {
 func (qc *QuicClient) run(ctx context.Context) {
 	qc.wg.Add(1)
 	defer qc.wg.Done()
+	defer removePrint()
 
 	policy := qc.retryPolicyFactory.NewPolicy(ctx)
 
@@ -283,6 +301,8 @@ func (qc *QuicClient) run(ctx context.Context) {
 		cEvent.At = qc.nowFunc()
 
 		if dialErr == nil {
+			qc.triesSinceLastConnect = 0
+
 			qc.connectListeners.Visit(func(l event.ConnectListener) {
 				l.OnConnect(cEvent)
 			})
@@ -358,6 +378,8 @@ func (qc *QuicClient) run(ctx context.Context) {
 			}
 		}
 
+		qc.triesSinceLastConnect++
+
 		if qc.once {
 			return
 		}
@@ -367,6 +389,7 @@ func (qc *QuicClient) run(ctx context.Context) {
 		if dialErr != nil {
 			cEvent.Err = dialErr
 			cEvent.RetryingAt = qc.nowFunc().Add(next)
+			cEvent.TriesSinceLastConnect = qc.triesSinceLastConnect
 			qc.connectListeners.Visit(func(l event.ConnectListener) {
 				l.OnConnect(cEvent)
 			})
@@ -378,6 +401,10 @@ func (qc *QuicClient) run(ctx context.Context) {
 			return
 		}
 	}
+}
+
+func removePrint() {
+	fmt.Println("exiting run")
 }
 
 func readBytes(reader io.Reader) ([]byte, error) {

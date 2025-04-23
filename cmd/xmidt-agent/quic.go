@@ -77,8 +77,8 @@ func provideQuic(in QuicIn) (quicOut, error) {
 
 	// Listener options
 	var (
-		msg, con, discon, heartbeat event.CancelFunc
-		cancels                     []func()
+		msg, con, discon event.CancelFunc
+		cancels          []func()
 	)
 	if in.CLI.Dev {
 		logger := in.Logger.Named("quic")
@@ -107,7 +107,7 @@ func provideQuic(in QuicIn) (quicOut, error) {
 	}
 
 	if in.CLI.Dev {
-		cancels = append(cancels, msg, con, discon, heartbeat)
+		cancels = append(cancels, msg, con, discon)
 	}
 
 	return quicOut{

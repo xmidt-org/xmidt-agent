@@ -36,6 +36,7 @@ type Proxy struct {
 	preferQuic bool
 
 	msgListeners eventor.Eventor[event.MsgListener]
+	maxTries     int
 }
 
 // TODO - log handler stuff
@@ -58,15 +59,34 @@ func New(opts ...Option) (Handler, error) {
 	p.qc.AddConnectListener(
 		event.ConnectListenerFunc(
 			func(e event.Connect) {
-				fmt.Printf("REMOVE %s connected", p.qc.Name())
-				if e.Err == quic.ErrHttp3NotSupported {
+				fmt.Printf("REMOVE %s connect event", p.qc.Name())
+				if e.Err != nil && e.TriesSinceLastConnect > p.maxTries {
 					fmt.Println("REMOVE switching to websocket")
 
 					p.qc.Stop()
+
+					fmt.Println("REMOVE after stop")
+
 					p.ws.Start()
 
 					p.wg.Lock()
 					p.active = p.ws
+					p.wg.Unlock()
+				}
+			}))
+
+	p.ws.AddConnectListener(
+		event.ConnectListenerFunc(
+			func(e event.Connect) {
+				fmt.Printf("REMOVE %s connect event", p.ws.Name())
+				if e.Err != nil && e.TriesSinceLastConnect > p.maxTries {
+					fmt.Println("REMOVE switching to quic")
+
+					p.ws.Stop()
+					p.qc.Start()
+
+					p.wg.Lock()
+					p.active = p.qc
 					p.wg.Unlock()
 				}
 			}))

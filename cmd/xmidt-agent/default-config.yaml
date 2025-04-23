@@ -51,7 +51,7 @@ websocket:
   disable: false
   url_path:           "/api/v2/device"
   # used if xmidt_service section is empty or xmdit_service connection fails
-  back_up_url:        "http://localhost:8080"
+  back_up_url:        "https://localhost:8080"
   fetch_url_timeout:  30s
   inactivity_timeout:      1m
   ping_write_timeout:       90s
@@ -63,12 +63,14 @@ websocket:
       idle_conn_timeout:       10s
       tls_handshake_timeout:   10s
       expect_continue_timeout: 1s
+    tls:
+      insecure_skip_verify: true
   max_message_bytes: 262144 # 256 * 1024
 quic:
-  disable: true
+  disable: false
   url_path:           "/api/v2/device"
   # used if xmidt_service section is empty or xmdit_service connection fails
-  back_up_url:        "https://localhost:4432"
+  back_up_url:        "https://localhost:8080"
   fetch_url_timeout:  30s
   send_timeout:       90s
   quic_client:
@@ -109,6 +111,8 @@ quic:
     max_interval: 341333ms # 341*time.Second + 333*time.Millisecond
 cloud:
   prefer_quic: true
+  # max tries before switching protocol
+  max_tries: 3 
 lib_parodus:
   parodus_service_url: "tcp://127.0.0.1:6666"
   keep_alive_interval: 30s
@@ -142,7 +146,7 @@ storage:
   # temporary: "~/local-rdk-testing/temporary"
   # durable: "~/local-rdk-testing/durable"
 mock_tr_181:
-  enabled: false
+  enabled: true
   file_path: "mock_tr181.json"
   service_name: "mock_config"
 xmidt_agent_crud:
