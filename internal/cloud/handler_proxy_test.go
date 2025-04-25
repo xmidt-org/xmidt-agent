@@ -161,4 +161,8 @@ func (suite *ProxySuite) TestProxyCalls() {
 		))
 
 	suite.mockQuicClient.AssertCalled(suite.T(), "Start")
+	suite.mockQuicClient.AssertCalled(suite.T(), "Stop")
+	suite.mockQuicClient.AssertCalled(suite.T(), "HandleWrp", mock.Anything)
+	suite.Equal(1, suite.got.msgListeners.Len())
+	suite.Equal(1, suite.got.connectListeners.Len())
 }

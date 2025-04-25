@@ -474,6 +474,7 @@ func Test_CancelCtx(t *testing.T) {
 
 	got.Start()
 	time.Sleep(500 * time.Millisecond)
+	assert.Equal(0, got.triesSinceLastConnect)
 	got.shutdown()
 	time.Sleep(500 * time.Millisecond)
 	got.Stop()
