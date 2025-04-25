@@ -10,7 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/xmidt-org/xmidt-agent/internal/cloud"
-	"github.com/xmidt-org/xmidt-agent/internal/event"
+	//"github.com/xmidt-org/xmidt-agent/internal/event"
 	"github.com/xmidt-org/xmidt-agent/internal/quic"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
 	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
@@ -47,10 +47,10 @@ func provideCloudHandler(in CloudHandlerIn) (cloudHandlerOut, error) {
 		cloud.MaxTries(in.Cloud.MaxTries),
 	)
 
-	var (
-		msg, con, discon event.CancelFunc
-		cancels          []func()
-	)
+	// var (
+	// 	msg, con, discon event.CancelFunc
+	// 	cancels          []func()
+	// )
 
 	// switch to validate and opts
 	cloudProxy, err := cloud.New(opts...)
@@ -58,13 +58,13 @@ func provideCloudHandler(in CloudHandlerIn) (cloudHandlerOut, error) {
 		err = errors.Join(ErrCloudConfig, err)
 	}
 
-	if in.CLI.Dev {
-		cancels = append(cancels, msg, con, discon)
-	}
+	// if in.CLI.Dev {
+	// 	cancels = append(cancels, msg, con, discon)
+	// }
 
 	return cloudHandlerOut{
 		CloudHandler: cloudProxy,
 		WrpHandler:   cloudProxy.(wrpkit.Handler),
-		Cancels:      cancels, // TODO
+		//Cancels:      cancels, // TODO
 	}, err
 }

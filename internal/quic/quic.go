@@ -177,6 +177,7 @@ func (qc *QuicClient) Name() string {
 // Start starts the http3 connection and a long running goroutine to maintain
 // the connection.
 func (qc *QuicClient) Start() {
+	fmt.Println("REMOVE calling quic start")
 	qc.triesSinceLastConnect = 0
 
 	fmt.Println("REMOVE before lock")
@@ -209,16 +210,17 @@ func (qc *QuicClient) Stop() {
 	fmt.Println("REMOVE after unlock")
 
 	if shutdown != nil {
+		fmt.Println("REMOVE shutting down")
 		shutdown()
 	} else {
 		fmt.Println("REMOVE shutdown is nil")
 	}
 
-	qc.shutdown = nil
-
 	fmt.Println("REMOVE before wait")
-	//qc.wg.Wait() // TODO - this is blocking forever
+
+	qc.wg.Wait() // TODO - this is blocking forever
 	fmt.Println("REMOVE after wait")
+	qc.shutdown = nil
 }
 
 func (qc *QuicClient) IsEnabled() bool {
@@ -282,6 +284,7 @@ func (qc *QuicClient) dial(ctx context.Context) (quic.Connection, error) {
 }
 
 func (qc *QuicClient) run(ctx context.Context) {
+	fmt.Println("REMOVE in run")
 	qc.wg.Add(1)
 	defer qc.wg.Done()
 	defer removePrint()
@@ -320,7 +323,9 @@ func (qc *QuicClient) run(ctx context.Context) {
 				var msg wrp.Message
 				ctx, cancel := context.WithCancelCause(ctx)
 
+				fmt.Println("REMOVE before accept stream")
 				stream, err := conn.AcceptStream(ctx)
+				fmt.Println("REMOVE after accept stream")
 				if err != nil {
 					cancel(nil)
 
@@ -341,6 +346,7 @@ func (qc *QuicClient) run(ctx context.Context) {
 				ctxErr := context.Cause(ctx)
 				// If ctxErr is context.Canceled then the parent context has been canceled.
 				if errors.Is(ctxErr, context.Canceled) {
+					fmt.Println("context is canceled")
 					cancel(nil)
 					break
 				}
@@ -395,11 +401,15 @@ func (qc *QuicClient) run(ctx context.Context) {
 			})
 		}
 
+		fmt.Println("REMOVE before select")
 		select {
 		case <-time.After(next):
+			fmt.Println("next")
 		case <-ctx.Done():
+			fmt.Println("REMOVE context is done")
 			return
 		}
+		fmt.Println("REMOVE after select")
 	}
 }
 

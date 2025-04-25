@@ -199,7 +199,7 @@ func (ws *Websocket) Stop() {
 		shutdown()
 	}
 
-	//ws.wg.Wait()  // TODO - this is hanging forever
+	ws.wg.Wait()
 }
 
 func (ws *Websocket) Name() string {

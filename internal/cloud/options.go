@@ -5,8 +5,6 @@ package cloud
 
 import (
 	"github.com/xmidt-org/xmidt-agent/internal/event"
-	"github.com/xmidt-org/xmidt-agent/internal/quic"
-	"github.com/xmidt-org/xmidt-agent/internal/websocket"
 )
 
 type Option interface {
@@ -28,7 +26,7 @@ func PreferQuic(preferQuic bool) Option {
 		})
 }
 
-func QuicClient(qc *quic.QuicClient) Option {
+func QuicClient(qc Handler) Option {
 	return optionFunc(
 		func(p *Proxy) error {
 			if qc == nil {
@@ -39,7 +37,7 @@ func QuicClient(qc *quic.QuicClient) Option {
 		})
 }
 
-func Websocket(ws *websocket.Websocket) Option {
+func Websocket(ws Handler) Option {
 	return optionFunc(
 		func(p *Proxy) error {
 			if ws == nil {
