@@ -110,7 +110,7 @@ quic:
 cloud:
   prefer_quic: false
   # max tries before switching protocol
-  max_tries: 3 
+  max_tries: 3
 lib_parodus:
   parodus_service_url: "tcp://127.0.0.1:6666"
   keep_alive_interval: 30s
