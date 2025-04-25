@@ -55,9 +55,12 @@ func (suite *ProxySuite) SetupTest() {
 }
 
 func (suite *ProxySuite) TestNew() {
+	// quic preferred
+
 	suite.Equal(suite.got.active, suite.mockQuicClient)
 
 	// websocket preferred
+
 	h, err := New(
 		QuicClient(suite.mockQuicClient),
 		Websocket(suite.mockWebsocket),
@@ -70,6 +73,7 @@ func (suite *ProxySuite) TestNew() {
 	suite.Equal(p.active, suite.mockWebsocket)
 
 	// missing quic client
+
 	_, err = New(
 		Websocket(suite.mockWebsocket),
 		PreferQuic(false),
@@ -78,6 +82,7 @@ func (suite *ProxySuite) TestNew() {
 	suite.Error(err)
 
 	// missing websocket
+
 	_, err = New(
 		QuicClient(suite.mockQuicClient),
 		PreferQuic(false),
@@ -108,13 +113,16 @@ func (suite *ProxySuite) TestOnQuicConnect() {
 }
 
 func (suite *ProxySuite) TestOnWebsocketConnect() {
+
 	// max tries not exceeded
+
 	suite.mockWebsocket.On("Name").Return("websocket")
 	e := event.Connect{}
 	suite.got.OnWebsocketConnect(e)
 	suite.mockQuicClient.AssertNotCalled(suite.T(), "Stop")
 
 	// max tries exceeded
+
 	suite.mockWebsocket.On("Stop").Return()
 	suite.mockQuicClient.On("Start").Return()
 	e = event.Connect{
@@ -129,16 +137,15 @@ func (suite *ProxySuite) TestOnWebsocketConnect() {
 }
 
 func (suite *ProxySuite) TestProxyCalls() {
-	//suite.mockQuicClient.On("Send", mock.Anything).Return(nil)
+
 	suite.mockQuicClient.On("Start")
 	suite.mockQuicClient.On("Stop")
 	suite.mockQuicClient.On("AddConnectListener", mock.Anything).Return(TestCancelFunc)
 	suite.mockQuicClient.On("AddMessageListener", mock.Anything).Return(TestCancelFunc)
 	suite.mockQuicClient.On("HandleWrp", mock.Anything).Return(nil)
-	suite.mockQuicClient.On("HandleWrp", mock.Anything).Return(nil)
 
 	suite.got.HandleWrp(wrp.Message{})
-	//suite.got.Send(context.Background(), wrp.Message{})
+
 	suite.got.Start()
 	suite.got.Stop()
 	suite.got.AddConnectListener(
@@ -149,4 +156,6 @@ func (suite *ProxySuite) TestProxyCalls() {
 		event.MsgListenerFunc(
 			func(msg wrp.Message) {},
 		))
+
+	suite.mockQuicClient.AssertCalled(suite.T(), "Start")
 }

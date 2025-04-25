@@ -17,7 +17,7 @@ func (f optionFunc) apply(p *Proxy) error {
 	return f(p)
 }
 
-// whether or not to try quic before the websocket
+// whether or not to try quic before trying the websocket
 func PreferQuic(preferQuic bool) Option {
 	return optionFunc(
 		func(p *Proxy) error {
@@ -48,6 +48,7 @@ func Websocket(ws Handler) Option {
 		})
 }
 
+// max tries before switching protocols (quic vs websocket)
 func MaxTries(maxTries int) Option {
 	return optionFunc(
 		func(p *Proxy) error {

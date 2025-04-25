@@ -27,11 +27,6 @@ func (m *MockCloudHandler) Name() string {
 	return args.Get(0).(string)
 }
 
-// func (m *MockCloudHandler) Send(ctx context.Context, msg wrp.Message) error {
-// 	args := m.Called(ctx, msg)
-// 	return args.Error(0)
-// }
-
 func (m *MockCloudHandler) AddMessageListener(l event.MsgListener) event.CancelFunc {
 	args := m.Called(l)
 	return args.Get(0).(event.CancelFunc)

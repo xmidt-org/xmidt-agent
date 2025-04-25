@@ -103,11 +103,6 @@ func (m *Proxy) Stop() {
 	m.active.Stop()
 }
 
-// func (m *Proxy) Send(ctx context.Context, msg wrp.Message) error {
-// 	// no op
-// 	return nil
-// }
-
 func (p *Proxy) AddProxyListeners(handler Handler) {
 	handler.AddMessageListener(
 		event.MsgListenerFunc(

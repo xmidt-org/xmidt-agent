@@ -112,6 +112,6 @@ func provideQuic(in QuicIn) (quicOut, error) {
 
 	return quicOut{
 		QuicClient: quicClient,
-		Cancels:    cancels, // TODO
+		Cancels:    cancels,
 	}, err
 }
