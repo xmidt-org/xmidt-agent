@@ -91,11 +91,7 @@ type qosOut struct {
 }
 
 func provideQOSHandler(in qosIn) (qosOut, error) {
-	//
-	// cloudHandler, ok := in.CloudHandler
-	// if !ok {
-	// 	return qosOut{}, errors.New("invalid cloud handler passed to QOS service")
-	// }
+
 	lh, err := loghandler.New(in.EgressHandler,
 		in.Logger.With(
 			zap.String("stage", "egress"),

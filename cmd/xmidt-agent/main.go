@@ -326,33 +326,3 @@ func fetchURL(path, backUpURL string, f func(context.Context) (string, error)) f
 		return url.JoinPath(baseURL, path)
 	}
 }
-
-// func provideCloudHandler(in CloudHandlerIn) (cloudHandlerOut, error) {
-// 	cloudHandlerOut := cloudHandlerOut{}
-
-// quicOut, err := provideQuic(in)
-// if err != nil {
-// 	return cloudHandlerOut, err
-// }
-
-// wsOut, err := provideWS(in)
-// if err != nil {
-// 	return cloudHandlerOut, err
-// }
-
-// if in.Websocket.Disable && !in.Quic.Disable {
-// 	cloudHandlerOut.Cancels = quicOut.Cancels
-// 	cloudHandlerOut.Egress = quicOut.Egress
-// 	cloudHandlerOut.Handler = quicOut.Handler
-// 	cloudHandlerOut.WrpHandler = quicOut.Handler.(wrpkit.Handler)
-// }
-
-// if !in.Websocket.Disable {
-// 	cloudHandlerOut.Cancels = wsOut.Cancels
-// 	cloudHandlerOut.Egress = wsOut.Egress
-// 	cloudHandlerOut.Handler = wsOut.Handler
-// 	cloudHandlerOut.WrpHandler = wsOut.Handler.(wrpkit.Handler)
-// }
-
-// 	return cloudHandlerOut, nil
-// }

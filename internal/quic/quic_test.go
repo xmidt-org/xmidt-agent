@@ -389,7 +389,7 @@ func (suite *QuicSuite) Test_DialErr() {
 	remoteServerUrl, err := url.Parse("RemoteServerUrl")
 	suite.NoError(err)
 	suite.mockRedirector.On("GetUrl", mock.Anything, mock.Anything).Return(remoteServerUrl, errors.New("some error"))
-	suite.mockEventListeners.On("OnConnect", mock.Anything)
+	args := suite.mockEventListeners.On("OnConnect", mock.Anything)
 	suite.got.Start()
 
 	time.Sleep(10 * time.Millisecond)

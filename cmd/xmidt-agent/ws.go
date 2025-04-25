@@ -45,9 +45,6 @@ type wsOut struct {
 }
 
 func provideWS(in WsIn) (wsOut, error) {
-	// if in.Websocket.Disable {
-	// 	return wsOut{}, nil
-	// }
 
 	var fetchURLFunc func(context.Context) (string, error)
 	// JWTXT is not required
@@ -126,6 +123,6 @@ func provideWS(in WsIn) (wsOut, error) {
 
 	return wsOut{
 		WS:      ws,
-		Cancels: cancels, // TODO - where should this go?
+		Cancels: cancels,
 	}, err
 }

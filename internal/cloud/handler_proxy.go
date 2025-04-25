@@ -32,6 +32,9 @@ type Proxy struct {
 	qc Handler
 	ws Handler
 
+	qcMsgHandler wrpkit.Handler
+	wsMsgHandler wrpkit.Handler
+
 	active           Handler
 	activeWrpHandler wrpkit.Handler
 
@@ -72,12 +75,15 @@ func New(opts ...Option) (Handler, error) {
 	p.AddProxyListeners(p.qc)
 	p.AddProxyListeners(p.ws)
 
+	p.qcMsgHandler = p.qc.(wrpkit.Handler)
+	p.wsMsgHandler = p.ws.(wrpkit.Handler)
+
 	if p.preferQuic {
 		p.active = p.qc
-		p.activeWrpHandler = p.qc.(wrpkit.Handler)
+		p.activeWrpHandler = p.qcMsgHandler
 	} else {
 		p.active = p.ws
-		p.activeWrpHandler = p.ws.(wrpkit.Handler)
+		p.activeWrpHandler = p.wsMsgHandler
 	}
 
 	return p, nil
@@ -128,6 +134,8 @@ func (p *Proxy) HandleWrp(m wrp.Message) error {
 
 func (p *Proxy) OnQuicConnect(e event.Connect) {
 	fmt.Printf("REMOVE %s connect event", p.qc.Name())
+
+	// switch to websocket
 	if e.Err != nil && e.TriesSinceLastConnect > p.maxTries {
 		fmt.Println("REMOVE switching to websocket")
 
@@ -139,13 +147,15 @@ func (p *Proxy) OnQuicConnect(e event.Connect) {
 
 		p.wg.Lock()
 		p.active = p.ws
-		p.activeWrpHandler = p.ws.(wrpkit.Handler)
+		p.activeWrpHandler = p.wsMsgHandler
 		p.wg.Unlock()
 	}
 }
 
 func (p *Proxy) OnWebsocketConnect(e event.Connect) {
 	fmt.Printf("REMOVE %s connect event", p.ws.Name())
+
+	// switch to quic
 	if e.Err != nil && e.TriesSinceLastConnect > p.maxTries {
 		fmt.Println("REMOVE switching to quic")
 
@@ -155,7 +165,7 @@ func (p *Proxy) OnWebsocketConnect(e event.Connect) {
 		p.wg.Lock()
 
 		p.active = p.qc
-		p.activeWrpHandler = p.qc.(wrpkit.Handler)
+		p.activeWrpHandler = p.qcMsgHandler
 
 		p.wg.Unlock()
 	}

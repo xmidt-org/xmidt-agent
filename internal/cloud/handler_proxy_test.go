@@ -55,9 +55,11 @@ func (suite *ProxySuite) SetupTest() {
 }
 
 func (suite *ProxySuite) TestNew() {
+
 	// quic preferred
 
 	suite.Equal(suite.got.active, suite.mockQuicClient)
+	suite.Equal(suite.got.activeWrpHandler, suite.mockQuicClient)
 
 	// websocket preferred
 
@@ -71,6 +73,7 @@ func (suite *ProxySuite) TestNew() {
 	suite.NoError(err)
 	p := h.(*Proxy)
 	suite.Equal(p.active, suite.mockWebsocket)
+	suite.Equal(p.activeWrpHandler, suite.mockWebsocket)
 
 	// missing quic client
 
