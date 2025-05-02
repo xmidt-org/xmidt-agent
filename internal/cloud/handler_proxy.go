@@ -5,7 +5,6 @@ package cloud
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 
 	"github.com/xmidt-org/eventor"
@@ -19,8 +18,6 @@ var (
 	ErrQuicRequired       = errors.New("quic cannot be nil")
 	ErrWsRequired         = errors.New("websocket cannot be nil")
 )
-
-const HandlerName = "proxy"
 
 type CloudConfig struct {
 	QuicPreferred bool
@@ -42,7 +39,7 @@ type Proxy struct {
 
 	msgListeners     eventor.Eventor[event.MsgListener]
 	connectListeners eventor.Eventor[event.ConnectListener]
-	maxTries         int
+	maxTries         int64
 }
 
 // TODO - log handler stuff
@@ -133,16 +130,10 @@ func (p *Proxy) HandleWrp(m wrp.Message) error {
 }
 
 func (p *Proxy) OnQuicConnect(e event.Connect) {
-	fmt.Printf("REMOVE %s connect event", p.qc.Name())
 
-	// switch to websocket
+	// should we switch to websocket?
 	if e.Err != nil && e.TriesSinceLastConnect > p.maxTries {
-		fmt.Println("REMOVE switching to websocket")
-
 		p.qc.Stop()
-
-		fmt.Println("REMOVE after stop")
-
 		p.ws.Start()
 
 		p.wg.Lock()
@@ -153,12 +144,8 @@ func (p *Proxy) OnQuicConnect(e event.Connect) {
 }
 
 func (p *Proxy) OnWebsocketConnect(e event.Connect) {
-	fmt.Printf("REMOVE %s connect event", p.ws.Name())
-
-	// switch to quic
+	// should we switch to quic?
 	if e.Err != nil && e.TriesSinceLastConnect > p.maxTries {
-		fmt.Println("REMOVE switching to quic")
-
 		p.ws.Stop()
 		p.qc.Start()
 

@@ -6,7 +6,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/xmidt-org/wrp-go/v5"
@@ -87,7 +86,6 @@ func provideWS(in WsIn) (wsOut, error) {
 		cancels                     []func()
 	)
 	if in.CLI.Dev {
-		fmt.Println("REMOVE appending dev event listeners to ws")
 		logger := in.Logger.Named("websocket")
 		opts = append(opts,
 			websocket.AddMessageListener(

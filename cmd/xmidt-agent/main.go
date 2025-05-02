@@ -264,7 +264,7 @@ func onStart(cred *credentials.Credentials, cloudHandler cloud.Handler, libParod
 		}
 
 		if cloudHandler == nil {
-			logger.Info("cloudHandler disabled")
+			logger.Info("no cloud handler")
 			return err
 		}
 

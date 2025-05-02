@@ -10,7 +10,6 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -35,7 +34,6 @@ type QuicDialer struct {
 // "dialer" uses the http3.ClientConn api directly and that api uses the passed in connection.
 func (qd *QuicDialer) DialQuic(ctx context.Context, url *url.URL) (quic.Connection, error) {
 
-	fmt.Println("REMOVE before Dialaddr")
 	conn, err := quic.DialAddr(ctx, url.Host, qd.tlsConfig, &qd.quicConfig)
 	if err != nil {
 		return nil, err
@@ -46,17 +44,13 @@ func (qd *QuicDialer) DialQuic(ctx context.Context, url *url.URL) (quic.Connecti
 		QUICConfig:      &qd.quicConfig,
 	}
 
-	fmt.Println("REMOVE before newclientconn")
 	h3Conn := roundTripper.NewClientConn(conn)
 
-	fmt.Println("REMOVE before open request stream")
 	reqStream, err := h3Conn.OpenRequestStream(ctx)
 	if err != nil {
-
 		return nil, err
 	}
 
-	fmt.Println("REMOVE before new request")
 	req, err := http.NewRequest(http.MethodPost, url.String(), bytes.NewBuffer([]byte{}))
 	if err != nil {
 		roundTripper.Close()
@@ -67,19 +61,16 @@ func (qd *QuicDialer) DialQuic(ctx context.Context, url *url.URL) (quic.Connecti
 	qd.credDecorator(req.Header)
 	qd.conveyDecorator(req.Header)
 
-	fmt.Println("REMOVE before send request header")
 	err = reqStream.SendRequestHeader(req)
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println("REMOVE before read response")
 	resp, err := reqStream.ReadResponse()
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println("REMOVE after read response")
 	_, err = io.Copy(io.Discard, resp.Body)
 	if (err != nil) && errors.Is(err, io.EOF) {
 		err = nil

@@ -49,7 +49,7 @@ func Websocket(ws Handler) Option {
 }
 
 // max tries before switching protocols (quic vs websocket)
-func MaxTries(maxTries int) Option {
+func MaxTries(maxTries int64) Option {
 	return optionFunc(
 		func(p *Proxy) error {
 			p.maxTries = maxTries

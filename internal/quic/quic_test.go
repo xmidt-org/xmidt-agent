@@ -395,8 +395,8 @@ func (suite *QuicSuite) Test_DialErr() {
 	time.Sleep(10 * time.Millisecond)
 
 	e := events.Parent.Calls[0].Arguments.Get(0).(event.Connect)
-	suite.Equal(1, e.TriesSinceLastConnect)
-	suite.Equal(1, suite.got.triesSinceLastConnect)
+	suite.Equal(int64(1), e.TriesSinceLastConnect)
+	suite.Equal(int64(1), suite.got.triesSinceLastConnect)
 	suite.NotNil(e.Err)
 	suite.mockEventListeners.AssertCalled(suite.T(), "OnConnect", mock.Anything)
 }
@@ -424,7 +424,7 @@ func (suite *QuicSuite) Test_Send() {
 	mockConn.AssertCalled(suite.T(), "OpenStream")
 	mockStr.AssertCalled(suite.T(), "Write", mock.Anything)
 	mockStr.AssertCalled(suite.T(), "Close")
-	suite.Equal(0, suite.got.triesSinceLastConnect)
+	suite.Equal(int64(0), suite.got.triesSinceLastConnect)
 }
 
 func (suite *QuicSuite) TestGetName() {

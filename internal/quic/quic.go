@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/quic-go/quic-go"
@@ -105,7 +106,7 @@ type QuicClient struct {
 	qd Dialer
 	rd Redirector
 
-	triesSinceLastConnect int
+	triesSinceLastConnect int64
 }
 
 // Option is a functional option type for Quic.
@@ -177,14 +178,10 @@ func (qc *QuicClient) Name() string {
 // Start starts the http3 connection and a long running goroutine to maintain
 // the connection.
 func (qc *QuicClient) Start() {
-	fmt.Println("REMOVE calling quic start")
-	qc.triesSinceLastConnect = 0
+	atomic.StoreInt64(&qc.triesSinceLastConnect, 0)
 
-	fmt.Println("REMOVE before lock")
 	qc.m.Lock()
-	fmt.Println("REMOVE after lock")
 	defer qc.m.Unlock()
-	fmt.Println("REMOVE after unlock")
 
 	if qc.shutdown != nil {
 		return
@@ -198,28 +195,20 @@ func (qc *QuicClient) Start() {
 
 // Stop stops the quic connection.
 func (qc *QuicClient) Stop() {
-	fmt.Println("REMOVE before lock")
 	qc.m.Lock()
 	if qc.conn != nil {
 		_ = qc.conn.CloseWithError(quic.ApplicationErrorCode(quic.ApplicationErrorErrorCode), "connection stopped by application")
 	}
-	fmt.Println("REMOVE after lock")
 	shutdown := qc.shutdown
-	fmt.Println("REMOVE after shutdown")
 	qc.m.Unlock()
-	fmt.Println("REMOVE after unlock")
 
 	if shutdown != nil {
-		fmt.Println("REMOVE shutting down")
 		shutdown()
-	} else {
-		fmt.Println("REMOVE shutdown is nil")
 	}
 
-	fmt.Println("REMOVE before wait")
-
-	qc.wg.Wait() // TODO - this is blocking forever
-	fmt.Println("REMOVE after wait")
+	// run doesn't seem to exit until Stop() is finished so below
+	// is deadlocked
+	//qc.wg.Wait() // TODO - this is blocking forever
 	qc.shutdown = nil
 }
 
@@ -284,9 +273,8 @@ func (qc *QuicClient) dial(ctx context.Context) (quic.Connection, error) {
 }
 
 func (qc *QuicClient) run(ctx context.Context) {
-	fmt.Println("REMOVE in run")
-	qc.wg.Add(1)
-	defer qc.wg.Done()
+	//qc.wg.Add(1)  // see deadlock comment in Stop()
+	//defer qc.wg.Done()
 	defer removePrint()
 
 	policy := qc.retryPolicyFactory.NewPolicy(ctx)
@@ -304,7 +292,7 @@ func (qc *QuicClient) run(ctx context.Context) {
 		cEvent.At = qc.nowFunc()
 
 		if dialErr == nil {
-			qc.triesSinceLastConnect = 0
+			atomic.StoreInt64(&qc.triesSinceLastConnect, 0)
 
 			qc.connectListeners.Visit(func(l event.ConnectListener) {
 				l.OnConnect(cEvent)
@@ -323,9 +311,7 @@ func (qc *QuicClient) run(ctx context.Context) {
 				var msg wrp.Message
 				ctx, cancel := context.WithCancelCause(ctx)
 
-				fmt.Println("REMOVE before accept stream")
 				stream, err := conn.AcceptStream(ctx)
-				fmt.Println("REMOVE after accept stream")
 				if err != nil {
 					cancel(nil)
 
@@ -384,7 +370,7 @@ func (qc *QuicClient) run(ctx context.Context) {
 			}
 		}
 
-		qc.triesSinceLastConnect++
+		atomic.AddInt64(&qc.triesSinceLastConnect, 1)
 
 		if qc.once {
 			return
@@ -395,26 +381,24 @@ func (qc *QuicClient) run(ctx context.Context) {
 		if dialErr != nil {
 			cEvent.Err = dialErr
 			cEvent.RetryingAt = qc.nowFunc().Add(next)
-			cEvent.TriesSinceLastConnect = qc.triesSinceLastConnect
+			cEvent.TriesSinceLastConnect = atomic.LoadInt64(&qc.triesSinceLastConnect)
 			qc.connectListeners.Visit(func(l event.ConnectListener) {
 				l.OnConnect(cEvent)
 			})
 		}
 
-		fmt.Println("REMOVE before select")
 		select {
 		case <-time.After(next):
 			fmt.Println("next")
 		case <-ctx.Done():
-			fmt.Println("REMOVE context is done")
 			return
 		}
-		fmt.Println("REMOVE after select")
 	}
 }
 
+// debug print for deadlock
 func removePrint() {
-	fmt.Println("exiting run")
+	fmt.Println("exiting quic run")
 }
 
 func readBytes(reader io.Reader) ([]byte, error) {

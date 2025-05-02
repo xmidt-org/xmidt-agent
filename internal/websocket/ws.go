@@ -6,10 +6,10 @@ package websocket
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/xmidt-org/arrange/arrangehttp"
@@ -108,7 +108,7 @@ type Websocket struct {
 
 	conn *nhws.Conn
 
-	triesSinceLastConnect int
+	triesSinceLastConnect int64
 }
 
 // Option is a functional option type for WS.
@@ -168,12 +168,10 @@ func New(opts ...Option) (*Websocket, error) {
 // Start starts the websocket connection and a long running goroutine to maintain
 // the connection.
 func (ws *Websocket) Start() {
-	fmt.Println("REMOVE starting websocket")
-
-	ws.triesSinceLastConnect = 0
-
 	ws.m.Lock()
 	defer ws.m.Unlock()
+
+	atomic.StoreInt64(&ws.triesSinceLastConnect, 0)
 
 	if ws.shutdown != nil {
 		return
@@ -265,7 +263,7 @@ func (ws *Websocket) run(ctx context.Context) {
 		cEvent.At = ws.nowFunc()
 
 		if dialErr == nil {
-			ws.triesSinceLastConnect = 0
+			atomic.StoreInt64(&ws.triesSinceLastConnect, 0)
 
 			ws.connectListeners.Visit(func(l event.ConnectListener) {
 				l.OnConnect(cEvent)
@@ -375,7 +373,8 @@ func (ws *Websocket) run(ctx context.Context) {
 				})
 			}
 		}
-		ws.triesSinceLastConnect++
+
+		atomic.AddInt64(&ws.triesSinceLastConnect, 1)
 
 		if ws.once {
 			return
@@ -386,7 +385,7 @@ func (ws *Websocket) run(ctx context.Context) {
 		if dialErr != nil {
 			cEvent.Err = dialErr
 			cEvent.RetryingAt = ws.nowFunc().Add(next)
-			cEvent.TriesSinceLastConnect = ws.triesSinceLastConnect
+			cEvent.TriesSinceLastConnect = atomic.LoadInt64(&ws.triesSinceLastConnect)
 			ws.connectListeners.Visit(func(l event.ConnectListener) {
 				l.OnConnect(cEvent)
 			})
