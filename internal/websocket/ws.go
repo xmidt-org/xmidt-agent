@@ -197,7 +197,8 @@ func (ws *Websocket) Stop() {
 		shutdown()
 	}
 
-	ws.wg.Wait()
+	// TODO - run is not exiting until Stop() exits so this is causing deadlock
+	//ws.wg.Wait()
 }
 
 func (ws *Websocket) Name() string {
@@ -238,8 +239,9 @@ func (ws *Websocket) Send(ctx context.Context, msg wrp.Message) error {
 
 // neither this or websocket code logs errors, this needs to be rectified.
 func (ws *Websocket) run(ctx context.Context) {
-	ws.wg.Add(1)
-	defer ws.wg.Done()
+	// see note in Stop()
+	// ws.wg.Add(1)
+	// defer ws.wg.Done()
 
 	mode := ws.nextMode(event.Ipv4)
 
