@@ -108,7 +108,7 @@ type Websocket struct {
 
 	conn *nhws.Conn
 
-	triesSinceLastConnect int64
+	triesSinceLastConnect atomic.Int32
 }
 
 // Option is a functional option type for WS.
@@ -171,7 +171,7 @@ func (ws *Websocket) Start() {
 	ws.m.Lock()
 	defer ws.m.Unlock()
 
-	atomic.StoreInt64(&ws.triesSinceLastConnect, 0)
+	ws.triesSinceLastConnect.Store(0)
 
 	if ws.shutdown != nil {
 		return
@@ -265,7 +265,7 @@ func (ws *Websocket) run(ctx context.Context) {
 		cEvent.At = ws.nowFunc()
 
 		if dialErr == nil {
-			atomic.StoreInt64(&ws.triesSinceLastConnect, 0)
+			ws.triesSinceLastConnect.Store(0)
 
 			ws.connectListeners.Visit(func(l event.ConnectListener) {
 				l.OnConnect(cEvent)
@@ -376,7 +376,7 @@ func (ws *Websocket) run(ctx context.Context) {
 			}
 		}
 
-		atomic.AddInt64(&ws.triesSinceLastConnect, 1)
+		ws.triesSinceLastConnect.Add(1)
 
 		if ws.once {
 			return
@@ -387,7 +387,7 @@ func (ws *Websocket) run(ctx context.Context) {
 		if dialErr != nil {
 			cEvent.Err = dialErr
 			cEvent.RetryingAt = ws.nowFunc().Add(next)
-			cEvent.TriesSinceLastConnect = atomic.LoadInt64(&ws.triesSinceLastConnect)
+			cEvent.TriesSinceLastConnect = ws.triesSinceLastConnect.Load()
 			ws.connectListeners.Visit(func(l event.ConnectListener) {
 				l.OnConnect(cEvent)
 			})

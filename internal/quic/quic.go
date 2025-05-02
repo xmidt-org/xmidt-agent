@@ -106,7 +106,7 @@ type QuicClient struct {
 	qd Dialer
 	rd Redirector
 
-	triesSinceLastConnect int64
+	triesSinceLastConnect atomic.Int32
 }
 
 // Option is a functional option type for Quic.
@@ -178,7 +178,7 @@ func (qc *QuicClient) Name() string {
 // Start starts the http3 connection and a long running goroutine to maintain
 // the connection.
 func (qc *QuicClient) Start() {
-	atomic.StoreInt64(&qc.triesSinceLastConnect, 0)
+	qc.triesSinceLastConnect.Store(0)
 
 	qc.m.Lock()
 	defer qc.m.Unlock()
@@ -292,7 +292,7 @@ func (qc *QuicClient) run(ctx context.Context) {
 		cEvent.At = qc.nowFunc()
 
 		if dialErr == nil {
-			atomic.StoreInt64(&qc.triesSinceLastConnect, 0)
+			qc.triesSinceLastConnect.Store(0)
 
 			qc.connectListeners.Visit(func(l event.ConnectListener) {
 				l.OnConnect(cEvent)
@@ -370,21 +370,21 @@ func (qc *QuicClient) run(ctx context.Context) {
 			}
 		}
 
-		atomic.AddInt64(&qc.triesSinceLastConnect, 1)
-
-		if qc.once {
-			return
-		}
+		qc.triesSinceLastConnect.Add(1)
 
 		next, _ = policy.Next()
 
 		if dialErr != nil {
 			cEvent.Err = dialErr
 			cEvent.RetryingAt = qc.nowFunc().Add(next)
-			cEvent.TriesSinceLastConnect = atomic.LoadInt64(&qc.triesSinceLastConnect)
+			cEvent.TriesSinceLastConnect = qc.triesSinceLastConnect.Load()
 			qc.connectListeners.Visit(func(l event.ConnectListener) {
 				l.OnConnect(cEvent)
 			})
+		}
+
+		if qc.once {
+			return
 		}
 
 		select {

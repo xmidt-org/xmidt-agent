@@ -39,7 +39,7 @@ type Proxy struct {
 
 	msgListeners     eventor.Eventor[event.MsgListener]
 	connectListeners eventor.Eventor[event.ConnectListener]
-	maxTries         int64
+	maxTries         int32
 }
 
 // TODO - log handler stuff

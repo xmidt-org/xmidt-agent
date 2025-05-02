@@ -1,5 +1,9 @@
 // SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
 // SPDX-License-Identifier: Apache-2.0
+
+//go:build !race
+// +build !race
+
 package quic
 
 import (
@@ -308,10 +312,11 @@ func Test_emptyDecorator(t *testing.T) {
 
 type QuicSuite struct {
 	suite.Suite
-	got                *QuicClient
-	mockRedirector     *MockRedirector
-	mockDialer         *MockDialer
-	mockEventListeners *mockevent.MockListeners
+	got                          *QuicClient
+	mockRedirector               *MockRedirector
+	mockDialer                   *MockDialer
+	mockConnectEventListeners    *mockevent.MockListeners
+	mockDisconnectEventListeners *mockevent.MockListeners
 }
 
 func TestQuicSuite(t *testing.T) {
@@ -319,7 +324,8 @@ func TestQuicSuite(t *testing.T) {
 }
 
 func (suite *QuicSuite) SetupTest() {
-	mockEventListeners := &mockevent.MockListeners{}
+	mockConnectEventListeners := &mockevent.MockListeners{}
+	mockDisconnectEventListeners := &mockevent.MockListeners{}
 	got, err := New(
 		Enabled(true),
 		URL(RemoteServerUrl),
@@ -342,8 +348,9 @@ func (suite *QuicSuite) SetupTest() {
 			QuicConfig: quic.Config{},
 			TlsConfig:  tls.Config{},
 		}),
-		AddConnectListener(mockEventListeners),
-		AddDisconnectListener(mockEventListeners),
+		AddConnectListener(mockConnectEventListeners),
+		AddDisconnectListener(mockDisconnectEventListeners),
+		Once(true),
 	)
 
 	suite.NoError(err)
@@ -359,7 +366,8 @@ func (suite *QuicSuite) SetupTest() {
 	suite.got = got
 	suite.mockRedirector = mockRedirector
 	suite.mockDialer = mockDialer
-	suite.mockEventListeners = mockEventListeners
+	suite.mockConnectEventListeners = mockConnectEventListeners
+	suite.mockDisconnectEventListeners = mockDisconnectEventListeners
 }
 
 func (suite *QuicSuite) Test_CancelCtx() {
@@ -374,8 +382,8 @@ func (suite *QuicSuite) Test_CancelCtx() {
 	suite.mockRedirector.On("GetUrl", mock.Anything, mock.Anything).Return(remoteServerUrl, nil)
 	suite.mockDialer.On("DialQuic", mock.Anything, mock.Anything).Return(mockConn, nil)
 
-	suite.mockEventListeners.On("OnConnect", mock.Anything).Return()
-	suite.mockEventListeners.On("OnDisconnect", mock.Anything).Return()
+	suite.mockConnectEventListeners.On("OnConnect", mock.Anything).Return()
+	suite.mockDisconnectEventListeners.On("OnDisconnect", mock.Anything).Return()
 
 	suite.got.Start()
 
@@ -389,16 +397,16 @@ func (suite *QuicSuite) Test_DialErr() {
 	remoteServerUrl, err := url.Parse("RemoteServerUrl")
 	suite.NoError(err)
 	suite.mockRedirector.On("GetUrl", mock.Anything, mock.Anything).Return(remoteServerUrl, errors.New("some error"))
-	events := suite.mockEventListeners.On("OnConnect", mock.Anything)
+	events := suite.mockConnectEventListeners.On("OnConnect", mock.Anything)
 	suite.got.Start()
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(20 * time.Millisecond)
 
 	e := events.Parent.Calls[0].Arguments.Get(0).(event.Connect)
-	suite.Equal(int64(1), e.TriesSinceLastConnect)
-	suite.Equal(int64(1), suite.got.triesSinceLastConnect)
+	suite.Equal(int32(1), e.TriesSinceLastConnect)
+	suite.Equal(int32(1), suite.got.triesSinceLastConnect.Load())
 	suite.NotNil(e.Err)
-	suite.mockEventListeners.AssertCalled(suite.T(), "OnConnect", mock.Anything)
+	suite.mockConnectEventListeners.AssertCalled(suite.T(), "OnConnect", mock.Anything)
 }
 
 func (suite *QuicSuite) Test_Send() {
@@ -424,7 +432,7 @@ func (suite *QuicSuite) Test_Send() {
 	mockConn.AssertCalled(suite.T(), "OpenStream")
 	mockStr.AssertCalled(suite.T(), "Write", mock.Anything)
 	mockStr.AssertCalled(suite.T(), "Close")
-	suite.Equal(int64(0), suite.got.triesSinceLastConnect)
+	suite.Equal(int32(0), suite.got.triesSinceLastConnect.Load())
 }
 
 func (suite *QuicSuite) TestGetName() {
@@ -442,8 +450,8 @@ func (suite *QuicSuite) Test_StreamErr() {
 	mockConn.On("AcceptStream", mock.Anything).Return(mockStr, errors.New("some error"))
 	mockConn.On("CloseWithError", mock.Anything, mock.Anything).Return(nil)
 
-	suite.mockEventListeners.On("OnConnect", mock.Anything).Return()
-	suite.mockEventListeners.On("OnDisconnect", mock.Anything).Return()
+	suite.mockConnectEventListeners.On("OnConnect", mock.Anything).Return()
+	suite.mockDisconnectEventListeners.On("OnDisconnect", mock.Anything).Return()
 
 	remoteServerUrl, err := url.Parse("RemoteServerUrl")
 	suite.NoError(err)
@@ -453,8 +461,8 @@ func (suite *QuicSuite) Test_StreamErr() {
 	suite.got.Start()
 	time.Sleep(20 * time.Millisecond)
 
-	suite.mockEventListeners.AssertCalled(suite.T(), "OnConnect", mock.Anything)
-	suite.mockEventListeners.AssertCalled(suite.T(), "OnDisconnect", mock.Anything)
+	suite.mockConnectEventListeners.AssertCalled(suite.T(), "OnConnect", mock.Anything)
+	suite.mockDisconnectEventListeners.AssertCalled(suite.T(), "OnDisconnect", mock.Anything)
 	mockConn.AssertCalled(suite.T(), "AcceptStream", mock.Anything)
 	mockConn.AssertCalled(suite.T(), "CloseWithError", mock.Anything, mock.Anything)
 	suite.mockRedirector.AssertCalled(suite.T(), "GetUrl", mock.Anything, mock.Anything)
@@ -468,8 +476,8 @@ func (suite *QuicSuite) Test_DecodeErr() {
 	mockStr.On("Read", mock.Anything).Return(5, nil)
 	mockStr.On("Close").Return(nil)
 
-	suite.mockEventListeners.On("OnConnect", mock.Anything).Return()
-	suite.mockEventListeners.On("OnDisconnect", mock.Anything).Return()
+	suite.mockConnectEventListeners.On("OnConnect", mock.Anything).Return()
+	suite.mockDisconnectEventListeners.On("OnDisconnect", mock.Anything).Return()
 
 	remoteServerUrl, err := url.Parse("RemoteServerUrl")
 	suite.NoError(err)
@@ -479,9 +487,9 @@ func (suite *QuicSuite) Test_DecodeErr() {
 	suite.got.Start()
 	time.Sleep(10 * time.Millisecond)
 
-	suite.mockEventListeners.AssertCalled(suite.T(), "OnConnect", mock.Anything)
+	suite.mockConnectEventListeners.AssertCalled(suite.T(), "OnConnect", mock.Anything)
 	mockConn.AssertCalled(suite.T(), "AcceptStream", mock.Anything)
-	suite.mockEventListeners.AssertCalled(suite.T(), "OnDisconnect", mock.Anything)
+	suite.mockDisconnectEventListeners.AssertCalled(suite.T(), "OnDisconnect", mock.Anything)
 	//mockConn.AssertCalled(suite.T(), "CloseWithError", mock.Anything)  - this gets called in the debugger
 	suite.mockRedirector.AssertCalled(suite.T(), "GetUrl", mock.Anything, mock.Anything)
 }

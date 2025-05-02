@@ -43,7 +43,7 @@ type Connect struct {
 	RetryingAt time.Time
 
 	// tries since last successful connect
-	TriesSinceLastConnect int64
+	TriesSinceLastConnect int32
 
 	// Error is the error returned from the attempt to connect.
 	Err error
