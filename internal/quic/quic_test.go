@@ -229,6 +229,13 @@ func TestMessageListener(t *testing.T) {
 		RetryPolicy(retry.Config{}),
 	)
 
+	// external resource can call this after New
+	got.AddMessageListener(
+		event.MsgListenerFunc(
+			func(m wrp.Message) {
+				fmt.Println("do something with message")
+			}))
+
 	assert.NoError(err)
 	if assert.NotNil(got) {
 		got.msgListeners.Visit(func(l event.MsgListener) {
@@ -262,6 +269,13 @@ func TestConnectListener(t *testing.T) {
 		NowFunc(time.Now),
 		RetryPolicy(retry.Config{}),
 	)
+
+	// called by external actors after New
+	got.AddConnectListener(
+		event.ConnectListenerFunc(
+			func(e event.Connect) {
+				fmt.Println("do something after connect event")
+			}))
 
 	assert.NoError(err)
 	if assert.NotNil(got) {
