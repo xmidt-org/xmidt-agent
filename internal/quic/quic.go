@@ -332,7 +332,6 @@ func (qc *QuicClient) run(ctx context.Context) {
 				ctxErr := context.Cause(ctx)
 				// If ctxErr is context.Canceled then the parent context has been canceled.
 				if errors.Is(ctxErr, context.Canceled) {
-					fmt.Println("context is canceled")
 					cancel(nil)
 					break
 				}
@@ -389,7 +388,6 @@ func (qc *QuicClient) run(ctx context.Context) {
 
 		select {
 		case <-time.After(next):
-			fmt.Println("next")
 		case <-ctx.Done():
 			return
 		}

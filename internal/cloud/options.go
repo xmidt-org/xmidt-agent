@@ -3,9 +3,7 @@
 
 package cloud
 
-import (
-	"github.com/xmidt-org/xmidt-agent/internal/event"
-)
+import ()
 
 type Option interface {
 	apply(*Proxy) error
@@ -40,7 +38,8 @@ func QuicClient(qc Handler) Option {
 func Websocket(ws Handler) Option {
 	return optionFunc(
 		func(p *Proxy) error {
-			if ws == nil {
+			var nilHandler Handler
+			if ws == nilHandler {
 				return ErrWsRequired
 			}
 			p.ws = ws
@@ -53,18 +52,6 @@ func MaxTries(maxTries int32) Option {
 	return optionFunc(
 		func(p *Proxy) error {
 			p.maxTries = maxTries
-			return nil
-		})
-}
-
-// AddMessageListener adds a message listener to the WS connection.
-// The listener will be called for every message received from the WS.
-func AddMessageListener(listener event.MsgListener, cancel ...*event.CancelFunc) Option {
-	return optionFunc(
-		func(p *Proxy) error {
-			var ignored event.CancelFunc
-			cancel = append(cancel, &ignored)
-			*cancel[0] = event.CancelFunc(p.msgListeners.Add(listener))
 			return nil
 		})
 }

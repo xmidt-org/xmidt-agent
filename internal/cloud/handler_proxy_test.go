@@ -84,6 +84,16 @@ func (suite *ProxySuite) TestNew() {
 	)
 	suite.Error(err)
 
+	// nil quic client
+
+	_, err = New(
+		QuicClient(nil),
+		Websocket(suite.mockWebsocket),
+		PreferQuic(false),
+		MaxTries(2),
+	)
+	suite.Error(err)
+
 	// missing websocket
 
 	_, err = New(
@@ -91,7 +101,48 @@ func (suite *ProxySuite) TestNew() {
 		PreferQuic(false),
 		MaxTries(2),
 	)
+
+	// nil websocket
+
+	_, err = New(
+		Websocket(nil),
+		QuicClient(suite.mockQuicClient),
+		PreferQuic(false),
+		MaxTries(2),
+	)
 	suite.Error(err)
+}
+
+func (suite *ProxySuite) TestProxyMessageListener() {
+	msgCount := 0
+
+	// external resource can call this after New
+	suite.got.AddMessageListener(
+		event.MsgListenerFunc(
+			func(m wrp.Message) {
+				msgCount++
+			}))
+
+	suite.got.msgListeners.Visit(func(l event.MsgListener) {
+		l.OnMessage(wrp.Message{})
+	})
+	suite.Equal(1, msgCount)
+}
+
+func (suite *ProxySuite) TestProxyConnectListener() {
+	eCount := 0
+
+	// external resource can call this after New
+	suite.got.AddConnectListener(
+		event.ConnectListenerFunc(
+			func(e event.Connect) {
+				eCount++
+			}))
+
+	suite.got.connectListeners.Visit(func(l event.ConnectListener) {
+		l.OnConnect(event.Connect{})
+	})
+	suite.Equal(1, eCount)
 }
 
 func (suite *ProxySuite) TestOnQuicConnect() {
@@ -113,6 +164,11 @@ func (suite *ProxySuite) TestOnQuicConnect() {
 	// Calls are made but asserts are failing
 	// suite.mockQuicClient.AssertCalled(suite.T(), "Stop")
 	// suite.mockQuicClient.AssertCalled(suite.T(), "Start")
+}
+
+func (suite *ProxySuite) TestName() {
+	suite.mockQuicClient.On("Name").Return("quic")
+	suite.Equal("quic", suite.got.Name())
 }
 
 func (suite *ProxySuite) TestOnWebsocketConnect() {
