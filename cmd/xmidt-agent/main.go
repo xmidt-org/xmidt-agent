@@ -263,11 +263,6 @@ func onStart(cred *credentials.Credentials, cloudHandler cloud.Handler, libParod
 			cred.WaitUntilFetched(ctx)
 		}
 
-		if cloudHandler == nil {
-			logger.Info("no cloud handler")
-			return err
-		}
-
 		cloudHandler.Start()
 
 		err = libParodus.Start()
