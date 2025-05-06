@@ -405,6 +405,7 @@ func (suite *QuicSuite) Test_CancelCtx() {
 	suite.got.shutdown()
 	time.Sleep(500 * time.Millisecond)
 	suite.got.Stop()
+	time.Sleep(500 * time.Millisecond)
 }
 
 func (suite *QuicSuite) Test_DialErr() {
