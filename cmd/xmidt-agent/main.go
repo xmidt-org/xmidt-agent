@@ -16,11 +16,9 @@ import (
 	"github.com/xmidt-org/xmidt-agent/internal/adapters/libparodus"
 	"github.com/xmidt-org/xmidt-agent/internal/cloud"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials"
-	"github.com/xmidt-org/xmidt-agent/internal/jwtxt"
-	"github.com/xmidt-org/xmidt-agent/internal/loglevel"
-	"github.com/xmidt-org/xmidt-agent/internal/metadata"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/qos"
-	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
+
+	"github.com/xmidt-org/xmidt-agent/internal/loglevel"
 
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -100,6 +98,8 @@ func provideAppOptions(args []string) fx.Option {
 			provideConfig,
 			provideCredentials,
 			provideInstructions,
+			provideQuic,
+			provideWS,
 			provideCloudHandler,
 			provideLibParodus,
 
@@ -117,6 +117,7 @@ func provideAppOptions(args []string) fx.Option {
 			goschtalt.UnmarshalFunc[NetworkService]("network_service"),
 			goschtalt.UnmarshalFunc[QOS]("qos"),
 			goschtalt.UnmarshalFunc[LibParodus]("lib_parodus"),
+			goschtalt.UnmarshalFunc[Cloud]("cloud"),
 
 			provideNetworkService,
 			provideMetadataProvider,
@@ -262,11 +263,6 @@ func onStart(cred *credentials.Credentials, cloudHandler cloud.Handler, libParod
 			cred.WaitUntilFetched(ctx)
 		}
 
-		if cloudHandler == nil {
-			logger.Info("cloudHandler disabled")
-			return err
-		}
-
 		cloudHandler.Start()
 
 		err = libParodus.Start()
@@ -324,56 +320,4 @@ func fetchURL(path, backUpURL string, f func(context.Context) (string, error)) f
 
 		return url.JoinPath(baseURL, path)
 	}
-}
-
-type CloudHandlerIn struct {
-	fx.In
-	Identity  Identity
-	Logger    *zap.Logger
-	CLI       *CLI
-	JWTXT     *jwtxt.Instructions
-	Cred      *credentials.Credentials
-	Metadata  *metadata.MetadataProvider
-	Quic      Quic
-	Websocket Websocket
-}
-
-type cloudHandlerOut struct {
-	fx.Out
-	Handler    cloud.Handler
-	Egress     cloud.Egress
-	WrpHandler wrpkit.Handler
-
-	// cancels
-	Cancels []func() `group:"cancels,flatten"`
-}
-
-func provideCloudHandler(in CloudHandlerIn) (cloudHandlerOut, error) {
-	cloudHandlerOut := cloudHandlerOut{}
-
-	quicOut, err := provideQuic(in)
-	if err != nil {
-		return cloudHandlerOut, err
-	}
-
-	wsOut, err := provideWS(in)
-	if err != nil {
-		return cloudHandlerOut, err
-	}
-
-	if in.Websocket.Disable && !in.Quic.Disable {
-		cloudHandlerOut.Cancels = quicOut.Cancels
-		cloudHandlerOut.Egress = quicOut.Egress
-		cloudHandlerOut.Handler = quicOut.Handler
-		cloudHandlerOut.WrpHandler = quicOut.Handler.(wrpkit.Handler)
-	}
-
-	if !in.Websocket.Disable {
-		cloudHandlerOut.Cancels = wsOut.Cancels
-		cloudHandlerOut.Egress = wsOut.Egress
-		cloudHandlerOut.Handler = wsOut.Handler
-		cloudHandlerOut.WrpHandler = wsOut.Handler.(wrpkit.Handler)
-	}
-
-	return cloudHandlerOut, nil
 }
