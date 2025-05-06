@@ -107,6 +107,7 @@ type QuicClient struct {
 	rd Redirector
 
 	triesSinceLastConnect atomic.Int32
+	done                  bool
 }
 
 // Option is a functional option type for Quic.
@@ -129,6 +130,7 @@ func New(opts ...Option) (*QuicClient, error) {
 	qc := QuicClient{
 		credDecorator:   emptyDecorator,
 		conveyDecorator: emptyDecorator,
+		done:            true,
 	}
 
 	opts = append(opts,
@@ -191,6 +193,7 @@ func (qc *QuicClient) Start() {
 	ctx, qc.shutdown = context.WithCancel(context.Background())
 
 	go qc.run(ctx)
+	qc.done = false
 }
 
 // Stop stops the quic connection.
@@ -275,7 +278,7 @@ func (qc *QuicClient) dial(ctx context.Context) (quic.Connection, error) {
 func (qc *QuicClient) run(ctx context.Context) {
 	//qc.wg.Add(1)  // see deadlock comment in Stop()
 	//defer qc.wg.Done()
-	defer removePrint()
+	defer qc.recordDone()
 
 	policy := qc.retryPolicyFactory.NewPolicy(ctx)
 
@@ -395,7 +398,8 @@ func (qc *QuicClient) run(ctx context.Context) {
 }
 
 // debug print for deadlock
-func removePrint() {
+func (qc *QuicClient) recordDone() {
+	qc.done = true
 	fmt.Println("exiting quic run")
 }
 

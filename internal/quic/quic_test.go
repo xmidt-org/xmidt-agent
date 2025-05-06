@@ -269,6 +269,7 @@ func TestConnectListener(t *testing.T) {
 		NowFunc(time.Now),
 		RetryPolicy(retry.Config{}),
 	)
+	assert.NoError(err)
 
 	// called by external actors after New
 	got.AddConnectListener(
@@ -277,7 +278,6 @@ func TestConnectListener(t *testing.T) {
 				fmt.Println("do something after connect event")
 			}))
 
-	assert.NoError(err)
 	if assert.NotNil(got) {
 		got.connectListeners.Visit(func(l event.ConnectListener) {
 			l.OnConnect(event.Connect{})
@@ -403,9 +403,10 @@ func (suite *QuicSuite) Test_CancelCtx() {
 
 	time.Sleep(500 * time.Millisecond)
 	suite.got.shutdown()
-	time.Sleep(500 * time.Millisecond)
 	suite.got.Stop()
-	time.Sleep(500 * time.Millisecond)
+	for suite.got.done == false {
+		time.Sleep(10 * time.Millisecond)
+	}
 }
 
 func (suite *QuicSuite) Test_DialErr() {
@@ -448,6 +449,55 @@ func (suite *QuicSuite) Test_Send() {
 	mockStr.AssertCalled(suite.T(), "Write", mock.Anything)
 	mockStr.AssertCalled(suite.T(), "Close")
 	suite.Equal(int32(0), suite.got.triesSinceLastConnect.Load())
+}
+
+func (suite *QuicSuite) Test_SendError() {
+	mockConn := NewMockConnection()
+
+	mockStr := NewMockStream([]byte(""))
+
+	mockStr.On("Close").Return(nil)
+
+	mockConn.On("OpenStream").Return(mockStr, errors.New("some error"))
+
+	suite.got.conn = mockConn
+
+	msg := wrp.Message{
+		Type:        wrp.SimpleEventMessageType,
+		Source:      fmt.Sprintf("event:test.com/%s", "client"),
+		Destination: "mac:4ca161000109/mock_config",
+		PartnerIDs:  []string{"foobar"},
+	}
+	err := suite.got.Send(context.Background(), msg)
+	suite.Error(err)
+
+	mockConn.AssertCalled(suite.T(), "OpenStream")
+	mockStr.AssertNotCalled(suite.T(), "Write", mock.Anything)
+}
+
+func (suite *QuicSuite) Test_WriteError() {
+	mockConn := NewMockConnection()
+
+	mockStr := NewMockStream([]byte(""))
+
+	mockStr.On("Write", mock.Anything).Return(0, errors.New("some error"))
+	mockStr.On("Close").Return(nil)
+
+	mockConn.On("OpenStream").Return(mockStr, nil)
+
+	suite.got.conn = mockConn
+
+	msg := wrp.Message{
+		Type:        wrp.SimpleEventMessageType,
+		Source:      fmt.Sprintf("event:test.com/%s", "client"),
+		Destination: "mac:4ca161000109/mock_config",
+		PartnerIDs:  []string{"foobar"},
+	}
+	err := suite.got.Send(context.Background(), msg)
+	suite.Error(err)
+
+	mockConn.AssertCalled(suite.T(), "OpenStream")
+	mockStr.AssertCalled(suite.T(), "Write", mock.Anything)
 }
 
 func (suite *QuicSuite) TestGetName() {
