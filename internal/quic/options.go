@@ -229,14 +229,3 @@ func AddDisconnectListener(listener event.DisconnectListener, cancel ...*event.C
 			return nil
 		})
 }
-
-// AddHeartbeatListener adds a heartbeat listener to the WS connection.
-func AddHeartbeatListener(listener event.HeartbeatListener, cancel ...*event.CancelFunc) Option {
-	return optionFunc(
-		func(ws *QuicClient) error {
-			var ignored event.CancelFunc
-			cancel = append(cancel, &ignored)
-			*cancel[0] = event.CancelFunc(ws.heartbeatListeners.Add(listener))
-			return nil
-		})
-}

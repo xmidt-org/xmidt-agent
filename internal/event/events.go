@@ -42,6 +42,9 @@ type Connect struct {
 	// RetryingAt is the time when the next connection attempt will be made.
 	RetryingAt time.Time
 
+	// tries since last successful connect
+	TriesSinceLastConnect int32
+
 	// Error is the error returned from the attempt to connect.
 	Err error
 }
