@@ -97,8 +97,69 @@ func TestNew(t *testing.T) {
 				assert.Equal("some value", c.additionalHeaders.Get("Convey-Decorator"))
 			},
 		},
-
-		// URL Related
+		{
+			description: "empty device id",
+			opts: []Option{
+				DeviceID(""),
+			},
+			expectedErr: ErrMisconfiguredQuic,
+		},
+		{
+			description: "empty url",
+			opts: []Option{
+				URL(""),
+			},
+			expectedErr: ErrMisconfiguredQuic,
+		},
+		{
+			description: "nil url fetcher",
+			opts: []Option{
+				FetchURL(nil),
+			},
+			expectedErr: ErrMisconfiguredQuic,
+		},
+		{
+			description: "nil credentials decorator",
+			opts: []Option{
+				CredentialsDecorator(nil),
+			},
+			expectedErr: ErrMisconfiguredQuic,
+		},
+		{
+			description: "nil convey decorator",
+			opts: []Option{
+				ConveyDecorator(nil),
+			},
+			expectedErr: ErrMisconfiguredQuic,
+		},
+		{
+			description: "negative keep alive",
+			opts: []Option{
+				KeepAliveInterval(-1),
+			},
+			expectedErr: ErrMisconfiguredQuic,
+		},
+		{
+			description: "negative send timeout",
+			opts: []Option{
+				SendTimeout(-1),
+			},
+			expectedErr: ErrMisconfiguredQuic,
+		},
+		{
+			description: "nil retry policy",
+			opts: []Option{
+				RetryPolicy(nil),
+			},
+			expectedErr: ErrMisconfiguredQuic,
+		},
+		{
+			description: "no quic address",
+			opts: []Option{
+				DeviceID("mac:112233445566"),
+			},
+			expectedErr: ErrMisconfiguredQuic,
+		},
 		{
 			description: "no url, or fetcher",
 			opts: []Option{
