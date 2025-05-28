@@ -253,15 +253,8 @@ func (suite *EToESuite) SetupSuite() {
 }
 
 func (suite *EToESuite) TearDownSuite() {
-	// fmt.Println("about to tear down")
-	// ctx, cancel := context.WithCancel(context.Background())
-	// defer cancel()
-
 	suite.server.Close()
 	suite.redirectServer.Close()
-
-	// suite.server.Shutdown(ctx)
-	// suite.redirectServer.Shutdown(ctx)
 }
 
 func (suite *EToESuite) TestEndToEnd() {
@@ -358,8 +351,6 @@ func (suite *EToESuite) TestEndToEnd() {
 			return
 		}
 	}
-
-	time.Sleep(10 * time.Millisecond)
 
 	suite.True(suite.messageReceivedFromClient)
 
