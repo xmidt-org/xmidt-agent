@@ -43,14 +43,14 @@ func (r *UrlRedirector) GetUrl(ctx context.Context, inUrl *url.URL) (*url.URL, e
 	outUrl := inUrl
 
 	client := &http.Client{
-		Transport: &http3.Transport{		
+		Transport: &http3.Transport{
 			TLSClientConfig: r.tlsConfig,
 			QUICConfig: &quic.Config{
 				KeepAlivePeriod: time.Second,
 			},
 		},
-		
-		Timeout: time.Second*30,  // REMOVE
+
+		Timeout: time.Second * 30, // REMOVE
 	}
 
 	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
@@ -68,7 +68,6 @@ func (r *UrlRedirector) GetUrl(ctx context.Context, inUrl *url.URL) (*url.URL, e
 
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Printf("REMOVE redirect err %s", err.Error())
 		return nil, err
 	}
 
@@ -76,7 +75,7 @@ func (r *UrlRedirector) GetUrl(ctx context.Context, inUrl *url.URL) (*url.URL, e
 	if (err != nil) && errors.Is(err, io.EOF) {
 		err = nil
 	}
-	
+
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
@@ -89,6 +88,8 @@ func (r *UrlRedirector) GetUrl(ctx context.Context, inUrl *url.URL) (*url.URL, e
 		errString := fmt.Sprintf("redirectServer returned status %d", resp.StatusCode)
 		return nil, fmt.Errorf("%s: %w", errString, ErrFromRedirectServer)
 	}
+
+	client.CloseIdleConnections()
 
 	return outUrl, nil
 }

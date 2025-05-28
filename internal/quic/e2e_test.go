@@ -41,15 +41,15 @@ const (
 type myHandler struct{}
 
 var (
-	remoteServerPort           = "4433"
-	redirectServerPort         = "4432"
+	remoteServerPort   = "4433"
+	redirectServerPort = "4432"
 )
 
 func (h myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("in ServeHTTP")
 
 	rc := http.NewResponseController(w)
-    defer rc.Flush()
+	defer rc.Flush()
 
 	conn := r.Context().Value(QuicConnectionKey).(quic.Connection)
 	suite := r.Context().Value(SuiteKey).(*EToESuite)
@@ -153,16 +153,15 @@ func (suite *EToESuite) StartRemoteServer(port string, redirect bool) {
 			ctx = context.WithValue(ctx, ShouldRedirectKey, redirect)
 			return ctx
 		},
-		
 	}
 
-	if (redirect) {
+	if redirect {
 		suite.redirectServer = server
 	} else {
 		suite.server = server
 	}
 
-	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("0.0.0.0:%s", port))
+	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("127.0.0.1:%s", port))
 	if err != nil {
 		fmt.Println("error resolving udp address")
 		log.Fatal(err)
@@ -235,12 +234,11 @@ func generateTLSConfig() *tls.Config {
 
 type EToESuite struct {
 	suite.Suite
-	clientRedirected bool
-	postReceivedFromClient bool
+	clientRedirected          bool
+	postReceivedFromClient    bool
 	messageReceivedFromClient bool
-	server *http3.Server
-	redirectServer *http3.Server
-
+	server                    *http3.Server
+	redirectServer            *http3.Server
 }
 
 func TestEToESuite(t *testing.T) {
@@ -251,15 +249,19 @@ func (suite *EToESuite) SetupSuite() {
 	go suite.StartRemoteServer(redirectServerPort, true)
 	go suite.StartRemoteServer(remoteServerPort, false)
 
-	time.Sleep(10 * time.Second)
+	time.Sleep(5 * time.Second)
 }
 
 func (suite *EToESuite) TearDownSuite() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	// fmt.Println("about to tear down")
+	// ctx, cancel := context.WithCancel(context.Background())
+	// defer cancel()
 
-	suite.server.Shutdown(ctx)
-	suite.redirectServer.Shutdown(ctx)
+	suite.server.Close()
+	suite.redirectServer.Close()
+
+	// suite.server.Shutdown(ctx)
+	// suite.redirectServer.Shutdown(ctx)
 }
 
 func (suite *EToESuite) TestEndToEnd() {
@@ -273,7 +275,9 @@ func (suite *EToESuite) TestEndToEnd() {
 		DeviceID("mac:112233445566"),
 		HTTP3Client(&Http3ClientConfig{
 			QuicConfig: quic.Config{
-				KeepAlivePeriod: 500 * time.Millisecond,
+				KeepAlivePeriod:      500 * time.Millisecond,
+				HandshakeIdleTimeout: 1 * time.Minute,
+				MaxIdleTimeout:       2 * time.Minute,
 			},
 			TlsConfig: tls.Config{
 				NextProtos:         []string{"h3"},
