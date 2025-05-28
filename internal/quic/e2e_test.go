@@ -1,9 +1,6 @@
 // SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
 // SPDX-License-Identifier: Apache-2.0
 
-//go:build !race
-
-// go is complaining about accessing a global map of test values during the test
 package quic
 
 import (
@@ -62,7 +59,7 @@ func (h myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(r.Header)
 
 	if shouldRedirect {
-		//suite.clientRedirected = true
+		suite.clientRedirected = true
 		fmt.Println("about to redirect")
 		http.Redirect(w, r, fmt.Sprintf("https://127.0.0.1:%s", remoteServerPort), http.StatusMovedPermanently)
 		w.Write([]byte("test body"))
@@ -70,7 +67,7 @@ func (h myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//suite.postReceivedFromClient = true
+	suite.postReceivedFromClient = true
 
 	w.WriteHeader(http.StatusOK)
 
@@ -156,6 +153,13 @@ func (suite *EToESuite) StartRemoteServer(port string, redirect bool) {
 			ctx = context.WithValue(ctx, ShouldRedirectKey, redirect)
 			return ctx
 		},
+		
+	}
+
+	if (redirect) {
+		suite.redirectServer = server
+	} else {
+		suite.server = server
 	}
 
 	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("0.0.0.0:%s", port))
@@ -194,7 +198,7 @@ func (suite *EToESuite) StartRemoteServer(port string, redirect bool) {
 			continue
 		}
 
-		fmt.Println("accepted connection")
+		fmt.Printf("accepted connection on port %s\n", port)
 
 		switch c.ConnectionState().TLS.NegotiatedProtocol {
 		case http3.NextProtoH3:
@@ -234,6 +238,8 @@ type EToESuite struct {
 	clientRedirected bool
 	postReceivedFromClient bool
 	messageReceivedFromClient bool
+	server *http3.Server
+	redirectServer *http3.Server
 
 }
 
@@ -245,11 +251,15 @@ func (suite *EToESuite) SetupSuite() {
 	go suite.StartRemoteServer(redirectServerPort, true)
 	go suite.StartRemoteServer(remoteServerPort, false)
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(10 * time.Second)
 }
 
-func (suite *EToESuite) TearDownTest() {
-	// Teardown after each test
+func (suite *EToESuite) TearDownSuite() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	suite.server.Shutdown(ctx)
+	suite.redirectServer.Shutdown(ctx)
 }
 
 func (suite *EToESuite) TestEndToEnd() {
@@ -325,8 +335,8 @@ func (suite *EToESuite) TestEndToEnd() {
 		}
 	}
 
-	//suite.True(suite.clientRedirected)
-	//suite.True(suite.postReceivedFromClient)
+	suite.True(suite.clientRedirected)
+	suite.True(suite.postReceivedFromClient)
 
 	got.Send(context.Background(), GetWrpMessage("client")) // TODO - first one is not received
 	time.Sleep(10 * time.Millisecond)
@@ -347,7 +357,7 @@ func (suite *EToESuite) TestEndToEnd() {
 
 	time.Sleep(10 * time.Millisecond)
 
-	//suite.True(suite.messageReceivedFromClient)
+	suite.True(suite.messageReceivedFromClient)
 
 	got.Stop()
 
