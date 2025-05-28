@@ -321,10 +321,7 @@ func (suite *EToESuite) TestEndToEnd() {
 		}
 	}
 
-	//suite.m.Lock()
-	fuckyou := postsReceivedFromClient[testId]
-	suite.True(fuckyou)
-	//suite.m.Unlock()
+	suite.True(postsReceivedFromClient[testId])
 
 	got.Send(context.Background(), GetWrpMessage("client")) // TODO - first one is not received
 	time.Sleep(10 * time.Millisecond)
@@ -345,10 +342,7 @@ func (suite *EToESuite) TestEndToEnd() {
 
 	time.Sleep(10 * time.Millisecond)
 
-	//suite.m.Lock()
-	fuckyouToo := messagesReceivedFromClient[testId]
-	suite.True(fuckyouToo)
-	//suite.m.Unlock()
+	suite.True(messagesReceivedFromClient[testId])
 
 	got.Stop()
 
