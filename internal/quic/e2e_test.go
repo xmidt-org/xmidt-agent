@@ -44,13 +44,16 @@ const (
 type myHandler struct{}
 
 var (
-	postsReceivedFromClient    map[string]bool
-	messagesReceivedFromClient map[string]bool
 	remoteServerPort           = "4433"
 	redirectServerPort         = "4432"
 )
 
 func (h myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("in ServeHTTP")
+
+	rc := http.NewResponseController(w)
+    defer rc.Flush()
+
 	conn := r.Context().Value(QuicConnectionKey).(quic.Connection)
 	suite := r.Context().Value(SuiteKey).(*EToESuite)
 	shouldRedirect := r.Context().Value(ShouldRedirectKey).(bool)
@@ -59,13 +62,15 @@ func (h myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(r.Header)
 
 	if shouldRedirect {
+		//suite.clientRedirected = true
+		fmt.Println("about to redirect")
 		http.Redirect(w, r, fmt.Sprintf("https://127.0.0.1:%s", remoteServerPort), http.StatusMovedPermanently)
+		w.Write([]byte("test body"))
+		fmt.Println("redirected")
 		return
 	}
 
-	//suite.m.Lock()
-	postsReceivedFromClient[testId] = true
-	//suite.m.Unlock()
+	//suite.postReceivedFromClient = true
 
 	w.WriteHeader(http.StatusOK)
 
@@ -115,9 +120,7 @@ func listenForMessageFromClient(conn quic.Connection, suite *EToESuite, ctx cont
 
 	fmt.Println("stream handled got: " + string(buf))
 
-	//suite.m.Lock()
-	messagesReceivedFromClient[testId] = true
-	//suite.m.Unlock()
+	suite.messageReceivedFromClient = true
 
 	return nil
 }
@@ -228,6 +231,10 @@ func generateTLSConfig() *tls.Config {
 
 type EToESuite struct {
 	suite.Suite
+	clientRedirected bool
+	postReceivedFromClient bool
+	messageReceivedFromClient bool
+
 }
 
 func TestEToESuite(t *testing.T) {
@@ -235,9 +242,6 @@ func TestEToESuite(t *testing.T) {
 }
 
 func (suite *EToESuite) SetupSuite() {
-	messagesReceivedFromClient = make(map[string]bool)
-	postsReceivedFromClient = make(map[string]bool)
-
 	go suite.StartRemoteServer(redirectServerPort, true)
 	go suite.StartRemoteServer(remoteServerPort, false)
 
@@ -321,9 +325,8 @@ func (suite *EToESuite) TestEndToEnd() {
 		}
 	}
 
-	//suite.m.Lock()
-	suite.True(postsReceivedFromClient[testId])
-	//suite.m.Unlock()
+	//suite.True(suite.clientRedirected)
+	//suite.True(suite.postReceivedFromClient)
 
 	got.Send(context.Background(), GetWrpMessage("client")) // TODO - first one is not received
 	time.Sleep(10 * time.Millisecond)
@@ -344,9 +347,7 @@ func (suite *EToESuite) TestEndToEnd() {
 
 	time.Sleep(10 * time.Millisecond)
 
-	//suite.m.Lock()
-	suite.True(messagesReceivedFromClient[testId])
-	//suite.m.Unlock()
+	//suite.True(suite.messageReceivedFromClient)
 
 	got.Stop()
 

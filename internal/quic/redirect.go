@@ -60,6 +60,7 @@ func (r *UrlRedirector) GetUrl(ctx context.Context, inUrl *url.URL) (*url.URL, e
 
 	resp, err := client.Do(req)
 	if err != nil {
+		fmt.Printf("REMOVE redirect err %s", err.Error())
 		return nil, err
 	}
 	defer resp.Body.Close()
