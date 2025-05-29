@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //go:build !race
-// +build !race
 
 package quic
 
@@ -470,7 +469,7 @@ func (suite *QuicSuite) Test_CancelCtx() {
 	}
 }
 
-func (suite *QuicSuite) Test_DialErr() {
+func (suite *QuicSuite) TestDialErr() {
 	remoteServerUrl, err := url.Parse("RemoteServerUrl")
 	suite.NoError(err)
 	suite.mockRedirector.On("GetUrl", mock.Anything, mock.Anything).Return(remoteServerUrl, errors.New("some error"))
@@ -486,7 +485,7 @@ func (suite *QuicSuite) Test_DialErr() {
 	suite.mockConnectEventListeners.AssertCalled(suite.T(), "OnConnect", mock.Anything)
 }
 
-func (suite *QuicSuite) Test_Send() {
+func (suite *QuicSuite) TestSend() {
 	mockConn := NewMockConnection()
 
 	mockStr := NewMockStream([]byte(""))
@@ -512,7 +511,33 @@ func (suite *QuicSuite) Test_Send() {
 	suite.Equal(int32(0), suite.got.triesSinceLastConnect.Load())
 }
 
-func (suite *QuicSuite) Test_SendError() {
+func (suite *QuicSuite) TestHandleWrp() {
+	mockConn := NewMockConnection()
+
+	mockStr := NewMockStream([]byte(""))
+
+	mockStr.On("Write", mock.Anything).Return(0, nil)
+	mockStr.On("Close").Return(nil)
+
+	mockConn.On("OpenStream").Return(mockStr, nil)
+
+	suite.got.conn = mockConn
+
+	msg := wrp.Message{
+		Type:        wrp.SimpleEventMessageType,
+		Source:      fmt.Sprintf("event:test.com/%s", "client"),
+		Destination: "mac:4ca161000109/mock_config",
+		PartnerIDs:  []string{"foobar"},
+	}
+	suite.got.HandleWrp(msg)
+
+	mockConn.AssertCalled(suite.T(), "OpenStream")
+	mockStr.AssertCalled(suite.T(), "Write", mock.Anything)
+	mockStr.AssertCalled(suite.T(), "Close")
+	suite.Equal(int32(0), suite.got.triesSinceLastConnect.Load())
+}
+
+func (suite *QuicSuite) TestSendError() {
 	mockConn := NewMockConnection()
 
 	mockStr := NewMockStream([]byte(""))
@@ -536,7 +561,7 @@ func (suite *QuicSuite) Test_SendError() {
 	mockStr.AssertNotCalled(suite.T(), "Write", mock.Anything)
 }
 
-func (suite *QuicSuite) Test_WriteError() {
+func (suite *QuicSuite) TestWriteError() {
 	mockConn := NewMockConnection()
 
 	mockStr := NewMockStream([]byte(""))
