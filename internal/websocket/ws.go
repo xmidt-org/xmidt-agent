@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/xmidt-org/arrange/arrangehttp"
@@ -106,6 +107,8 @@ type Websocket struct {
 	shutdown context.CancelFunc
 
 	conn *nhws.Conn
+
+	triesSinceLastConnect atomic.Int32
 }
 
 // Option is a functional option type for WS.
@@ -168,6 +171,8 @@ func (ws *Websocket) Start() {
 	ws.m.Lock()
 	defer ws.m.Unlock()
 
+	ws.triesSinceLastConnect.Store(0)
+
 	if ws.shutdown != nil {
 		return
 	}
@@ -192,7 +197,8 @@ func (ws *Websocket) Stop() {
 		shutdown()
 	}
 
-	ws.wg.Wait()
+	// TODO - run is not exiting until Stop() exits so this is causing deadlock
+	//ws.wg.Wait()
 }
 
 func (ws *Websocket) Name() string {
@@ -207,6 +213,12 @@ func (ws *Websocket) HandleWrp(m wrp.Message) error {
 // The listener will be called for every message received from the WS.
 func (ws *Websocket) AddMessageListener(listener event.MsgListener) event.CancelFunc {
 	return event.CancelFunc(ws.msgListeners.Add(listener))
+}
+
+// AddMessageListener adds a message listener to the WS connection.
+// The listener will be called for every message received from the WS.
+func (ws *Websocket) AddConnectListener(listener event.ConnectListener) event.CancelFunc {
+	return event.CancelFunc(ws.connectListeners.Add(listener))
 }
 
 // Send sends the provided WRP message through the existing websocket.  This
@@ -227,8 +239,9 @@ func (ws *Websocket) Send(ctx context.Context, msg wrp.Message) error {
 
 // neither this or websocket code logs errors, this needs to be rectified.
 func (ws *Websocket) run(ctx context.Context) {
-	ws.wg.Add(1)
-	defer ws.wg.Done()
+	// see note in Stop()
+	// ws.wg.Add(1)
+	// defer ws.wg.Done()
 
 	mode := ws.nextMode(event.Ipv4)
 
@@ -252,6 +265,8 @@ func (ws *Websocket) run(ctx context.Context) {
 		cEvent.At = ws.nowFunc()
 
 		if dialErr == nil {
+			ws.triesSinceLastConnect.Store(0)
+
 			ws.connectListeners.Visit(func(l event.ConnectListener) {
 				l.OnConnect(cEvent)
 			})
@@ -361,6 +376,8 @@ func (ws *Websocket) run(ctx context.Context) {
 			}
 		}
 
+		ws.triesSinceLastConnect.Add(1)
+
 		if ws.once {
 			return
 		}
@@ -370,6 +387,7 @@ func (ws *Websocket) run(ctx context.Context) {
 		if dialErr != nil {
 			cEvent.Err = dialErr
 			cEvent.RetryingAt = ws.nowFunc().Add(next)
+			cEvent.TriesSinceLastConnect = ws.triesSinceLastConnect.Load()
 			ws.connectListeners.Visit(func(l event.ConnectListener) {
 				l.OnConnect(cEvent)
 			})

@@ -8,10 +8,12 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/quic-go/quic-go"
@@ -31,6 +33,7 @@ var (
 	ErrInvalidMsgType     = errors.New("invalid message type")
 	ErrFromRedirectServer = errors.New("non-300 response from redirect server")
 	ErrSendTimeout        = errors.New("wrp message send timed out")
+	ErrHttp3NotSupported  = errors.New("http3 protocol not supported")
 )
 
 type Http3ClientConfig struct {
@@ -82,9 +85,6 @@ type QuicClient struct {
 	// disconnectListeners are the disconnect listeners for the WS connection.
 	disconnectListeners eventor.Eventor[event.DisconnectListener]
 
-	// heartbeatListeners are the heartbeat listeners for the WS connection.
-	heartbeatListeners eventor.Eventor[event.HeartbeatListener]
-
 	// msgListeners are the message listeners for messages from the WS.
 	msgListeners eventor.Eventor[event.MsgListener]
 
@@ -105,9 +105,12 @@ type QuicClient struct {
 
 	qd Dialer
 	rd Redirector
+
+	triesSinceLastConnect atomic.Int32
+	//done                  bool
 }
 
-// Option is a functional option type for WS.
+// Option is a functional option type for Quic.
 type Option interface {
 	apply(*QuicClient) error
 }
@@ -127,12 +130,12 @@ func New(opts ...Option) (*QuicClient, error) {
 	qc := QuicClient{
 		credDecorator:   emptyDecorator,
 		conveyDecorator: emptyDecorator,
+		//done:            true,
 	}
 
 	opts = append(opts,
 		validateDeviceID(),
 		validateURL(),
-		//validateFetchURL(),
 		validateCredentialsDecorator(),
 		validateConveyDecorator(),
 		validateNowFunc(),
@@ -177,6 +180,8 @@ func (qc *QuicClient) Name() string {
 // Start starts the http3 connection and a long running goroutine to maintain
 // the connection.
 func (qc *QuicClient) Start() {
+	qc.triesSinceLastConnect.Store(0)
+
 	qc.m.Lock()
 	defer qc.m.Unlock()
 
@@ -188,6 +193,7 @@ func (qc *QuicClient) Start() {
 	ctx, qc.shutdown = context.WithCancel(context.Background())
 
 	go qc.run(ctx)
+	//qc.done = false
 }
 
 // Stop stops the quic connection.
@@ -196,7 +202,6 @@ func (qc *QuicClient) Stop() {
 	if qc.conn != nil {
 		_ = qc.conn.CloseWithError(quic.ApplicationErrorCode(quic.ApplicationErrorErrorCode), "connection stopped by application")
 	}
-
 	shutdown := qc.shutdown
 	qc.m.Unlock()
 
@@ -204,7 +209,10 @@ func (qc *QuicClient) Stop() {
 		shutdown()
 	}
 
-	qc.wg.Wait()
+	// run doesn't seem to exit until Stop() is finished so below
+	// is deadlocked
+	//qc.wg.Wait() // TODO - this is blocking forever
+	qc.shutdown = nil
 }
 
 func (qc *QuicClient) IsEnabled() bool {
@@ -219,6 +227,12 @@ func (qc *QuicClient) HandleWrp(m wrp.Message) error {
 // The listener will be called for every message received from the cloud.
 func (qc *QuicClient) AddMessageListener(listener event.MsgListener) event.CancelFunc {
 	return event.CancelFunc(qc.msgListeners.Add(listener))
+}
+
+// AddConnectListener adds a connect listener to the quic connection.
+// The listener will be called every time the connection succeeds or fails
+func (qc *QuicClient) AddConnectListener(listener event.ConnectListener) event.CancelFunc {
+	return event.CancelFunc(qc.connectListeners.Add(listener))
 }
 
 // Send sends the provided WRP message through the existing quic connection.
@@ -262,8 +276,9 @@ func (qc *QuicClient) dial(ctx context.Context) (quic.Connection, error) {
 }
 
 func (qc *QuicClient) run(ctx context.Context) {
-	qc.wg.Add(1)
-	defer qc.wg.Done()
+	//qc.wg.Add(1)  // see deadlock comment in Stop()
+	//defer qc.wg.Done()
+	defer qc.recordDone()
 
 	policy := qc.retryPolicyFactory.NewPolicy(ctx)
 
@@ -280,6 +295,8 @@ func (qc *QuicClient) run(ctx context.Context) {
 		cEvent.At = qc.nowFunc()
 
 		if dialErr == nil {
+			qc.triesSinceLastConnect.Store(0)
+
 			qc.connectListeners.Visit(func(l event.ConnectListener) {
 				l.OnConnect(cEvent)
 			})
@@ -355,18 +372,21 @@ func (qc *QuicClient) run(ctx context.Context) {
 			}
 		}
 
-		if qc.once {
-			return
-		}
+		qc.triesSinceLastConnect.Add(1)
 
 		next, _ = policy.Next()
 
 		if dialErr != nil {
 			cEvent.Err = dialErr
 			cEvent.RetryingAt = qc.nowFunc().Add(next)
+			cEvent.TriesSinceLastConnect = qc.triesSinceLastConnect.Load()
 			qc.connectListeners.Visit(func(l event.ConnectListener) {
 				l.OnConnect(cEvent)
 			})
+		}
+
+		if qc.once {
+			return
 		}
 
 		select {
@@ -375,6 +395,12 @@ func (qc *QuicClient) run(ctx context.Context) {
 			return
 		}
 	}
+}
+
+// debug print for deadlock
+func (qc *QuicClient) recordDone() {
+	//qc.done = true
+	fmt.Println("exiting quic run")
 }
 
 func readBytes(reader io.Reader) ([]byte, error) {
