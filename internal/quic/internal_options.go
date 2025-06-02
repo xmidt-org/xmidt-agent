@@ -66,13 +66,3 @@ func validRetryPolicy() Option {
 			return nil
 		})
 }
-
-func validHttp3() Option {
-	return optionFunc(
-		func(qc *QuicClient) error {
-			if qc.http3ClientConfig == nil {
-				return fmt.Errorf("%w: nil Http3 Client Config", ErrMisconfiguredQuic)
-			}
-			return nil
-		})
-}

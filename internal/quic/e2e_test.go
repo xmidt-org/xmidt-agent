@@ -232,6 +232,7 @@ func generateTLSConfig() *tls.Config {
 	return &tls.Config{
 		Certificates: []tls.Certificate{tlsCert},
 		NextProtos:   []string{"h3"},
+		MinVersion:   tls.VersionTLS12,
 	}
 }
 
@@ -277,7 +278,7 @@ func (suite *EToESuite) TestEndToEnd() {
 			},
 			TlsConfig: tls.Config{
 				NextProtos:         []string{"h3"},
-				InsecureSkipVerify: true,
+				InsecureSkipVerify: true, // #nosec G402
 			},
 		}),
 		AddMessageListener(

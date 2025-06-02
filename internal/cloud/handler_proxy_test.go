@@ -101,6 +101,7 @@ func (suite *ProxySuite) TestNew() {
 		PreferQuic(false),
 		MaxTries(2),
 	)
+	suite.Error(err)
 
 	// nil websocket
 
