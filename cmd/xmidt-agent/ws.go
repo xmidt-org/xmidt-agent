@@ -43,7 +43,7 @@ type wsOut struct {
 	Cancels []func() `group:"cancels,flatten"`
 }
 
-func provideWS(in WsIn) (wsOut, error) {
+func provideWS(in WsIn) (wsOut, error) { //nolint
 
 	var fetchURLFunc func(context.Context) (string, error)
 	// JWTXT is not required

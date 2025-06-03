@@ -121,14 +121,9 @@ func TestEndToEnd(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
-	for {
-		if msgCnt.Load() < 1 {
-			time.Sleep(10 * time.Millisecond)
-		} else {
-			break
-		}
+	for connectCnt.Load() == 0 {
 		if ctx.Err() != nil {
-			assert.Fail("timed out waiting for messages")
+			assert.Fail("timed waiting to connect")
 			return
 		}
 	}
@@ -140,10 +135,7 @@ func TestEndToEnd(t *testing.T) {
 			Destination: "dns:server",
 		})
 
-	for {
-		if msgCnt.Load() > 0 && connectCnt.Load() > 0 && disconnectCnt.Load() > 0 {
-			break
-		}
+	for msgCnt.Load() == 0 {
 		select {
 		case <-ctx.Done():
 			assert.Fail("timed out waiting for messages")
@@ -155,6 +147,15 @@ func TestEndToEnd(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 	finished = true
 	got.Stop()
+	for disconnectCnt.Load() == 0 {
+		select {
+		case <-ctx.Done():
+			assert.Fail("timed out waiting to disconnect")
+			return
+		default:
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 }
 
 func TestEndToEndBadData(t *testing.T) {
@@ -245,10 +246,7 @@ func TestEndToEndBadData(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 			defer cancel()
 
-			for {
-				if connectCnt.Load() > 0 && disconnectCnt.Load() > 0 {
-					break
-				}
+			for connectCnt.Load() == 0 || disconnectCnt.Load() == 0 {
 				select {
 				case <-ctx.Done():
 					assert.Fail("timed out waiting for messages")

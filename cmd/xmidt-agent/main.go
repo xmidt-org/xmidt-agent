@@ -248,7 +248,7 @@ func provideLogger(in LoggerIn) (*zap.AtomicLevel, *zap.Logger, error) {
 }
 
 func onStart(cred *credentials.Credentials, cloudHandler cloud.Handler, libParodus *libparodus.Adapter, qos *qos.Handler, waitUntilFetched time.Duration, logger *zap.Logger) func(context.Context) error {
-	logger = logger.Named("on_start")
+	//logger = logger.Named("on_start")
 
 	return func(ctx context.Context) (err error) {
 		if err = ctx.Err(); err != nil {
