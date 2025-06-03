@@ -26,7 +26,7 @@ import (
 )
 
 func TestEndToEnd(t *testing.T) {
-	var finished bool
+	var finished atomic.Bool
 
 	assert := assert.New(t)
 	require := require.New(t)
@@ -52,7 +52,7 @@ func TestEndToEnd(t *testing.T) {
 				mt, got, err := c.Read(ctx)
 				// server will halt until the websocket closes resulting in a EOF
 				var closeErr websocket.CloseError
-				if finished && errors.As(err, &closeErr) {
+				if finished.Load() && errors.As(err, &closeErr) {
 					assert.Equal(closeErr.Code, websocket.StatusNormalClosure)
 					return
 				}
@@ -145,7 +145,7 @@ func TestEndToEnd(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	time.Sleep(10 * time.Millisecond)
-	finished = true
+	finished.Store(true)
 	got.Stop()
 	for disconnectCnt.Load() == 0 {
 		select {
