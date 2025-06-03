@@ -98,7 +98,6 @@ type QuicClient struct {
 	once bool
 
 	m        sync.Mutex
-	wg       sync.WaitGroup
 	shutdown context.CancelFunc
 
 	conn quic.Connection

@@ -7,16 +7,14 @@ package cloud
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
+
 	"crypto/tls"
-	"crypto/x509"
-	"encoding/pem"
+
 	"errors"
 	"net/http/httptest"
 
 	"fmt"
-	"math/big"
+
 	"net/http"
 
 	"sync/atomic"
@@ -43,37 +41,12 @@ const (
 	SuiteKey          key = "suite"
 )
 
-type myHandler struct{}
-
 func GetWrpMessage(origin string) wrp.Message {
 	return wrp.Message{
 		Type:        wrp.SimpleEventMessageType,
 		Source:      fmt.Sprintf("event:test.com/%s", origin),
 		Destination: "mac:4ca161000109/mock_config",
 		PartnerIDs:  []string{"foobar"},
-	}
-}
-
-func generateTLSConfig() *tls.Config {
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		panic(err)
-	}
-	template := x509.Certificate{SerialNumber: big.NewInt(1)}
-	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
-	if err != nil {
-		panic(err)
-	}
-	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
-	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
-
-	tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
-	if err != nil {
-		panic(err)
-	}
-	return &tls.Config{
-		Certificates: []tls.Certificate{tlsCert},
-		NextProtos:   []string{"h3"},
 	}
 }
 
@@ -148,7 +121,7 @@ func (suite *EToESuite) TestSwitchFromQuicToWebsocket() {
 			},
 			TlsConfig: tls.Config{
 				NextProtos:         []string{"h3"},
-				InsecureSkipVerify: true,
+				InsecureSkipVerify: true, // #nosec G402
 			},
 		}),
 		qc.AddConnectListener(
@@ -230,6 +203,7 @@ func (suite *EToESuite) TestSwitchFromQuicToWebsocket() {
 		PreferQuic(true),
 		MaxTries(1),
 	)
+	suite.NoError(err)
 
 	cloud.Start()
 

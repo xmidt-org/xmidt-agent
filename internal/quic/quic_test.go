@@ -66,7 +66,9 @@ func TestNew(t *testing.T) {
 				}),
 				HTTP3Client(&Http3ClientConfig{
 					QuicConfig: quic.Config{},
-					TlsConfig:  tls.Config{},
+					TlsConfig: tls.Config{
+						MinVersion: tls.VersionTLS12,
+					},
 				}),
 				SendTimeout(1*time.Second),
 				KeepAliveInterval(5*time.Second),
@@ -177,7 +179,9 @@ func TestNew(t *testing.T) {
 				}),
 				HTTP3Client(&Http3ClientConfig{
 					QuicConfig: quic.Config{},
-					TlsConfig:  tls.Config{},
+					TlsConfig: tls.Config{
+						MinVersion: tls.VersionTLS12,
+					},
 				}),
 				NowFunc(time.Now),
 				RetryPolicy(retry.Config{}),
@@ -216,7 +220,9 @@ func TestNew(t *testing.T) {
 				}),
 				HTTP3Client(&Http3ClientConfig{
 					QuicConfig: quic.Config{},
-					TlsConfig:  tls.Config{},
+					TlsConfig: tls.Config{
+						MinVersion: tls.VersionTLS12,
+					},
 				}),
 				RetryPolicy(retry.Config{}),
 			),
@@ -281,7 +287,9 @@ func TestMessageListener(t *testing.T) {
 		}),
 		HTTP3Client(&Http3ClientConfig{
 			QuicConfig: quic.Config{},
-			TlsConfig:  tls.Config{},
+			TlsConfig: tls.Config{
+				MinVersion: tls.VersionTLS12,
+			},
 		}),
 		NowFunc(time.Now),
 		RetryPolicy(retry.Config{}),
@@ -322,7 +330,9 @@ func TestConnectListener(t *testing.T) {
 		}),
 		HTTP3Client(&Http3ClientConfig{
 			QuicConfig: quic.Config{},
-			TlsConfig:  tls.Config{},
+			TlsConfig: tls.Config{
+				MinVersion: tls.VersionTLS12,
+			},
 		}),
 		NowFunc(time.Now),
 		RetryPolicy(retry.Config{}),
@@ -363,7 +373,9 @@ func TestDisconnectListener(t *testing.T) {
 		}),
 		HTTP3Client(&Http3ClientConfig{
 			QuicConfig: quic.Config{},
-			TlsConfig:  tls.Config{},
+			TlsConfig: tls.Config{
+				MinVersion: tls.VersionTLS12,
+			},
 		}),
 		NowFunc(time.Now),
 		RetryPolicy(retry.Config{}),
@@ -418,7 +430,9 @@ func (suite *QuicSuite) SetupTest() {
 		}),
 		HTTP3Client(&Http3ClientConfig{
 			QuicConfig: quic.Config{},
-			TlsConfig:  tls.Config{},
+			TlsConfig: tls.Config{
+				MinVersion: tls.VersionTLS12,
+			},
 		}),
 		AddConnectListener(mockConnectEventListeners),
 		AddDisconnectListener(mockDisconnectEventListeners),

@@ -103,7 +103,6 @@ type Websocket struct {
 	once bool
 
 	m        sync.Mutex
-	wg       sync.WaitGroup
 	shutdown context.CancelFunc
 
 	conn *nhws.Conn

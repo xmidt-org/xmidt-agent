@@ -44,7 +44,7 @@ type quicOut struct {
 	Cancels []func() `group:"cancels,flatten"`
 }
 
-func provideQuic(in QuicIn) (quicOut, error) {
+func provideQuic(in QuicIn) (quicOut, error) { //nolint
 	var fetchURLFunc func(context.Context) (string, error)
 	// JWTXT is not required
 	// fetchURL() will use in.quic.BackUpURL if in.JWTXT is nil
