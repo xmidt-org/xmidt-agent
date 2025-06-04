@@ -75,6 +75,8 @@ func New(opts ...Option) (Handler, error) {
 	p.qcMsgHandler = p.qc.(wrpkit.Handler)
 	p.wsMsgHandler = p.ws.(wrpkit.Handler)
 
+	p.wg.Lock()
+	defer p.wg.Unlock()
 	if p.preferQuic {
 		p.active = p.qc
 		p.activeWrpHandler = p.qcMsgHandler
@@ -87,6 +89,8 @@ func New(opts ...Option) (Handler, error) {
 }
 
 func (p *Proxy) Name() string {
+	p.wg.Lock()
+	defer p.wg.Unlock()
 	return p.active.Name()
 }
 
@@ -98,12 +102,16 @@ func (p *Proxy) AddConnectListener(listener event.ConnectListener) event.CancelF
 	return event.CancelFunc(p.connectListeners.Add(listener))
 }
 
-func (m *Proxy) Start() {
-	m.active.Start()
+func (p *Proxy) Start() {
+	p.wg.Lock()
+	defer p.wg.Unlock()
+	p.active.Start()
 }
 
-func (m *Proxy) Stop() {
-	m.active.Stop()
+func (p *Proxy) Stop() {
+	p.wg.Lock()
+	defer p.wg.Unlock()
+	p.active.Stop()
 }
 
 func (p *Proxy) AddProxyListeners(handler Handler) {
@@ -126,6 +134,8 @@ func (p *Proxy) AddProxyListeners(handler Handler) {
 }
 
 func (p *Proxy) HandleWrp(m wrp.Message) error {
+	p.wg.Lock()
+	defer p.wg.Unlock()
 	return p.activeWrpHandler.HandleWrp(m)
 }
 
@@ -137,9 +147,9 @@ func (p *Proxy) OnQuicConnect(e event.Connect) {
 		p.ws.Start()
 
 		p.wg.Lock()
+		defer p.wg.Unlock()
 		p.active = p.ws
 		p.activeWrpHandler = p.wsMsgHandler
-		p.wg.Unlock()
 	}
 }
 
@@ -150,10 +160,8 @@ func (p *Proxy) OnWebsocketConnect(e event.Connect) {
 		p.qc.Start()
 
 		p.wg.Lock()
-
+		defer p.wg.Unlock()
 		p.active = p.qc
 		p.activeWrpHandler = p.qcMsgHandler
-
-		p.wg.Unlock()
 	}
 }
