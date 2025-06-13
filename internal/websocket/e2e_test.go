@@ -257,6 +257,15 @@ func TestEndToEndBadData(t *testing.T) {
 			}
 			time.Sleep(10 * time.Millisecond)
 			got.Stop()
+			for disconnectCnt.Load() == 0 {
+				select {
+				case <-ctx.Done():
+					assert.Fail("timed out waiting to disconnect")
+					return
+				default:
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
 		})
 	}
 }
@@ -366,6 +375,15 @@ func TestEndToEndConnectionIssues(t *testing.T) {
 		}
 	}
 	got.Stop()
+	for disconnectCnt.Load() == 0 {
+		select {
+		case <-ctx.Done():
+			assert.Fail("timed out waiting to disconnect")
+			return
+		default:
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 
 	assert.True(started)
 	assert.True(msgCnt.Load() > 0, "got message")
@@ -429,6 +447,11 @@ func TestEndToEndPingWriteTimeout(t *testing.T) {
 		}),
 		// Triggers ping timeouts
 		ws.PingWriteTimeout(time.Nanosecond),
+		ws.AddDisconnectListener(
+			event.DisconnectListenerFunc(
+				func(e event.Disconnect) {
+					disconnectCnt.Add(1)
+				})),
 	)
 	require.NoError(err)
 	require.NotNil(got)
@@ -456,6 +479,13 @@ func TestEndToEndPingWriteTimeout(t *testing.T) {
 func TestEndToEndInactivityTimeout(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5000*time.Millisecond)
+	defer cancel()
+
+	var (
+		disconnectCnt atomic.Int64
+	)
 
 	s := httptest.NewServer(
 		http.HandlerFunc(
@@ -495,6 +525,11 @@ func TestEndToEndInactivityTimeout(t *testing.T) {
 		}),
 		// Triggers inactivity timeouts
 		ws.InactivityTimeout(10*time.Millisecond),
+		ws.AddDisconnectListener(
+			event.DisconnectListenerFunc(
+				func(e event.Disconnect) {
+					disconnectCnt.Add(1)
+				})),
 	)
 	require.NoError(err)
 	require.NotNil(got)
@@ -502,4 +537,13 @@ func TestEndToEndInactivityTimeout(t *testing.T) {
 	got.Start()
 	time.Sleep(400 * time.Millisecond)
 	got.Stop()
+	for disconnectCnt.Load() == 0 {
+		select {
+		case <-ctx.Done():
+			assert.Fail("timed out waiting to disconnect")
+			return
+		default:
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 }
