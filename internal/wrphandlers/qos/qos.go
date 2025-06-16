@@ -140,7 +140,6 @@ func (h *Handler) serviceQOS(queue <-chan wrp.Message) {
 		failedMsg <-chan wrp.Message
 	)
 
-	// create and manage the priority queue
 	pq := priorityQueue{
 		maxQueueBytes:   h.maxQueueBytes,
 		maxMessageBytes: h.maxMessageBytes,
@@ -150,7 +149,6 @@ func (h *Handler) serviceQOS(queue <-chan wrp.Message) {
 		select {
 		case msg, ok := <-queue:
 			if !ok {
-				// Handler.Stop has been called.
 				return
 			}
 
