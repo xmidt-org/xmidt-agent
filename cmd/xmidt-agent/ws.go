@@ -9,8 +9,12 @@ import (
 	"time"
 
 	"github.com/xmidt-org/wrp-go/v5"
+	"github.com/xmidt-org/xmidt-agent/internal/credentials"
 	"github.com/xmidt-org/xmidt-agent/internal/event"
+	"github.com/xmidt-org/xmidt-agent/internal/jwtxt"
+	"github.com/xmidt-org/xmidt-agent/internal/metadata"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
+	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
 
@@ -18,10 +22,28 @@ var (
 	ErrWebsocketConfig = errors.New("websocket configuration error")
 )
 
-func provideWS(in CloudHandlerIn) (cloudHandlerOut, error) {
-	if in.Websocket.Disable {
-		return cloudHandlerOut{}, nil
-	}
+type WsIn struct {
+	fx.In
+	Identity  Identity
+	Logger    *zap.Logger
+	CLI       *CLI
+	JWTXT     *jwtxt.Instructions
+	Cred      *credentials.Credentials
+	Metadata  *metadata.MetadataProvider
+	Cloud     Cloud
+	Quic      Quic
+	Websocket Websocket
+}
+
+type wsOut struct {
+	fx.Out
+	WS *websocket.Websocket
+
+	// cancels
+	Cancels []func() `group:"cancels,flatten"`
+}
+
+func provideWS(in WsIn) (wsOut, error) { //nolint
 
 	var fetchURLFunc func(context.Context) (string, error)
 	// JWTXT is not required
@@ -97,9 +119,8 @@ func provideWS(in CloudHandlerIn) (cloudHandlerOut, error) {
 		cancels = append(cancels, msg, con, discon, heartbeat)
 	}
 
-	return cloudHandlerOut{
-		Handler: ws,
-		Egress:  ws,
+	return wsOut{
+		WS:      ws,
 		Cancels: cancels,
 	}, err
 }

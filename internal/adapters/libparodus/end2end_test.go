@@ -100,11 +100,7 @@ func (m *mockLibParodus) Send(url string, msg wrp.Message) error {
 }
 
 func (m *mockLibParodus) WaitFor(ctx context.Context, expected wrp.Message) {
-	for {
-		if m.HasReceived(expected) {
-			break
-		}
-
+	for !m.HasReceived(expected) {
 		if ctx.Err() != nil {
 			break
 		}
