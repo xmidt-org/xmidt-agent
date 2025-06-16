@@ -157,7 +157,6 @@ func (h *Handler) serviceQOS(queue <-chan wrp.Message) {
 			_ = pq.Enqueue(msg)
 		case <-ready:
 			if msg, ok := <-failedMsg; ok {
-				// ErrMaxMessageBytes errrors are ignored.
 				_ = pq.Enqueue(msg)
 			}
 
