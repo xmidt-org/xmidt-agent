@@ -1,13 +1,7 @@
 # SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
 # SPDX-License-Identifier: Apache-2.0
 ---
-linters-settings:
-  misspell:
-    locale: US
-  errorlint:
-    # Report non-wrapping error creation using fmt.Errorf
-    errorf: false
-
+version: "2"
 linters:
   enable:
     - bodyclose
@@ -16,30 +10,50 @@ linters:
     - goconst
     - gosec
     - misspell
-    - unconvert
     - prealloc
+    - unconvert
   disable:
     - errcheck
     - ineffassign
-
-issues:
-  exclude-files:
-    - "internal/jwtxt/keypairs_for_test.go"
-  exclude-rules:
-    - path: _test.go
-      linters:
-        - dupl
-        - funlen
-    - path: internal/credentials/cmd/example/main.go
-      linters:
-        - gosec
-    - path: internal/nhooyr.io/*
-      linters:
-        - bodyclose
-        - errorlint
-        - gosec
-        - goconst
-        - misspell
-        - prealloc
-        - govet
-        - staticcheck
+  settings:
+    errorlint:
+      errorf: false
+    misspell:
+      locale: US
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - dupl
+          - funlen
+        path: _test.go
+      - linters:
+          - gosec
+        path: internal/credentials/cmd/example/main.go
+      - linters:
+          - bodyclose
+          - errorlint
+          - goconst
+          - gosec
+          - govet
+          - misspell
+          - prealloc
+          - staticcheck
+        path: internal/nhooyr.io/*
+    paths:
+      - internal/jwtxt/keypairs_for_test.go
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

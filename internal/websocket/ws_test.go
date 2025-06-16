@@ -6,6 +6,7 @@ package websocket
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -81,6 +82,7 @@ func TestNew(t *testing.T) {
 				assert.Equal("vAlUE", c.additionalHeaders.Get("Some-Other-Header"))
 				assert.Equal("some value", c.additionalHeaders.Get("Credentials-Decorator"))
 				assert.Equal("some value", c.additionalHeaders.Get("Convey-Decorator"))
+				assert.Equal("websocket", c.Name())
 			},
 		},
 
@@ -228,6 +230,13 @@ func TestMessageListener(t *testing.T) {
 		RetryPolicy(retry.Config{}),
 	)
 
+	// external resource can call this after New
+	got.AddMessageListener(
+		event.MsgListenerFunc(
+			func(m wrp.Message) {
+				fmt.Println("do something with message")
+			}))
+
 	assert.NoError(err)
 	if assert.NotNil(got) {
 		got.msgListeners.Visit(func(l event.MsgListener) {
@@ -258,6 +267,13 @@ func TestConnectListener(t *testing.T) {
 		NowFunc(time.Now),
 		RetryPolicy(retry.Config{}),
 	)
+
+	// called by external actors after New
+	got.AddConnectListener(
+		event.ConnectListenerFunc(
+			func(e event.Connect) {
+				fmt.Println("do something after connect event")
+			}))
 
 	assert.NoError(err)
 	if assert.NotNil(got) {
@@ -474,6 +490,7 @@ func Test_CancelCtx(t *testing.T) {
 
 	got.Start()
 	time.Sleep(500 * time.Millisecond)
+	assert.Equal(int32(0), got.triesSinceLastConnect.Load())
 	got.shutdown()
 	time.Sleep(500 * time.Millisecond)
 	got.Stop()

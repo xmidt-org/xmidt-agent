@@ -65,7 +65,9 @@ func main() {
 		myquic.HTTP3Client(
 			&myquic.Http3ClientConfig{
 				QuicConfig: quic.Config{},
-				TlsConfig:  tls.Config{},
+				TlsConfig: tls.Config{
+					MinVersion: tls.VersionTLS12,
+				},
 			},
 		),
 		myquic.AddConnectListener(

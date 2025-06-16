@@ -1,6 +1,6 @@
 module github.com/xmidt-org/xmidt-agent
 
-go 1.24
+go 1.24.2
 
 require (
 	github.com/alecthomas/kong v1.10.0
@@ -12,7 +12,7 @@ require (
 	github.com/goschtalt/yaml-encoder v0.0.4
 	github.com/lestrrat-go/jwx/v2 v2.1.6
 	github.com/stretchr/testify v1.10.0
-	github.com/tinylib/msgp v1.2.5
+	github.com/tinylib/msgp v1.3.0
 	github.com/xmidt-org/arrange v0.5.1
 	github.com/xmidt-org/eventor v1.0.23
 	github.com/xmidt-org/retry v0.0.4
