@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
 // SPDX-License-Identifier: Apache-2.0
+
 package quic
 
 import (
@@ -65,7 +66,9 @@ func TestNew(t *testing.T) {
 				}),
 				HTTP3Client(&Http3ClientConfig{
 					QuicConfig: quic.Config{},
-					TlsConfig:  tls.Config{},
+					TlsConfig: tls.Config{
+						MinVersion: tls.VersionTLS12,
+					},
 				}),
 				SendTimeout(1*time.Second),
 				KeepAliveInterval(5*time.Second),
@@ -93,8 +96,69 @@ func TestNew(t *testing.T) {
 				assert.Equal("some value", c.additionalHeaders.Get("Convey-Decorator"))
 			},
 		},
-
-		// URL Related
+		{
+			description: "empty device id",
+			opts: []Option{
+				DeviceID(""),
+			},
+			expectedErr: ErrMisconfiguredQuic,
+		},
+		{
+			description: "empty url",
+			opts: []Option{
+				URL(""),
+			},
+			expectedErr: ErrMisconfiguredQuic,
+		},
+		{
+			description: "nil url fetcher",
+			opts: []Option{
+				FetchURL(nil),
+			},
+			expectedErr: ErrMisconfiguredQuic,
+		},
+		{
+			description: "nil credentials decorator",
+			opts: []Option{
+				CredentialsDecorator(nil),
+			},
+			expectedErr: ErrMisconfiguredQuic,
+		},
+		{
+			description: "nil convey decorator",
+			opts: []Option{
+				ConveyDecorator(nil),
+			},
+			expectedErr: ErrMisconfiguredQuic,
+		},
+		{
+			description: "negative keep alive",
+			opts: []Option{
+				KeepAliveInterval(-1),
+			},
+			expectedErr: ErrMisconfiguredQuic,
+		},
+		{
+			description: "negative send timeout",
+			opts: []Option{
+				SendTimeout(-1),
+			},
+			expectedErr: ErrMisconfiguredQuic,
+		},
+		{
+			description: "nil retry policy",
+			opts: []Option{
+				RetryPolicy(nil),
+			},
+			expectedErr: ErrMisconfiguredQuic,
+		},
+		{
+			description: "no quic address",
+			opts: []Option{
+				DeviceID("mac:112233445566"),
+			},
+			expectedErr: ErrMisconfiguredQuic,
+		},
 		{
 			description: "no url, or fetcher",
 			opts: []Option{
@@ -115,7 +179,9 @@ func TestNew(t *testing.T) {
 				}),
 				HTTP3Client(&Http3ClientConfig{
 					QuicConfig: quic.Config{},
-					TlsConfig:  tls.Config{},
+					TlsConfig: tls.Config{
+						MinVersion: tls.VersionTLS12,
+					},
 				}),
 				NowFunc(time.Now),
 				RetryPolicy(retry.Config{}),
@@ -154,7 +220,9 @@ func TestNew(t *testing.T) {
 				}),
 				HTTP3Client(&Http3ClientConfig{
 					QuicConfig: quic.Config{},
-					TlsConfig:  tls.Config{},
+					TlsConfig: tls.Config{
+						MinVersion: tls.VersionTLS12,
+					},
 				}),
 				RetryPolicy(retry.Config{}),
 			),
@@ -219,11 +287,20 @@ func TestMessageListener(t *testing.T) {
 		}),
 		HTTP3Client(&Http3ClientConfig{
 			QuicConfig: quic.Config{},
-			TlsConfig:  tls.Config{},
+			TlsConfig: tls.Config{
+				MinVersion: tls.VersionTLS12,
+			},
 		}),
 		NowFunc(time.Now),
 		RetryPolicy(retry.Config{}),
 	)
+
+	// external resource can call this after New
+	got.AddMessageListener(
+		event.MsgListenerFunc(
+			func(m wrp.Message) {
+				fmt.Println("do something with message")
+			}))
 
 	assert.NoError(err)
 	if assert.NotNil(got) {
@@ -253,13 +330,22 @@ func TestConnectListener(t *testing.T) {
 		}),
 		HTTP3Client(&Http3ClientConfig{
 			QuicConfig: quic.Config{},
-			TlsConfig:  tls.Config{},
+			TlsConfig: tls.Config{
+				MinVersion: tls.VersionTLS12,
+			},
 		}),
 		NowFunc(time.Now),
 		RetryPolicy(retry.Config{}),
 	)
-
 	assert.NoError(err)
+
+	// called by external actors after New
+	got.AddConnectListener(
+		event.ConnectListenerFunc(
+			func(e event.Connect) {
+				fmt.Println("do something after connect event")
+			}))
+
 	if assert.NotNil(got) {
 		got.connectListeners.Visit(func(l event.ConnectListener) {
 			l.OnConnect(event.Connect{})
@@ -287,7 +373,9 @@ func TestDisconnectListener(t *testing.T) {
 		}),
 		HTTP3Client(&Http3ClientConfig{
 			QuicConfig: quic.Config{},
-			TlsConfig:  tls.Config{},
+			TlsConfig: tls.Config{
+				MinVersion: tls.VersionTLS12,
+			},
 		}),
 		NowFunc(time.Now),
 		RetryPolicy(retry.Config{}),
@@ -302,50 +390,17 @@ func TestDisconnectListener(t *testing.T) {
 	}
 }
 
-func TestHeartbeatListener(t *testing.T) {
-	assert := assert.New(t)
-
-	var m mockevent.MockListeners
-
-	m.On("OnHeartbeat", mock.Anything).Return()
-
-	got, err := New(
-		URL(RemoteServerUrl),
-		DeviceID("mac:112233445566"),
-		AddHeartbeatListener(&m),
-		CredentialsDecorator(func(h http.Header) error {
-			return nil
-		}),
-		ConveyDecorator(func(h http.Header) error {
-			return nil
-		}),
-		HTTP3Client(&Http3ClientConfig{
-			QuicConfig: quic.Config{},
-			TlsConfig:  tls.Config{},
-		}),
-		NowFunc(time.Now),
-		RetryPolicy(retry.Config{}),
-	)
-
-	assert.NoError(err)
-	if assert.NotNil(got) {
-		got.heartbeatListeners.Visit(func(l event.HeartbeatListener) {
-			l.OnHeartbeat(event.Heartbeat{})
-		})
-		m.AssertExpectations(t)
-	}
-}
-
 func Test_emptyDecorator(t *testing.T) {
 	assert.NoError(t, emptyDecorator(http.Header{}))
 }
 
 type QuicSuite struct {
 	suite.Suite
-	got                *QuicClient
-	mockRedirector     *MockRedirector
-	mockDialer         *MockDialer
-	mockEventListeners *mockevent.MockListeners
+	got                          *QuicClient
+	mockRedirector               *MockRedirector
+	mockDialer                   *MockDialer
+	mockConnectEventListeners    *mockevent.MockListeners
+	mockDisconnectEventListeners *mockevent.MockListeners
 }
 
 func TestQuicSuite(t *testing.T) {
@@ -353,7 +408,8 @@ func TestQuicSuite(t *testing.T) {
 }
 
 func (suite *QuicSuite) SetupTest() {
-	mockEventListeners := &mockevent.MockListeners{}
+	mockConnectEventListeners := &mockevent.MockListeners{}
+	mockDisconnectEventListeners := &mockevent.MockListeners{}
 	got, err := New(
 		Enabled(true),
 		URL(RemoteServerUrl),
@@ -374,10 +430,13 @@ func (suite *QuicSuite) SetupTest() {
 		}),
 		HTTP3Client(&Http3ClientConfig{
 			QuicConfig: quic.Config{},
-			TlsConfig:  tls.Config{},
+			TlsConfig: tls.Config{
+				MinVersion: tls.VersionTLS12,
+			},
 		}),
-		AddConnectListener(mockEventListeners),
-		AddDisconnectListener(mockEventListeners),
+		AddConnectListener(mockConnectEventListeners),
+		AddDisconnectListener(mockDisconnectEventListeners),
+		Once(true),
 	)
 
 	suite.NoError(err)
@@ -393,7 +452,8 @@ func (suite *QuicSuite) SetupTest() {
 	suite.got = got
 	suite.mockRedirector = mockRedirector
 	suite.mockDialer = mockDialer
-	suite.mockEventListeners = mockEventListeners
+	suite.mockConnectEventListeners = mockConnectEventListeners
+	suite.mockDisconnectEventListeners = mockDisconnectEventListeners
 }
 
 func (suite *QuicSuite) Test_CancelCtx() {
@@ -408,30 +468,36 @@ func (suite *QuicSuite) Test_CancelCtx() {
 	suite.mockRedirector.On("GetUrl", mock.Anything, mock.Anything).Return(remoteServerUrl, nil)
 	suite.mockDialer.On("DialQuic", mock.Anything, mock.Anything).Return(mockConn, nil)
 
-	suite.mockEventListeners.On("OnConnect", mock.Anything).Return()
-	suite.mockEventListeners.On("OnDisconnect", mock.Anything).Return()
+	suite.mockConnectEventListeners.On("OnConnect", mock.Anything).Return()
+	suite.mockDisconnectEventListeners.On("OnDisconnect", mock.Anything).Return()
 
 	suite.got.Start()
 
 	time.Sleep(500 * time.Millisecond)
 	suite.got.shutdown()
-	time.Sleep(500 * time.Millisecond)
 	suite.got.Stop()
+	// for suite.got.done == false {
+	// 	time.Sleep(10 * time.Millisecond)
+	// }
 }
 
-func (suite *QuicSuite) Test_DialErr() {
+func (suite *QuicSuite) TestDialErr() {
 	remoteServerUrl, err := url.Parse("RemoteServerUrl")
 	suite.NoError(err)
 	suite.mockRedirector.On("GetUrl", mock.Anything, mock.Anything).Return(remoteServerUrl, errors.New("some error"))
-	suite.mockEventListeners.On("OnConnect", mock.Anything)
+	suite.mockConnectEventListeners.On("OnConnect", mock.Anything)
 	suite.got.Start()
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(20 * time.Millisecond)
 
-	suite.mockEventListeners.AssertCalled(suite.T(), "OnConnect", mock.Anything)
+	// e := events.Parent.Calls[0].Arguments.Get(0).(event.Connect)
+	// suite.Equal(int32(1), e.TriesSinceLastConnect)
+	suite.Equal(int32(1), suite.got.triesSinceLastConnect.Load())
+	//suite.NotNil(e.Err)
+	suite.mockConnectEventListeners.AssertCalled(suite.T(), "OnConnect", mock.Anything)
 }
 
-func (suite *QuicSuite) Test_Send() {
+func (suite *QuicSuite) TestSend() {
 	mockConn := NewMockConnection()
 
 	mockStr := NewMockStream([]byte(""))
@@ -454,6 +520,82 @@ func (suite *QuicSuite) Test_Send() {
 	mockConn.AssertCalled(suite.T(), "OpenStream")
 	mockStr.AssertCalled(suite.T(), "Write", mock.Anything)
 	mockStr.AssertCalled(suite.T(), "Close")
+	suite.Equal(int32(0), suite.got.triesSinceLastConnect.Load())
+}
+
+func (suite *QuicSuite) TestHandleWrp() {
+	mockConn := NewMockConnection()
+
+	mockStr := NewMockStream([]byte(""))
+
+	mockStr.On("Write", mock.Anything).Return(0, nil)
+	mockStr.On("Close").Return(nil)
+
+	mockConn.On("OpenStream").Return(mockStr, nil)
+
+	suite.got.conn = mockConn
+
+	msg := wrp.Message{
+		Type:        wrp.SimpleEventMessageType,
+		Source:      fmt.Sprintf("event:test.com/%s", "client"),
+		Destination: "mac:4ca161000109/mock_config",
+		PartnerIDs:  []string{"foobar"},
+	}
+	suite.got.HandleWrp(msg)
+
+	mockConn.AssertCalled(suite.T(), "OpenStream")
+	mockStr.AssertCalled(suite.T(), "Write", mock.Anything)
+	mockStr.AssertCalled(suite.T(), "Close")
+	suite.Equal(int32(0), suite.got.triesSinceLastConnect.Load())
+}
+
+func (suite *QuicSuite) TestSendError() {
+	mockConn := NewMockConnection()
+
+	mockStr := NewMockStream([]byte(""))
+
+	mockStr.On("Close").Return(nil)
+
+	mockConn.On("OpenStream").Return(mockStr, errors.New("some error"))
+
+	suite.got.conn = mockConn
+
+	msg := wrp.Message{
+		Type:        wrp.SimpleEventMessageType,
+		Source:      fmt.Sprintf("event:test.com/%s", "client"),
+		Destination: "mac:4ca161000109/mock_config",
+		PartnerIDs:  []string{"foobar"},
+	}
+	err := suite.got.Send(context.Background(), msg)
+	suite.Error(err)
+
+	mockConn.AssertCalled(suite.T(), "OpenStream")
+	mockStr.AssertNotCalled(suite.T(), "Write", mock.Anything)
+}
+
+func (suite *QuicSuite) TestWriteError() {
+	mockConn := NewMockConnection()
+
+	mockStr := NewMockStream([]byte(""))
+
+	mockStr.On("Write", mock.Anything).Return(0, errors.New("some error"))
+	mockStr.On("Close").Return(nil)
+
+	mockConn.On("OpenStream").Return(mockStr, nil)
+
+	suite.got.conn = mockConn
+
+	msg := wrp.Message{
+		Type:        wrp.SimpleEventMessageType,
+		Source:      fmt.Sprintf("event:test.com/%s", "client"),
+		Destination: "mac:4ca161000109/mock_config",
+		PartnerIDs:  []string{"foobar"},
+	}
+	err := suite.got.Send(context.Background(), msg)
+	suite.Error(err)
+
+	mockConn.AssertCalled(suite.T(), "OpenStream")
+	mockStr.AssertCalled(suite.T(), "Write", mock.Anything)
 }
 
 func (suite *QuicSuite) TestGetName() {
@@ -471,8 +613,8 @@ func (suite *QuicSuite) Test_StreamErr() {
 	mockConn.On("AcceptStream", mock.Anything).Return(mockStr, errors.New("some error"))
 	mockConn.On("CloseWithError", mock.Anything, mock.Anything).Return(nil)
 
-	suite.mockEventListeners.On("OnConnect", mock.Anything).Return()
-	suite.mockEventListeners.On("OnDisconnect", mock.Anything).Return()
+	suite.mockConnectEventListeners.On("OnConnect", mock.Anything).Return()
+	suite.mockDisconnectEventListeners.On("OnDisconnect", mock.Anything).Return()
 
 	remoteServerUrl, err := url.Parse("RemoteServerUrl")
 	suite.NoError(err)
@@ -482,8 +624,8 @@ func (suite *QuicSuite) Test_StreamErr() {
 	suite.got.Start()
 	time.Sleep(20 * time.Millisecond)
 
-	suite.mockEventListeners.AssertCalled(suite.T(), "OnConnect", mock.Anything)
-	suite.mockEventListeners.AssertCalled(suite.T(), "OnDisconnect", mock.Anything)
+	suite.mockConnectEventListeners.AssertCalled(suite.T(), "OnConnect", mock.Anything)
+	suite.mockDisconnectEventListeners.AssertCalled(suite.T(), "OnDisconnect", mock.Anything)
 	mockConn.AssertCalled(suite.T(), "AcceptStream", mock.Anything)
 	mockConn.AssertCalled(suite.T(), "CloseWithError", mock.Anything, mock.Anything)
 	suite.mockRedirector.AssertCalled(suite.T(), "GetUrl", mock.Anything, mock.Anything)
@@ -497,8 +639,8 @@ func (suite *QuicSuite) Test_DecodeErr() {
 	mockStr.On("Read", mock.Anything).Return(5, nil)
 	mockStr.On("Close").Return(nil)
 
-	suite.mockEventListeners.On("OnConnect", mock.Anything).Return()
-	suite.mockEventListeners.On("OnDisconnect", mock.Anything).Return()
+	suite.mockConnectEventListeners.On("OnConnect", mock.Anything).Return()
+	suite.mockDisconnectEventListeners.On("OnDisconnect", mock.Anything).Return()
 
 	remoteServerUrl, err := url.Parse("RemoteServerUrl")
 	suite.NoError(err)
@@ -508,9 +650,9 @@ func (suite *QuicSuite) Test_DecodeErr() {
 	suite.got.Start()
 	time.Sleep(10 * time.Millisecond)
 
-	suite.mockEventListeners.AssertCalled(suite.T(), "OnConnect", mock.Anything)
+	suite.mockConnectEventListeners.AssertCalled(suite.T(), "OnConnect", mock.Anything)
 	mockConn.AssertCalled(suite.T(), "AcceptStream", mock.Anything)
-	suite.mockEventListeners.AssertCalled(suite.T(), "OnDisconnect", mock.Anything)
+	suite.mockDisconnectEventListeners.AssertCalled(suite.T(), "OnDisconnect", mock.Anything)
 	//mockConn.AssertCalled(suite.T(), "CloseWithError", mock.Anything)  - this gets called in the debugger
 	suite.mockRedirector.AssertCalled(suite.T(), "GetUrl", mock.Anything, mock.Anything)
 }

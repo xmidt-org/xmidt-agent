@@ -315,11 +315,7 @@ func TestHandler_HandleWrp(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
 
-			for {
-				if nextCallCount.Load() > 0 || tc.shutdown {
-					break
-				}
-
+			for nextCallCount.Load() == 0 && !tc.shutdown {
 				if ctx.Err() != nil {
 					if tc.shouldHalt {
 						// send another msg to verify message delivery is blocked

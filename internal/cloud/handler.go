@@ -4,9 +4,6 @@
 package cloud
 
 import (
-	"context"
-
-	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/event"
 )
 
@@ -16,10 +13,9 @@ type Handler interface {
 	Start()
 	// disconnect from cloud
 	Stop()
-	// send message to the cloud
-	Send(ctx context.Context, msg wrp.Message) error
 	// any listener added will be called when the network channel receives a messages from the cloud
 	AddMessageListener(listener event.MsgListener) event.CancelFunc
-	// name of handler
+	// any listener added will be called when the network channel tries to connect
+	AddConnectListener(listener event.ConnectListener) event.CancelFunc
 	Name() string
 }
