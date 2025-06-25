@@ -100,7 +100,7 @@ type QuicClient struct {
 	m        sync.Mutex
 	shutdown context.CancelFunc
 
-	conn quic.Connection
+	conn Connection
 
 	qd Dialer
 	rd Redirector
@@ -250,7 +250,7 @@ func (qc *QuicClient) Send(ctx context.Context, msg wrp.Message) error {
 	return nil
 }
 
-func (qc *QuicClient) dial(ctx context.Context) (quic.Connection, error) {
+func (qc *QuicClient) dial(ctx context.Context) (Connection, error) {
 	fetchCtx, cancel := context.WithTimeout(ctx, qc.urlFetchingTimeout)
 	defer cancel()
 

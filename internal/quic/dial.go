@@ -19,7 +19,7 @@ import (
 )
 
 type Dialer interface {
-	DialQuic(ctx context.Context, url *url.URL) (quic.Connection, error)
+	DialQuic(ctx context.Context, url *url.URL) (Connection, error)
 }
 
 type QuicDialer struct {
@@ -29,10 +29,11 @@ type QuicDialer struct {
 	conveyDecorator func(http.Header) error
 }
 
-// NOTE - when using an http.Client, the quic connection seems to always
+// NOTE - with an older version of quic: when using an http.Client, the quic connection seems to always
 // get re-created and the client no longer had access to the current quic connection.  The below
 // "dialer" uses the http3.ClientConn api directly and that api uses the passed in connection.
-func (qd *QuicDialer) DialQuic(ctx context.Context, url *url.URL) (quic.Connection, error) {
+// However, retry now that quic has been updated.
+func (qd *QuicDialer) DialQuic(ctx context.Context, url *url.URL) (Connection, error) {
 
 	conn, err := quic.DialAddr(ctx, url.Host, qd.tlsConfig, &qd.quicConfig)
 	if err != nil {
@@ -78,5 +79,6 @@ func (qd *QuicDialer) DialQuic(ctx context.Context, url *url.URL) (quic.Connecti
 
 	resp.Body.Close()
 
-	return h3Conn.Connection, err
+	return &ConnectionWrapper{
+		conn: conn}, err
 }

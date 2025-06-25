@@ -43,8 +43,8 @@ const (
 type myHandler struct{}
 
 var (
-	remoteServerPort   = "4433"
-	redirectServerPort = "4432"
+	remoteServerPort   = "4443"
+	redirectServerPort = "4442"
 )
 
 func (h myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -53,7 +53,7 @@ func (h myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	rc := http.NewResponseController(w)
 	defer rc.Flush()
 
-	conn := r.Context().Value(QuicConnectionKey).(quic.Connection)
+	conn := r.Context().Value(QuicConnectionKey).(*quic.Conn)
 	suite := r.Context().Value(SuiteKey).(*EToESuite)
 	shouldRedirect := r.Context().Value(ShouldRedirectKey).(bool)
 	testId := r.Header.Get("testId")
@@ -85,7 +85,7 @@ func (h myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	go listenForMessageFromClient(conn, suite, context.Background(), testId)
 }
 
-func sendMessageFromServer(conn quic.Connection, suite *EToESuite, ctx context.Context) {
+func sendMessageFromServer(conn *quic.Conn, suite *EToESuite, ctx context.Context) {
 	msg := GetWrpMessage("server")
 
 	stream, err := conn.OpenStream()
@@ -103,7 +103,7 @@ func sendMessageFromServer(conn quic.Connection, suite *EToESuite, ctx context.C
 	stream.Close()
 }
 
-func listenForMessageFromClient(conn quic.Connection, suite *EToESuite, ctx context.Context, testId string) error {
+func listenForMessageFromClient(conn *quic.Conn, suite *EToESuite, ctx context.Context, testId string) error {
 	fmt.Println("listening for messages from client")
 	stream, err := conn.AcceptStream(ctx)
 	if err != nil {
@@ -150,7 +150,7 @@ func (suite *EToESuite) StartRemoteServer(port string, redirect bool) {
 		TLSConfig:  tlsConf,
 		Handler:    h,
 		QUICConfig: quicConf,
-		ConnContext: func(ctx context.Context, c quic.Connection) context.Context {
+		ConnContext: func(ctx context.Context, c *quic.Conn) context.Context {
 			ctx = context.WithValue(ctx, QuicConnectionKey, c)
 			ctx = context.WithValue(ctx, SuiteKey, suite)
 			ctx = context.WithValue(ctx, ShouldRedirectKey, redirect)
