@@ -19,9 +19,9 @@ type MockDialer struct {
 
 func NewMockDialer() *MockDialer { return &MockDialer{} }
 
-func (m *MockDialer) DialQuic(ctx context.Context, inUrl *url.URL) (quic.Connection, error) {
+func (m *MockDialer) DialQuic(ctx context.Context, inUrl *url.URL) (Connection, error) {
 	args := m.Called(ctx, inUrl)
-	return args.Get(0).(quic.Connection), args.Error(1)
+	return args.Get(0).(Connection), args.Error(1)
 }
 
 type MockRedirector struct {
@@ -112,15 +112,15 @@ type MockConnection struct {
 func NewMockConnection() *MockConnection { return &MockConnection{} }
 
 // AcceptStream mocks base method.
-func (m *MockConnection) AcceptStream(ctx context.Context) (quic.Stream, error) {
+func (m *MockConnection) AcceptStream(ctx context.Context) (Stream, error) {
 	args := m.Called(ctx)
-	return args.Get(0).(quic.Stream), args.Error(1)
+	return args.Get(0).(Stream), args.Error(1)
 }
 
 // AcceptUniStream mocks base method.
-func (m *MockConnection) AcceptUniStream(ctx context.Context) (quic.ReceiveStream, error) {
+func (m *MockConnection) AcceptUniStream(ctx context.Context) (Stream, error) {
 	args := m.Called(ctx)
-	return args.Get(0).(quic.ReceiveStream), args.Error(1)
+	return args.Get(0).(Stream), args.Error(1)
 }
 
 // CloseWithError mocks base method.
@@ -147,24 +147,24 @@ func (m *MockConnection) LocalAddr() net.Addr {
 	return args.Get(0).(net.Addr)
 }
 
-func (m *MockConnection) OpenStream() (quic.Stream, error) {
+func (m *MockConnection) OpenStream() (Stream, error) {
 	args := m.Called()
-	return args.Get(0).(quic.Stream), args.Error(1)
+	return args.Get(0).(Stream), args.Error(1)
 }
 
-func (m *MockConnection) OpenStreamSync(ctx context.Context) (quic.Stream, error) {
+func (m *MockConnection) OpenStreamSync(ctx context.Context) (Stream, error) {
 	args := m.Called(ctx)
-	return args.Get(0).(quic.Stream), args.Error(1)
+	return args.Get(0).(Stream), args.Error(1)
 }
 
-func (m *MockConnection) OpenUniStream() (quic.SendStream, error) {
+func (m *MockConnection) OpenUniStream() (Stream, error) {
 	args := m.Called()
-	return args.Get(0).(quic.SendStream), args.Error(1)
+	return args.Get(0).(Stream), args.Error(1)
 }
 
-func (m *MockConnection) OpenUniStreamSync(ctx context.Context) (quic.SendStream, error) {
+func (m *MockConnection) OpenUniStreamSync(ctx context.Context) (Stream, error) {
 	args := m.Called(ctx)
-	return args.Get(0).(quic.SendStream), args.Error(1)
+	return args.Get(0).(Stream), args.Error(1)
 }
 
 func (m *MockConnection) ReceiveDatagram(ctx context.Context) ([]byte, error) {
