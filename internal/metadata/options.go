@@ -118,3 +118,13 @@ func InterfaceUsedOpt(interfaceUsed string) Option {
 			return nil
 		})
 }
+
+// the identity metadata is usually transmitted to the cloud via the convey header on connect. optionally
+// append the identity metadata to every wrp message. (temporary workaround for home cloud issues)
+func AppendToMsg(appendToMsg bool) Option {
+	return optionFunc(
+		func(c *MetadataProvider) error {
+			c.appendToMsg = appendToMsg
+			return nil
+		})
+}

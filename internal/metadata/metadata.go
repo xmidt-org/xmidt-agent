@@ -54,6 +54,7 @@ type MetadataProvider struct {
 	bootTime           string
 	bootTimeRetryDelay string
 	interfaceUsed      string
+	appendToMsg        bool
 }
 
 func New(opts ...Option) (*MetadataProvider, error) {
@@ -122,14 +123,17 @@ func (c *MetadataProvider) Decorate(headers http.Header) error {
 }
 
 func (c *MetadataProvider) DecorateMsg(msg *wrp.Message) error {
-	header := c.GetMetadata()
+	if !c.appendToMsg {
+		return nil
+	}
 
-	// test this
+	m := c.GetMetadata()
+
 	if msg.Metadata == nil {
 		msg.Metadata = make(map[string]string)
 	}
 
-	for key, value := range header {
+	for key, value := range m {
 		if value != nil {
 			msg.Metadata[key] = value.(string)
 		}

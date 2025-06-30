@@ -109,6 +109,9 @@ func TestEndToEnd(t *testing.T) {
 		ws.ConveyDecorator(func(h http.Header) error {
 			return nil
 		}),
+		ws.ConveyMsgDecorator(func(m *wrp.Message) error {
+			return nil
+		}),
 	)
 	require.NoError(err)
 	require.NotNil(got)

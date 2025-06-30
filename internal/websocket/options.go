@@ -89,6 +89,7 @@ func CredentialsDecorator(f func(http.Header) error) Option {
 		})
 }
 
+// writes identity metadata to convey header on connect with the cloud
 func ConveyDecorator(f func(http.Header) error) Option {
 	return optionFunc(
 		func(ws *Websocket) error {
@@ -97,6 +98,19 @@ func ConveyDecorator(f func(http.Header) error) Option {
 			}
 
 			ws.conveyDecorator = f
+			return nil
+		})
+}
+
+// writes identity metadata directly to every outbound message
+func ConveyMsgDecorator(f func(*wrp.Message) error) Option {
+	return optionFunc(
+		func(ws *Websocket) error {
+			if f == nil {
+				return fmt.Errorf("%w: nil ConveyDecorator", ErrMisconfiguredWS)
+			}
+
+			ws.conveyMsgDecorator = f
 			return nil
 		})
 }

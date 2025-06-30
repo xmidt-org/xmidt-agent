@@ -50,8 +50,11 @@ type Websocket struct {
 	// credDecorator is the credentials decorator for the WS connection.
 	credDecorator func(http.Header) error
 
-	// credDecorator is the credentials decorator for the WS connection.
+	// conveyDecorator is the convey header decorator for the WS connection.
 	conveyDecorator func(http.Header) error
+
+	// conveyMsgDecorator is the convey msg decorator for the WS connection. Duplicates data from convey header to every message.  Should not be used.
+	conveyMsgDecorator func(*wrp.Message) error
 
 	// inactivityTimeout is the inactivity timeout for the WS connection.
 	// Defaults to 1 minute.
@@ -226,6 +229,8 @@ func (ws *Websocket) Send(ctx context.Context, msg wrp.Message) error {
 	err := ErrClosed
 	ctx, cancel := context.WithTimeout(ctx, ws.sendTimeout)
 	defer cancel()
+
+	ws.conveyMsgDecorator(&msg)
 
 	ws.m.Lock()
 	if ws.conn != nil {

@@ -87,6 +87,7 @@ func CredentialsDecorator(f func(http.Header) error) Option {
 		})
 }
 
+// writes identity metadata to convey header on connect with the cloud
 func ConveyDecorator(f func(http.Header) error) Option {
 	return optionFunc(
 		func(ws *QuicClient) error {
@@ -95,6 +96,19 @@ func ConveyDecorator(f func(http.Header) error) Option {
 			}
 
 			ws.conveyDecorator = f
+			return nil
+		})
+}
+
+// writes identity metadata directly to every outbound message.
+func ConveyMsgDecorator(f func(*wrp.Message) error) Option {
+	return optionFunc(
+		func(qc *QuicClient) error {
+			if f == nil {
+				return fmt.Errorf("%w: nil ConveyDecorator", ErrMisconfiguredQuic)
+			}
+
+			qc.conveyMsgDecorator = f
 			return nil
 		})
 }
@@ -222,10 +236,10 @@ func AddConnectListener(listener event.ConnectListener, cancel ...*event.CancelF
 // AddDisconnectListener adds a disconnect listener to the WS connection.
 func AddDisconnectListener(listener event.DisconnectListener, cancel ...*event.CancelFunc) Option {
 	return optionFunc(
-		func(ws *QuicClient) error {
+		func(qc *QuicClient) error {
 			var ignored event.CancelFunc
 			cancel = append(cancel, &ignored)
-			*cancel[0] = event.CancelFunc(ws.disconnectListeners.Add(listener))
+			*cancel[0] = event.CancelFunc(qc.disconnectListeners.Add(listener))
 			return nil
 		})
 }

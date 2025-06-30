@@ -315,6 +315,9 @@ func (suite *EToESuite) TestEndToEnd() {
 			h.Add("testId", testId)
 			return nil
 		}),
+		ConveyMsgDecorator(func(m *wrp.Message) error {
+			return nil
+		}),
 	)
 	suite.NoError(err)
 	suite.NotNil(got)
