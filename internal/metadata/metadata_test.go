@@ -118,7 +118,7 @@ func (suite *ConveySuite) TestDecorateMsg() {
 	msg := new(wrp.Message)
 	err := suite.conveyHeaderProvider.DecorateMsg(msg)
 	suite.NoError(err)
-	suite.Equal(map[string]string(map[string]string(nil)), msg.Metadata)
+	suite.Equal(map[string]string(nil), msg.Metadata)
 
 	suite.conveyHeaderProvider.appendToMsg = true
 	msg = new(wrp.Message)
