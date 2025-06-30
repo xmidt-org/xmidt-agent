@@ -52,6 +52,7 @@ func (suite *ConveySuite) SetupTest() {
 		BootTimeOpt("1111111111"),
 		BootRetryWaitOpt(time.Second),
 		InterfaceUsedOpt("erouter0"),
+		AppendToMsg(false),
 	}
 
 	conveyHeaderProvider, err := New(opts...)
