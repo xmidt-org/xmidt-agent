@@ -72,6 +72,7 @@ func provideWS(in WsIn) (wsOut, error) { //nolint
 		websocket.HTTPClientWithForceSets(in.Websocket.HTTPClient),
 		websocket.MaxMessageBytes(in.Websocket.MaxMessageBytes),
 		websocket.ConveyDecorator(in.Metadata.Decorate),
+		websocket.ConveyMsgDecorator(in.Metadata.DecorateMsg),
 		websocket.AdditionalHeaders(in.Websocket.AdditionalHeaders),
 		websocket.NowFunc(time.Now),
 		websocket.WithIPv6(!in.Websocket.DisableV6),

@@ -150,6 +150,9 @@ func (suite *EToESuite) TestSwitchFromQuicToWebsocket() {
 			h.Add("testId", testId)
 			return nil
 		}),
+		qc.ConveyMsgDecorator(func(m *wrp.Message) error {
+			return nil
+		}),
 	)
 	suite.NoError(err)
 	suite.NotNil(quic)
@@ -191,6 +194,9 @@ func (suite *EToESuite) TestSwitchFromQuicToWebsocket() {
 			return nil
 		}),
 		ws.ConveyDecorator(func(h http.Header) error {
+			return nil
+		}),
+		ws.ConveyMsgDecorator(func(m *wrp.Message) error {
 			return nil
 		}),
 	)

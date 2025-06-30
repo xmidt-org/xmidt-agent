@@ -64,6 +64,9 @@ func TestNew(t *testing.T) {
 					h.Add("Convey-Decorator", "some value")
 					return nil
 				}),
+				ConveyMsgDecorator(func(m *wrp.Message) error {
+					return nil
+				}),
 				HTTP3Client(&Http3ClientConfig{
 					QuicConfig: quic.Config{},
 					TlsConfig: tls.Config{
@@ -128,6 +131,13 @@ func TestNew(t *testing.T) {
 			description: "nil convey decorator",
 			opts: []Option{
 				ConveyDecorator(nil),
+			},
+			expectedErr: ErrMisconfiguredQuic,
+		},
+		{
+			description: "nil convey msg decorator",
+			opts: []Option{
+				ConveyMsgDecorator(nil),
 			},
 			expectedErr: ErrMisconfiguredQuic,
 		},

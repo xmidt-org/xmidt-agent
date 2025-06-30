@@ -69,6 +69,7 @@ func provideQuic(in QuicIn) (quicOut, error) { //nolint
 		quic.SendTimeout(in.Quic.SendTimeout),
 		quic.HTTP3Client(&in.Quic.QuicClient),
 		quic.ConveyDecorator(in.Metadata.Decorate),
+		quic.ConveyMsgDecorator(in.Metadata.DecorateMsg),
 		quic.AdditionalHeaders(in.Quic.AdditionalHeaders),
 		quic.NowFunc(time.Now),
 		quic.Once(in.Quic.Once),

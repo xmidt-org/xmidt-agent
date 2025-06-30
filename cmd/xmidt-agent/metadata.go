@@ -33,6 +33,7 @@ func provideMetadataProvider(in metadataIn) (*metadata.MetadataProvider, error) 
 		metadata.BootTimeOpt(in.Ops.BootTime.String()),
 		metadata.BootRetryWaitOpt(time.Second), // should this be configured?
 		metadata.InterfaceUsedOpt(in.Ops.WebpaInterfaceUsed),
+		metadata.AppendToMsg(in.Metadata.AppendToMsg),
 	}
 	return metadata.New(opts...)
 }

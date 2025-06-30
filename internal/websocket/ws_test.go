@@ -63,6 +63,9 @@ func TestNew(t *testing.T) {
 					h.Add("Convey-Decorator", "some value")
 					return nil
 				}),
+				ConveyMsgDecorator(func(w *wrp.Message) error {
+					return nil
+				}),
 				NowFunc(time.Now),
 				RetryPolicy(retry.Config{}),
 			),
@@ -262,6 +265,9 @@ func TestConnectListener(t *testing.T) {
 			return nil
 		}),
 		ConveyDecorator(func(h http.Header) error {
+			return nil
+		}),
+		ConveyMsgDecorator(func(m *wrp.Message) error {
 			return nil
 		}),
 		NowFunc(time.Now),

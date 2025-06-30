@@ -269,7 +269,8 @@ type MockTr181 struct {
 }
 
 type Metadata struct {
-	Fields []string
+	Fields      []string
+	AppendToMsg bool
 }
 
 type NetworkService struct {

@@ -27,7 +27,7 @@ identity:
   firmware_version: "v0.0.1"
   partner_id: foobar
 xmidt_service:
-  url: "https://localhost:8080"
+  url: "https://localhost:4432"
   backoff:
     max_delay: 600s
     min_delay: 7s
@@ -68,7 +68,7 @@ websocket:
 quic:
   url_path:           "/api/v2/device"
   # used if xmidt_service section is empty or xmdit_service connection fails
-  back_up_url:        "https://localhost:8080"
+  back_up_url:        "https://localhost:4432"
   fetch_url_timeout:  30s
   send_timeout:       90s
   quic_client:
@@ -108,9 +108,9 @@ quic:
     jitter: .33333333 #1.0 / 3.0
     max_interval: 341333ms # 341*time.Second + 333*time.Millisecond
 cloud:
-  prefer_quic: false
-  # max tries before switching protocol
-  max_tries: 3
+  prefer_quic: true
+  # max tries before switching protocols
+  max_tries: 10
 lib_parodus:
   parodus_service_url: "tcp://127.0.0.1:6666"
   keep_alive_interval: 30s
@@ -153,6 +153,7 @@ qos:
   max_queue_bytes:  104857600  # 100 * 1024 * 1024 // 100MB max/queue,
   priority: newest
 metadata:
+  append_to_msg: false # the identity metadata is sent via the convey header on connect.  optionally apply to every wrp message. temp workaround for home cloud. 
   fields:
     - fw-name
     - hw-model
@@ -164,7 +165,7 @@ metadata:
     - boot-time-retry-wait
     - webpa-interface-used
     - interfaces-available
-# lowest priority wins for network interfaces - note that this is not really used and may need to be removed in the future
+# remove below section, not used or needed
 network_service:
   allowed_interfaces:
     eth0:

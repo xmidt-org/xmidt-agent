@@ -64,8 +64,11 @@ type QuicClient struct {
 	// credDecorator is the credentials decorator for the Quic connection.
 	credDecorator func(http.Header) error
 
-	// credDecorator is the credentials decorator for the Quic connection.
+	// conveyDecorator is the convey header decorator for the WS connection.
 	conveyDecorator func(http.Header) error
+
+	// conveyMsgDecorator is the convey msg decorator. Duplicates data from convey header to every message.  Should generally not be used.
+	conveyMsgDecorator func(*wrp.Message) error
 
 	// sendTimeout is the send timeout for the Quic connection.
 	sendTimeout time.Duration
@@ -124,11 +127,16 @@ func emptyDecorator(http.Header) error {
 	return nil
 }
 
+func emptyMsgDecorator(*wrp.Message) error {
+	return nil
+}
+
 // New creates a new http3 connection with the given options.
 func New(opts ...Option) (*QuicClient, error) {
 	qc := QuicClient{
-		credDecorator:   emptyDecorator,
-		conveyDecorator: emptyDecorator,
+		credDecorator:      emptyDecorator,
+		conveyDecorator:    emptyDecorator,
+		conveyMsgDecorator: emptyMsgDecorator,
 		//done:            true,
 	}
 
@@ -241,6 +249,10 @@ func (qc *QuicClient) Send(ctx context.Context, msg wrp.Message) error {
 		return err
 	}
 	defer stream.Close()
+
+	fmt.Printf("before decorate %v", msg.Metadata)
+	qc.conveyMsgDecorator(&msg)
+	fmt.Printf("after decorate %v", msg.Metadata)
 
 	_, err = stream.Write(wrp.MustEncode(&msg, wrp.Msgpack))
 	if err != nil {
