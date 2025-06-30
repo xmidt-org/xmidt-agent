@@ -150,6 +150,20 @@ func TestNew(t *testing.T) {
 			},
 			expectedErr: ErrMisconfiguredWS,
 		},
+		{
+			description: "nil convey decorator",
+			opts: []Option{
+				ConveyDecorator(nil),
+			},
+			expectedErr: ErrMisconfiguredWS,
+		},
+		{
+			description: "nil convey msg decorator",
+			opts: []Option{
+				ConveyMsgDecorator(nil),
+			},
+			expectedErr: ErrMisconfiguredWS,
+		},
 
 		// Test the now func option
 		{
