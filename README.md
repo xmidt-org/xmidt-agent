@@ -18,6 +18,10 @@ By participating, you agree to this Code.
 
 Refer to [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## What is Xmidt-Agent?
+
+This is the go replacement for the c client (parodus) running on the RDK-B (internet gateway).  It connects the gateway to the xmidt cloud. 
+
 ## Run xmidt-agent simulator as a docker container
 1. build xmidt-agent for alpine
     ```cd cmd/xmidt-agent```
