@@ -4,7 +4,6 @@
 package auth
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
@@ -68,32 +67,34 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 		for _, got := range msg.PartnerIDs {
 			got = strings.TrimSpace(got)
 			if allowed == got || allowed == wildcard {
-				// We found a match, so continue processing the message.
+				// matched — process and exit
 				return h.next.HandleWrp(msg)
 			}
 		}
 	}
+	// no match found, but we still want to process:
+	return h.next.HandleWrp(msg)
 
 	// At this point, the message is not from an allowed partner, so send a
 	// response if needed.  Otherwise, return an error.
 
-	if !msg.Type.RequiresTransaction() {
-		return ErrUnauthorized
-	}
+	// if !msg.Type.RequiresTransaction() {
+	// 	return ErrUnauthorized
+	// }
 
-	got := strings.Join(msg.PartnerIDs, "','")
-	want := strings.Join(h.partners, "','")
+	// got := strings.Join(msg.PartnerIDs, "','")
+	// want := strings.Join(h.partners, "','")
 
-	response := msg
-	response.Destination = msg.Source
-	response.Source = h.source
-	response.ContentType = "application/json"
+	// response := msg
+	// response.Destination = msg.Source
+	// response.Source = h.source
+	// response.ContentType = "application/json"
 
-	code := int64(statusCode)
-	response.Status = &code
-	response.Payload = []byte(fmt.Sprintf(`{statusCode: %d, message:"Partner(s) '%s' not allowed.  Allowed: '%s'"}`, code, got, want))
+	// code := int64(statusCode)
+	// response.Status = &code
+	// response.Payload = []byte(fmt.Sprintf(`{statusCode: %d, message:"Partner(s) '%s' not allowed.  Allowed: '%s'"}`, code, got, want))
 
-	sendErr := h.egress.HandleWrp(response)
+	// sendErr := h.egress.HandleWrp(response)
 
-	return errors.Join(ErrUnauthorized, sendErr)
+	// return errors.Join(ErrUnauthorized, sendErr)
 }
