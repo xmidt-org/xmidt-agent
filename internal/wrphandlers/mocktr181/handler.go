@@ -243,126 +243,98 @@ func (h Handler) set(tr181 *Tr181Payload) (int64, []byte, error) {
 		Names:      tr181.Names,
 		StatusCode: http.StatusAccepted,
 	}
+	anyFailure := false
 
-	var (
-		writableParams []*MockParameter
-		failedParams   []Parameter
-	)
-
-	managementParams := map[string]struct{}{
-		"Device.X_COM_NOS_APP_MGMT.InstallApps":   {},
+	mgmtKeys := map[string]struct{}{
 		"Device.X_COM_NOS_APP_MGMT.UninstallApps": {},
+		"Device.X_COM_NOS_APP_MGMT.InstallApps":   {},
 		"Device.X_COM_NOS_APP_MGMT.ClearCache":    {},
 		"Device.X_COM_NOS_APP_MGMT.ClearData":     {},
 		"Device.X_COM_NOS_APP_MGMT.Launch":        {},
 	}
 
-	var normalParams []Parameter
-	var specialParams []Parameter
-	for _, p := range tr181.Parameters {
-		if _, isMgmt := managementParams[p.Name]; isMgmt {
-			specialParams = append(specialParams, p)
-		} else {
-			normalParams = append(normalParams, p)
-		}
-	}
-	tr181.Parameters = normalParams
+	for _, param := range tr181.Parameters {
+		var (
+			mp            *MockParameter
+			foundName     bool
+			foundWritable bool
+		)
 
-	// Check for any parameters that are not writable.
-	for _, parameter := range tr181.Parameters {
-		var found bool
 		for i := range h.parameters {
-			mockParameter := &h.parameters[i]
-			if mockParameter.Name != parameter.Name {
-				continue
+			p := &h.parameters[i]
+			if p.Name == param.Name {
+				foundName = true
+				if strings.Contains(p.Access, "w") {
+					foundWritable = true
+					mp = p
+				}
+				break
 			}
-
-			// Check whether mockParameter is writable.
-			if strings.Contains(mockParameter.Access, "w") {
-				found = true
-				// Add mockParameter to the list of parameters to be updated.
-				writableParams = append(writableParams, mockParameter)
-				continue
-			}
-
-			// mockParameter is not writable.
-			failedParams = append(failedParams, Parameter{
-				Name:    mockParameter.Name,
-				Message: "Parameter is not writable",
-			})
 		}
 
-		if !found {
-			// Requested parameter was not found.
-			failedParams = append(failedParams, Parameter{
-				Name:    parameter.Name,
+		if !foundName {
+			result.Parameters = append(result.Parameters, Parameter{
+				Name:    param.Name,
 				Message: "Invalid parameter name",
 			})
+			anyFailure = true
+			result.StatusCode = 520
+			continue
 		}
-	}
 
-	// Check if any parameters failed.
-	if len(failedParams) != 0 {
-		// If any parameter failed, then do not apply any changes to the parameters in writableParams.
-		writableParams = nil
-		result.Parameters = failedParams
-		result.StatusCode = 520
-	}
-
-	// If all the selected parameters are writable, then update the parameters. Otherwise, do nothing.
-	for _, parameter := range tr181.Parameters {
-		// writableParams will be nil if any parameters failed (i.e.: were not writable).
-		for _, mockParameter := range writableParams {
-			if mockParameter.Name != parameter.Name {
-				continue
-			}
-
-			mockParameter.Value = parameter.Value
-			mockParameter.DataType = parameter.DataType
-			mockParameter.Attributes = parameter.Attributes
+		if !foundWritable {
 			result.Parameters = append(result.Parameters, Parameter{
-				Name:       mockParameter.Name,
-				Value:      mockParameter.Value,
-				DataType:   mockParameter.DataType,
-				Attributes: mockParameter.Attributes,
+				Name:    param.Name,
+				Message: "Parameter is not writable",
+			})
+			anyFailure = true
+			result.StatusCode = 520
+			continue
+		}
+
+		if _, isMgmt := mgmtKeys[param.Name]; isMgmt {
+			var params []Parameter
+			var status int
+			switch param.Name {
+			case "Device.X_COM_NOS_APP_MGMT.UninstallApps":
+				params, status = h.handleUninstallApps(param)
+			case "Device.X_COM_NOS_APP_MGMT.InstallApps":
+				params, status = h.handleInstallApps(param)
+			case "Device.X_COM_NOS_APP_MGMT.ClearCache":
+				params, status = h.handleClearCache(param)
+			case "Device.X_COM_NOS_APP_MGMT.ClearData":
+				params, status = h.handleClearData(param)
+			case "Device.X_COM_NOS_APP_MGMT.Launch":
+				params, status = h.handleLaunch(param)
+			}
+			result.Parameters = append(result.Parameters, params...)
+			if status != http.StatusOK {
+				anyFailure = true
+				result.StatusCode = status
+			}
+		} else {
+			mp.Value = param.Value
+			mp.DataType = param.DataType
+			mp.Attributes = param.Attributes
+			result.Parameters = append(result.Parameters, Parameter{
+				Name:       mp.Name,
+				Value:      mp.Value,
+				DataType:   mp.DataType,
+				Attributes: mp.Attributes,
 				Message:    "Success",
 			})
 		}
 	}
 
-	// Handle special app management parameters
-	for _, respParam := range specialParams {
-		var params []Parameter
-		var status int
-		switch respParam.Name {
-		case "Device.X_COM_NOS_APP_MGMT.UninstallApps":
-			params, status = h.handleUninstallApps(respParam)
-		case "Device.X_COM_NOS_APP_MGMT.InstallApps":
-			params, status = h.handleInstallApps(respParam)
-		case "Device.X_COM_NOS_APP_MGMT.ClearCache":
-			params, status = h.handleClearCache(respParam)
-		case "Device.X_COM_NOS_APP_MGMT.ClearData":
-			params, status = h.handleClearData(respParam)
-		case "Device.X_COM_NOS_APP_MGMT.Launch":
-			params, status = h.handleLaunch(respParam)
-		}
-		if params != nil {
-			result.Parameters = append(result.Parameters, params...)
-			if status != http.StatusOK {
-				result.StatusCode = status
-			}
-		}
-	}
-
-	if result.StatusCode == http.StatusAccepted {
+	if !anyFailure {
 		result.StatusCode = http.StatusOK
 	}
 
 	payload, err := json.Marshal(result)
 	if err != nil {
-		return http.StatusInternalServerError, payload, errors.Join(ErrInvalidResponsePayload, err)
+		return http.StatusInternalServerError, payload,
+			errors.Join(ErrInvalidResponsePayload, err)
 	}
-
 	return int64(result.StatusCode), payload, nil
 }
 
@@ -383,24 +355,7 @@ func (h Handler) loadFile() ([]MockParameter, error) {
 	return parameters, nil
 }
 
-func (h *Handler) isParamSupported(paramName string) bool {
-	for _, p := range h.parameters {
-		if p.Name == paramName {
-			return true
-		}
-	}
-	return false
-}
-
 func (h *Handler) handleUninstallApps(param Parameter) ([]Parameter, int) {
-	const mgmtParam = "Device.X_COM_NOS_APP_MGMT.UninstallApps"
-	if !h.isParamSupported(mgmtParam) {
-		return []Parameter{{
-			Name:    param.Name,
-			Value:   param.Value,
-			Message: "UninstallApps operation not supported on this device",
-		}}, 520
-	}
 
 	// Gather package names from the param value
 	var pkgs []string
@@ -443,70 +398,55 @@ func (h *Handler) handleUninstallApps(param Parameter) ([]Parameter, int) {
 		}}, 520
 	}
 
-	// Otherwise, uninstall each and collect deletions
+	// Otherwise uninstall each and collect deletions
 	var result []Parameter
 	for _, pkg := range pkgs {
-		res := h.uninstallAppByPackage(pkg)
-		result = append(result, res...)
+		result = append(result, h.uninstallAppByPackage(pkg)...)
 	}
 	return result, http.StatusOK
 }
 
 func (h *Handler) handleInstallApps(param Parameter) ([]Parameter, int) {
-	const mgmtParam = "Device.X_COM_NOS_APP_MGMT.InstallApps"
-	if !h.isParamSupported(mgmtParam) {
-		return []Parameter{{
-			Name:    param.Name,
-			Message: "InstallApps operation not supported on this device",
-		}}, 520
-	}
-
 	var apps []InstallApp
 	appsBytes, err := json.Marshal(param.Value)
 	if err != nil {
 		return []Parameter{{
 			Name:    param.Name,
+			Value:   param.Value,
 			Message: "Invalid InstallApps value: " + err.Error(),
 		}}, 520
 	}
 	if err := json.Unmarshal(appsBytes, &apps); err != nil {
 		return []Parameter{{
 			Name:    param.Name,
+			Value:   param.Value,
 			Message: "Invalid InstallApps value: " + err.Error(),
 		}}, 520
 	}
 	if len(apps) == 0 {
 		return []Parameter{{
 			Name:    param.Name,
+			Value:   param.Value,
 			Message: "No apps specified for install",
 		}}, 520
 	}
+
 	var result []Parameter
 	for _, app := range apps {
-		// Validate required fields
 		if app.PackageName == "" {
 			result = append(result, Parameter{
 				Name:    param.Name,
+				Value:   param.Value,
 				Message: "Missing PackageName for install",
 			})
 			continue
 		}
-		installed := h.installAppByPackage(app)
-		result = append(result, installed...)
+		result = append(result, h.installAppByPackage(app)...)
 	}
 	return result, http.StatusOK
 }
 
 func (h *Handler) handleClearCache(param Parameter) ([]Parameter, int) {
-	const mgmtParam = "Device.X_COM_NOS_APP_MGMT.ClearCache"
-	if !h.isParamSupported(mgmtParam) {
-		return []Parameter{{
-			Name:    param.Name,
-			Value:   param.Value,
-			Message: "ClearCache operation not supported on this device",
-		}}, 520
-	}
-
 	// Build a slice of package names from the incoming value
 	var pkgs []string
 	switch v := param.Value.(type) {
@@ -557,16 +497,6 @@ func (h *Handler) handleClearCache(param Parameter) ([]Parameter, int) {
 }
 
 func (h *Handler) handleClearData(param Parameter) ([]Parameter, int) {
-	const mgmtParam = "Device.X_COM_NOS_APP_MGMT.ClearData"
-	if !h.isParamSupported(mgmtParam) {
-		return []Parameter{{
-			Name:    param.Name,
-			Value:   param.Value,
-			Message: "ClearData operation not supported on this device",
-		}}, 520
-	}
-
-	// Build a slice of package names from the incoming value
 	var pkgs []string
 	switch v := param.Value.(type) {
 	case []interface{}:
@@ -596,7 +526,6 @@ func (h *Handler) handleClearData(param Parameter) ([]Parameter, int) {
 		}}, 520
 	}
 
-	// If the first package isn’t installed, return a single “not found” failure
 	first := pkgs[0]
 	indexSet := h.getIndexesForPackage(first)
 	if len(indexSet) == 0 {
@@ -607,7 +536,6 @@ func (h *Handler) handleClearData(param Parameter) ([]Parameter, int) {
 		}}, 520
 	}
 
-	// Otherwise clear data for each package and collect the results
 	var result []Parameter
 	for _, pkg := range pkgs {
 		result = append(result, h.clearDataByPackage(pkg)...)
@@ -616,18 +544,11 @@ func (h *Handler) handleClearData(param Parameter) ([]Parameter, int) {
 }
 
 func (h *Handler) handleLaunch(param Parameter) ([]Parameter, int) {
-	const mgmtParam = "Device.X_COM_NOS_APP_MGMT.Launch"
-	if !h.isParamSupported(mgmtParam) {
-		return []Parameter{{
-			Name:    param.Name,
-			Message: "Launch operation not supported on this device",
-		}}, 520
-	}
-
 	pkg, ok := param.Value.(string)
 	if !ok || pkg == "" {
 		return []Parameter{{
 			Name:    param.Name,
+			Value:   param.Value,
 			Message: "Invalid Launch value: not a string",
 		}}, 520
 	}
@@ -635,11 +556,13 @@ func (h *Handler) handleLaunch(param Parameter) ([]Parameter, int) {
 	if len(indexSet) == 0 {
 		return []Parameter{{
 			Name:    param.Name,
+			Value:   param.Value,
 			Message: "Package not installed",
 		}}, 520
 	}
 	return []Parameter{{
 		Name:    param.Name,
+		Value:   param.Value,
 		Message: "Launch successful",
 	}}, http.StatusOK
 }
