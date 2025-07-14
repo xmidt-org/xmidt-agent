@@ -1,7 +1,7 @@
 [
    {
       "name":"Device.X_NOS_COM_APPS.NumberOfApps",
-      "value":"3",
+      "value":"4",
       "access":"r",
       "type":1
    },
@@ -167,6 +167,69 @@
       "key":"Device.X_NOS_COM_APPS.3.LastActivityTime",
       "name":"Device.X_NOS_COM_APPS.3.LastActivityTime",
       "value":"",
+      "type":4
+   },
+   {
+      "key":"Device.X_NOS_COM_APPS.4.Name",
+      "name":"Device.X_NOS_COM_APPS.4.Name",
+      "value":"Prime Video",
+      "access":"r",
+      "type":0
+   },
+   {
+      "key":"Device.X_NOS_COM_APPS.4.Package",
+      "name":"Device.X_NOS_COM_APPS.4.Package",
+      "value":"com.amazon.amazonvideo.livingroom",
+      "access":"r",
+      "type":0
+   },
+   {
+      "key":"Device.X_NOS_COM_APPS.4.Version",
+      "name":"Device.X_NOS_COM_APPS.4.Version",
+      "value":"6.19.5+v15.3.0.486-armv7a",
+      "access":"r",
+      "type":0
+   },
+   {
+      "key":"Device.X_NOS_COM_APPS.4.StorageSize",
+      "name":"Device.X_NOS_COM_APPS.4.StorageSize",
+      "value":"",
+      "access":"r",
+      "type":2
+   },
+   {
+      "key":"Device.X_NOS_COM_APPS.4.Data",
+      "name":"Device.X_NOS_COM_APPS.4.Data",
+      "value":"",
+      "access":"r",
+      "type":2
+   },
+   {
+      "key":"Device.X_NOS_COM_APPS.4.Cache",
+      "name":"Device.X_NOS_COM_APPS.4.Cache",
+      "value":"",
+      "access":"r",
+      "type":2
+   },
+   {
+      "key":"Device.X_NOS_COM_APPS.4.AppType",
+      "name":"Device.X_NOS_COM_APPS.4.AppType",
+      "value":"SystemApp",
+      "access":"r",
+      "type":0
+   },
+   {
+      "key":"Device.X_NOS_COM_APPS.4.State",
+      "name":"Device.X_NOS_COM_APPS.4.State",
+      "value":"",
+      "access":"r",
+      "type":0
+   },
+   {
+      "key":"Device.X_NOS_COM_APPS.4.LastActivityTime",
+      "name":"Device.X_NOS_COM_APPS.4.LastActivityTime",
+      "value":"",
+      "access":"r",
       "type":4
    },
    {

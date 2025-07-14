@@ -23,6 +23,7 @@ var (
 	ErrUnableToReadFile       = fmt.Errorf("unable to read file")
 	ErrInvalidPayload         = fmt.Errorf("invalid request payload")
 	ErrInvalidResponsePayload = fmt.Errorf("invalid response payload")
+	ErrMsgPackageNotFound     = fmt.Errorf("package not found")
 )
 
 // Option is a functional option type for mocktr181 Handler.
@@ -247,6 +248,26 @@ func (h Handler) set(tr181 *Tr181Payload) (int64, []byte, error) {
 		writableParams []*MockParameter
 		failedParams   []Parameter
 	)
+
+	managementParams := map[string]struct{}{
+		"Device.X_COM_NOS_APP_MGMT.InstallApps":   {},
+		"Device.X_COM_NOS_APP_MGMT.UninstallApps": {},
+		"Device.X_COM_NOS_APP_MGMT.ClearCache":    {},
+		"Device.X_COM_NOS_APP_MGMT.ClearData":     {},
+		"Device.X_COM_NOS_APP_MGMT.Launch":        {},
+	}
+
+	var normalParams []Parameter
+	var specialParams []Parameter
+	for _, p := range tr181.Parameters {
+		if _, isMgmt := managementParams[p.Name]; isMgmt {
+			specialParams = append(specialParams, p)
+		} else {
+			normalParams = append(normalParams, p)
+		}
+	}
+	tr181.Parameters = normalParams
+
 	// Check for any parameters that are not writable.
 	for _, parameter := range tr181.Parameters {
 		var found bool
@@ -309,169 +330,32 @@ func (h Handler) set(tr181 *Tr181Payload) (int64, []byte, error) {
 		}
 	}
 
-	const appsPrefix = "Device.X_NOS_COM_APPS."
-
-	for _, respParam := range tr181.Parameters {
-		if respParam.Name == "Device.X_COM_NOS_APP_MGMT.UninstallApps" {
-			var pkgs []string
-			switch v := respParam.Value.(type) {
-			case []interface{}:
-				for _, item := range v {
-					if s, ok := item.(string); ok {
-						pkgs = append(pkgs, s)
-					}
-				}
-			case []string:
-				pkgs = v
-			case string:
-				if v != "" {
-					pkgs = append(pkgs, v)
-				}
-			default:
-				result.Parameters = append(result.Parameters, Parameter{
-					Name:    respParam.Name,
-					Message: "Invalid UninstallApps value: not a string or string array",
-				})
-				result.StatusCode = 520
-				break
+	// Handle special app management parameters
+	for _, respParam := range specialParams {
+		var params []Parameter
+		var status int
+		switch respParam.Name {
+		case "Device.X_COM_NOS_APP_MGMT.UninstallApps":
+			params, status = h.handleUninstallApps(respParam)
+		case "Device.X_COM_NOS_APP_MGMT.InstallApps":
+			params, status = h.handleInstallApps(respParam)
+		case "Device.X_COM_NOS_APP_MGMT.ClearCache":
+			params, status = h.handleClearCache(respParam)
+		case "Device.X_COM_NOS_APP_MGMT.ClearData":
+			params, status = h.handleClearData(respParam)
+		case "Device.X_COM_NOS_APP_MGMT.Launch":
+			params, status = h.handleLaunch(respParam)
+		}
+		if params != nil {
+			result.Parameters = append(result.Parameters, params...)
+			if status != http.StatusOK {
+				result.StatusCode = status
 			}
-			for _, pkg := range pkgs {
-				deletions := h.uninstallAppByPackage(pkg)
-				result.Parameters = append(result.Parameters, deletions...)
-			}
-			result.StatusCode = http.StatusOK
-			break
 		}
 	}
 
-	for _, respParam := range tr181.Parameters {
-		if respParam.Name == "Device.X_COM_NOS_APP_MGMT.InstallApps" {
-			var apps []InstallApp
-			// Marshal interface{} value back to JSON, then unmarshal into []InstallApp
-			appsBytes, err := json.Marshal(respParam.Value)
-			if err != nil {
-				result.Parameters = append(result.Parameters, Parameter{
-					Name:    respParam.Name,
-					Message: "Invalid InstallApps value: " + err.Error(),
-				})
-				result.StatusCode = 520
-				break
-			}
-			if err := json.Unmarshal(appsBytes, &apps); err != nil {
-				result.Parameters = append(result.Parameters, Parameter{
-					Name:    respParam.Name,
-					Message: "Invalid InstallApps value: " + err.Error(),
-				})
-				result.StatusCode = 520
-				break
-			}
-			for _, app := range apps {
-				installed := h.installAppByPackage(app)
-				result.Parameters = append(result.Parameters, installed...)
-			}
-			result.StatusCode = http.StatusOK
-			break
-		}
-	}
-
-	for _, respParam := range tr181.Parameters {
-		if respParam.Name == "Device.X_COM_NOS_APP_MGMT.ClearCache" {
-			// Expecting respParam.Value to be a slice of package names
-			var pkgs []string
-			switch v := respParam.Value.(type) {
-			case []interface{}:
-				for _, item := range v {
-					if s, ok := item.(string); ok {
-						pkgs = append(pkgs, s)
-					}
-				}
-			case []string:
-				pkgs = v
-			case string:
-				if v != "" {
-					pkgs = append(pkgs, v)
-				}
-			default:
-				result.Parameters = append(result.Parameters, Parameter{
-					Name:    respParam.Name,
-					Message: "Invalid ClearCache value: not a string array",
-				})
-				result.StatusCode = 520
-				break
-			}
-			for _, pkg := range pkgs {
-				cleared := h.clearCacheByPackage(pkg)
-				result.Parameters = append(result.Parameters, cleared...)
-			}
-			result.StatusCode = http.StatusOK
-			break
-		}
-	}
-
-	for _, respParam := range tr181.Parameters {
-		if respParam.Name == "Device.X_COM_NOS_APP_MGMT.ClearData" {
-			var pkgs []string
-			switch v := respParam.Value.(type) {
-			case []interface{}:
-				for _, item := range v {
-					if s, ok := item.(string); ok {
-						pkgs = append(pkgs, s)
-					}
-				}
-			case []string:
-				pkgs = v
-			case string:
-				if v != "" {
-					pkgs = append(pkgs, v)
-				}
-			default:
-				result.Parameters = append(result.Parameters, Parameter{
-					Name:    respParam.Name,
-					Message: "Invalid ClearData value: not a string or string array",
-				})
-				result.StatusCode = 520
-				break
-			}
-			for _, pkg := range pkgs {
-				cleared := h.clearDataByPackage(pkg)
-				result.Parameters = append(result.Parameters, cleared...)
-			}
-			result.StatusCode = http.StatusOK
-			break
-		}
-	}
-
-	for _, respParam := range tr181.Parameters {
-		if respParam.Name == "Device.X_COM_NOS_APP_MGMT.Launch" {
-			var pkg string
-			switch v := respParam.Value.(type) {
-			case string:
-				pkg = v
-			default:
-				result.Parameters = append(result.Parameters, Parameter{
-					Name:    respParam.Name,
-					Message: "Invalid Launch value: not a string",
-				})
-				result.StatusCode = 520
-				break
-			}
-
-			indexSet := h.getIndexesForPackage(pkg)
-			if len(indexSet) == 0 {
-				result.Parameters = append(result.Parameters, Parameter{
-					Name:    respParam.Name,
-					Message: "Package not installed",
-				})
-				result.StatusCode = 520
-			} else {
-				result.Parameters = append(result.Parameters, Parameter{
-					Name:    respParam.Name,
-					Message: "Launch successful",
-				})
-				result.StatusCode = http.StatusOK
-			}
-			break
-		}
+	if result.StatusCode == http.StatusAccepted {
+		result.StatusCode = http.StatusOK
 	}
 
 	payload, err := json.Marshal(result)
@@ -499,10 +383,274 @@ func (h Handler) loadFile() ([]MockParameter, error) {
 	return parameters, nil
 }
 
+func (h *Handler) isParamSupported(paramName string) bool {
+	for _, p := range h.parameters {
+		if p.Name == paramName {
+			return true
+		}
+	}
+	return false
+}
+
+func (h *Handler) handleUninstallApps(param Parameter) ([]Parameter, int) {
+	const mgmtParam = "Device.X_COM_NOS_APP_MGMT.UninstallApps"
+	if !h.isParamSupported(mgmtParam) {
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: "UninstallApps operation not supported on this device",
+		}}, 520
+	}
+
+	// Gather package names from the param value
+	var pkgs []string
+	switch v := param.Value.(type) {
+	case []interface{}:
+		for _, item := range v {
+			if s, ok := item.(string); ok {
+				pkgs = append(pkgs, s)
+			}
+		}
+	case []string:
+		pkgs = v
+	case string:
+		if v != "" {
+			pkgs = append(pkgs, v)
+		}
+	default:
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: "Invalid UninstallApps value: not a string or string array",
+		}}, 520
+	}
+	if len(pkgs) == 0 {
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: "No packages specified for uninstall",
+		}}, 520
+	}
+
+	// If the first package isn't installed, return a single failure entry
+	firstPkg := pkgs[0]
+	indexSet := h.getIndexesForPackage(firstPkg)
+	if len(indexSet) == 0 {
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: "Package not found",
+		}}, 520
+	}
+
+	// Otherwise, uninstall each and collect deletions
+	var result []Parameter
+	for _, pkg := range pkgs {
+		res := h.uninstallAppByPackage(pkg)
+		result = append(result, res...)
+	}
+	return result, http.StatusOK
+}
+
+func (h *Handler) handleInstallApps(param Parameter) ([]Parameter, int) {
+	const mgmtParam = "Device.X_COM_NOS_APP_MGMT.InstallApps"
+	if !h.isParamSupported(mgmtParam) {
+		return []Parameter{{
+			Name:    param.Name,
+			Message: "InstallApps operation not supported on this device",
+		}}, 520
+	}
+
+	var apps []InstallApp
+	appsBytes, err := json.Marshal(param.Value)
+	if err != nil {
+		return []Parameter{{
+			Name:    param.Name,
+			Message: "Invalid InstallApps value: " + err.Error(),
+		}}, 520
+	}
+	if err := json.Unmarshal(appsBytes, &apps); err != nil {
+		return []Parameter{{
+			Name:    param.Name,
+			Message: "Invalid InstallApps value: " + err.Error(),
+		}}, 520
+	}
+	if len(apps) == 0 {
+		return []Parameter{{
+			Name:    param.Name,
+			Message: "No apps specified for install",
+		}}, 520
+	}
+	var result []Parameter
+	for _, app := range apps {
+		// Validate required fields
+		if app.PackageName == "" {
+			result = append(result, Parameter{
+				Name:    param.Name,
+				Message: "Missing PackageName for install",
+			})
+			continue
+		}
+		installed := h.installAppByPackage(app)
+		result = append(result, installed...)
+	}
+	return result, http.StatusOK
+}
+
+func (h *Handler) handleClearCache(param Parameter) ([]Parameter, int) {
+	const mgmtParam = "Device.X_COM_NOS_APP_MGMT.ClearCache"
+	if !h.isParamSupported(mgmtParam) {
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: "ClearCache operation not supported on this device",
+		}}, 520
+	}
+
+	// Build a slice of package names from the incoming value
+	var pkgs []string
+	switch v := param.Value.(type) {
+	case []interface{}:
+		for _, item := range v {
+			if s, ok := item.(string); ok {
+				pkgs = append(pkgs, s)
+			}
+		}
+	case []string:
+		pkgs = v
+	case string:
+		if v != "" {
+			pkgs = append(pkgs, v)
+		}
+	default:
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: "Invalid ClearCache value: not a string or string array",
+		}}, 520
+	}
+	if len(pkgs) == 0 {
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: "No packages specified for clear cache",
+		}}, 520
+	}
+
+	// If the first package isn’t installed, return a single “not found” failure
+	first := pkgs[0]
+	indexSet := h.getIndexesForPackage(first)
+	if len(indexSet) == 0 {
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: "Package not found",
+		}}, 520
+	}
+
+	// Otherwise clear cache for each package and collect the results
+	var result []Parameter
+	for _, pkg := range pkgs {
+		result = append(result, h.clearCacheByPackage(pkg)...)
+	}
+	return result, http.StatusOK
+}
+
+func (h *Handler) handleClearData(param Parameter) ([]Parameter, int) {
+	const mgmtParam = "Device.X_COM_NOS_APP_MGMT.ClearData"
+	if !h.isParamSupported(mgmtParam) {
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: "ClearData operation not supported on this device",
+		}}, 520
+	}
+
+	// Build a slice of package names from the incoming value
+	var pkgs []string
+	switch v := param.Value.(type) {
+	case []interface{}:
+		for _, item := range v {
+			if s, ok := item.(string); ok {
+				pkgs = append(pkgs, s)
+			}
+		}
+	case []string:
+		pkgs = v
+	case string:
+		if v != "" {
+			pkgs = append(pkgs, v)
+		}
+	default:
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: "Invalid ClearData value: not a string or string array",
+		}}, 520
+	}
+	if len(pkgs) == 0 {
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: "No packages specified for clear data",
+		}}, 520
+	}
+
+	// If the first package isn’t installed, return a single “not found” failure
+	first := pkgs[0]
+	indexSet := h.getIndexesForPackage(first)
+	if len(indexSet) == 0 {
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: "Package not found",
+		}}, 520
+	}
+
+	// Otherwise clear data for each package and collect the results
+	var result []Parameter
+	for _, pkg := range pkgs {
+		result = append(result, h.clearDataByPackage(pkg)...)
+	}
+	return result, http.StatusOK
+}
+
+func (h *Handler) handleLaunch(param Parameter) ([]Parameter, int) {
+	const mgmtParam = "Device.X_COM_NOS_APP_MGMT.Launch"
+	if !h.isParamSupported(mgmtParam) {
+		return []Parameter{{
+			Name:    param.Name,
+			Message: "Launch operation not supported on this device",
+		}}, 520
+	}
+
+	pkg, ok := param.Value.(string)
+	if !ok || pkg == "" {
+		return []Parameter{{
+			Name:    param.Name,
+			Message: "Invalid Launch value: not a string",
+		}}, 520
+	}
+	indexSet := h.getIndexesForPackage(pkg)
+	if len(indexSet) == 0 {
+		return []Parameter{{
+			Name:    param.Name,
+			Message: "Package not installed",
+		}}, 520
+	}
+	return []Parameter{{
+		Name:    param.Name,
+		Message: "Launch successful",
+	}}, http.StatusOK
+}
+
 func (h *Handler) uninstallAppByPackage(pkg string) []Parameter {
 	indexSet := h.getIndexesForPackage(pkg)
 	if len(indexSet) == 0 {
-		return nil
+		return []Parameter{{
+			Name:    pkg,
+			Message: "Package not found",
+		}}
 	}
 
 	toDelete := h.getNamesToDelete(indexSet)
@@ -663,6 +811,8 @@ func (h *Handler) getNamesToDelete(indexSet map[string]struct{}) map[string]stru
 func (h *Handler) clearCacheByPackage(pkg string) []Parameter {
 	const appsPrefix = "Device.X_NOS_COM_APPS."
 	indexSet := h.getIndexesForPackage(pkg)
+
+	// If somehow not found here, return a failure entry
 	if len(indexSet) == 0 {
 		return []Parameter{{
 			Name:    pkg,
@@ -670,7 +820,7 @@ func (h *Handler) clearCacheByPackage(pkg string) []Parameter {
 		}}
 	}
 
-	cleared := []Parameter{}
+	var cleared []Parameter
 	for idx := range indexSet {
 		cacheParamName := appsPrefix + idx + ".Cache"
 		for i := range h.parameters {
@@ -690,6 +840,7 @@ func (h *Handler) clearCacheByPackage(pkg string) []Parameter {
 func (h *Handler) clearDataByPackage(pkg string) []Parameter {
 	const appsPrefix = "Device.X_NOS_COM_APPS."
 	indexSet := h.getIndexesForPackage(pkg)
+
 	if len(indexSet) == 0 {
 		return []Parameter{{
 			Name:    pkg,
@@ -697,7 +848,7 @@ func (h *Handler) clearDataByPackage(pkg string) []Parameter {
 		}}
 	}
 
-	cleared := []Parameter{}
+	var cleared []Parameter
 	for idx := range indexSet {
 		dataParamName := appsPrefix + idx + ".Data"
 		for i := range h.parameters {
