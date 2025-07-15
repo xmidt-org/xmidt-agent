@@ -17,13 +17,33 @@ import (
 	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 )
 
+// Constants for TR-181 parameter names that are used multiple times
+const (
+	// App management command base path
+	appMgmtBasePath = "Device.X_COM_NOS_APP_MGMT."
+
+	// App management commands
+	appMgmtUninstallApps = appMgmtBasePath + "UninstallApps"
+	appMgmtInstallApps   = appMgmtBasePath + "InstallApps"
+	appMgmtClearCache    = appMgmtBasePath + "ClearCache"
+	appMgmtClearData     = appMgmtBasePath + "ClearData"
+	appMgmtLaunch        = appMgmtBasePath + "Launch"
+
+	// Apps data path and parameters
+	appsBasePath     = "Device.X_NOS_COM_APPS."
+	numberOfAppsPath = appsBasePath + "NumberOfApps"
+
+	// Common error messages
+	msgPackageNotFound     = "Package not found"
+	msgNoPackagesSpecified = "No packages specified"
+)
+
 var (
 	ErrInvalidInput           = fmt.Errorf("invalid input")
 	ErrInvalidFileInput       = fmt.Errorf("misconfigured file input")
 	ErrUnableToReadFile       = fmt.Errorf("unable to read file")
 	ErrInvalidPayload         = fmt.Errorf("invalid request payload")
 	ErrInvalidResponsePayload = fmt.Errorf("invalid response payload")
-	ErrMsgPackageNotFound     = fmt.Errorf("package not found")
 )
 
 // Option is a functional option type for mocktr181 Handler.
@@ -246,11 +266,11 @@ func (h Handler) set(tr181 *Tr181Payload) (int64, []byte, error) {
 	anyFailure := false
 
 	mgmtKeys := map[string]struct{}{
-		"Device.X_COM_NOS_APP_MGMT.UninstallApps": {},
-		"Device.X_COM_NOS_APP_MGMT.InstallApps":   {},
-		"Device.X_COM_NOS_APP_MGMT.ClearCache":    {},
-		"Device.X_COM_NOS_APP_MGMT.ClearData":     {},
-		"Device.X_COM_NOS_APP_MGMT.Launch":        {},
+		appMgmtUninstallApps: {},
+		appMgmtInstallApps:   {},
+		appMgmtClearCache:    {},
+		appMgmtClearData:     {},
+		appMgmtLaunch:        {},
 	}
 
 	for _, param := range tr181.Parameters {
@@ -296,15 +316,15 @@ func (h Handler) set(tr181 *Tr181Payload) (int64, []byte, error) {
 			var params []Parameter
 			var status int
 			switch param.Name {
-			case "Device.X_COM_NOS_APP_MGMT.UninstallApps":
+			case appMgmtUninstallApps:
 				params, status = h.handleUninstallApps(param)
-			case "Device.X_COM_NOS_APP_MGMT.InstallApps":
+			case appMgmtInstallApps:
 				params, status = h.handleInstallApps(param)
-			case "Device.X_COM_NOS_APP_MGMT.ClearCache":
+			case appMgmtClearCache:
 				params, status = h.handleClearCache(param)
-			case "Device.X_COM_NOS_APP_MGMT.ClearData":
+			case appMgmtClearData:
 				params, status = h.handleClearData(param)
-			case "Device.X_COM_NOS_APP_MGMT.Launch":
+			case appMgmtLaunch:
 				params, status = h.handleLaunch(param)
 			}
 			result.Parameters = append(result.Parameters, params...)
@@ -383,7 +403,7 @@ func (h *Handler) handleUninstallApps(param Parameter) ([]Parameter, int) {
 		return []Parameter{{
 			Name:    param.Name,
 			Value:   param.Value,
-			Message: "No packages specified for uninstall",
+			Message: msgNoPackagesSpecified,
 		}}, 520
 	}
 
@@ -394,7 +414,7 @@ func (h *Handler) handleUninstallApps(param Parameter) ([]Parameter, int) {
 		return []Parameter{{
 			Name:    param.Name,
 			Value:   param.Value,
-			Message: "Package not found",
+			Message: msgPackageNotFound,
 		}}, 520
 	}
 
@@ -427,7 +447,7 @@ func (h *Handler) handleInstallApps(param Parameter) ([]Parameter, int) {
 		return []Parameter{{
 			Name:    param.Name,
 			Value:   param.Value,
-			Message: "No apps specified for install",
+			Message: msgNoPackagesSpecified,
 		}}, 520
 	}
 
@@ -473,7 +493,7 @@ func (h *Handler) handleClearCache(param Parameter) ([]Parameter, int) {
 		return []Parameter{{
 			Name:    param.Name,
 			Value:   param.Value,
-			Message: "No packages specified for clear cache",
+			Message: msgNoPackagesSpecified,
 		}}, 520
 	}
 
@@ -484,7 +504,7 @@ func (h *Handler) handleClearCache(param Parameter) ([]Parameter, int) {
 		return []Parameter{{
 			Name:    param.Name,
 			Value:   param.Value,
-			Message: "Package not found",
+			Message: msgPackageNotFound,
 		}}, 520
 	}
 
@@ -522,7 +542,7 @@ func (h *Handler) handleClearData(param Parameter) ([]Parameter, int) {
 		return []Parameter{{
 			Name:    param.Name,
 			Value:   param.Value,
-			Message: "No packages specified for clear data",
+			Message: msgNoPackagesSpecified,
 		}}, 520
 	}
 
@@ -532,7 +552,7 @@ func (h *Handler) handleClearData(param Parameter) ([]Parameter, int) {
 		return []Parameter{{
 			Name:    param.Name,
 			Value:   param.Value,
-			Message: "Package not found",
+			Message: msgPackageNotFound,
 		}}, 520
 	}
 
@@ -572,7 +592,7 @@ func (h *Handler) uninstallAppByPackage(pkg string) []Parameter {
 	if len(indexSet) == 0 {
 		return []Parameter{{
 			Name:    pkg,
-			Message: "Package not found",
+			Message: msgPackageNotFound,
 		}}
 	}
 
@@ -597,13 +617,11 @@ func (h *Handler) uninstallAppByPackage(pkg string) []Parameter {
 }
 
 func (h *Handler) installAppByPackage(app InstallApp) []Parameter {
-	const appsPrefix = "Device.X_NOS_COM_APPS."
-
 	// Find the next available index
 	maxIdx := 0
 	for _, mp := range h.parameters {
-		if strings.HasPrefix(mp.Name, appsPrefix) {
-			tail := strings.TrimPrefix(mp.Name, appsPrefix)
+		if strings.HasPrefix(mp.Name, appsBasePath) {
+			tail := strings.TrimPrefix(mp.Name, appsBasePath)
 			parts := strings.SplitN(tail, ".", 2)
 			if len(parts) < 2 {
 				continue
@@ -619,27 +637,27 @@ func (h *Handler) installAppByPackage(app InstallApp) []Parameter {
 	// Create new parameters for the app
 	params := []MockParameter{
 		{
-			Name:   appsPrefix + idxStr + ".Package",
+			Name:   appsBasePath + idxStr + ".Package",
 			Value:  app.PackageName,
 			Access: "r",
 		},
 		{
-			Name:   appsPrefix + idxStr + ".Name",
+			Name:   appsBasePath + idxStr + ".Name",
 			Value:  app.PackageName,
 			Access: "r",
 		},
 		{
-			Name:   appsPrefix + idxStr + ".UUID",
+			Name:   appsBasePath + idxStr + ".UUID",
 			Value:  app.UUID,
 			Access: "r",
 		},
 		{
-			Name:   appsPrefix + idxStr + ".Location",
+			Name:   appsBasePath + idxStr + ".Location",
 			Value:  app.Location,
 			Access: "r",
 		},
 		{
-			Name:   appsPrefix + idxStr + ".Version",
+			Name:   appsBasePath + idxStr + ".Version",
 			Value:  app.Version,
 			Access: "r",
 		},
@@ -665,9 +683,8 @@ func (h *Handler) installAppByPackage(app InstallApp) []Parameter {
 }
 
 func (h *Handler) updateNumberOfApps(delta int) {
-	const paramName = "Device.X_NOS_COM_APPS.NumberOfApps"
 	for i := range h.parameters {
-		if h.parameters[i].Name == paramName {
+		if h.parameters[i].Name == numberOfAppsPath {
 			n := 0
 			switch v := h.parameters[i].Value.(type) {
 			case int:
@@ -695,20 +712,19 @@ func (h *Handler) updateNumberOfApps(delta int) {
 		val = 0
 	}
 	h.parameters = append(h.parameters, MockParameter{
-		Name:   paramName,
+		Name:   numberOfAppsPath,
 		Value:  val, // always int
 		Access: "r",
 	})
 }
 
 func (h *Handler) getIndexesForPackage(pkg string) map[string]struct{} {
-	const appsPrefix = "Device.X_NOS_COM_APPS."
 	indexSet := make(map[string]struct{})
 	for _, mp := range h.parameters {
-		if !strings.HasPrefix(mp.Name, appsPrefix) || !strings.HasSuffix(mp.Name, ".Package") {
+		if !strings.HasPrefix(mp.Name, appsBasePath) || !strings.HasSuffix(mp.Name, ".Package") {
 			continue
 		}
-		tail := strings.TrimPrefix(mp.Name, appsPrefix)
+		tail := strings.TrimPrefix(mp.Name, appsBasePath)
 		parts := strings.SplitN(tail, ".", 2)
 		if len(parts) == 2 && parts[1] == "Package" && mp.Value == pkg {
 			indexSet[parts[0]] = struct{}{}
@@ -718,10 +734,9 @@ func (h *Handler) getIndexesForPackage(pkg string) map[string]struct{} {
 }
 
 func (h *Handler) getNamesToDelete(indexSet map[string]struct{}) map[string]struct{} {
-	const appsPrefix = "Device.X_NOS_COM_APPS."
 	toDelete := make(map[string]struct{})
 	for idx := range indexSet {
-		prefix := appsPrefix + idx + "."
+		prefix := appsBasePath + idx + "."
 		for _, mp := range h.parameters {
 			if strings.HasPrefix(mp.Name, prefix) {
 				toDelete[mp.Name] = struct{}{}
@@ -732,20 +747,19 @@ func (h *Handler) getNamesToDelete(indexSet map[string]struct{}) map[string]stru
 }
 
 func (h *Handler) clearCacheByPackage(pkg string) []Parameter {
-	const appsPrefix = "Device.X_NOS_COM_APPS."
 	indexSet := h.getIndexesForPackage(pkg)
 
 	// If somehow not found here, return a failure entry
 	if len(indexSet) == 0 {
 		return []Parameter{{
 			Name:    pkg,
-			Message: "Package not found",
+			Message: msgPackageNotFound,
 		}}
 	}
 
 	var cleared []Parameter
 	for idx := range indexSet {
-		cacheParamName := appsPrefix + idx + ".Cache"
+		cacheParamName := appsBasePath + idx + ".Cache"
 		for i := range h.parameters {
 			if h.parameters[i].Name == cacheParamName {
 				h.parameters[i].Value = "" // Clear the cache
@@ -761,19 +775,18 @@ func (h *Handler) clearCacheByPackage(pkg string) []Parameter {
 }
 
 func (h *Handler) clearDataByPackage(pkg string) []Parameter {
-	const appsPrefix = "Device.X_NOS_COM_APPS."
 	indexSet := h.getIndexesForPackage(pkg)
 
 	if len(indexSet) == 0 {
 		return []Parameter{{
 			Name:    pkg,
-			Message: "Package not found",
+			Message: msgPackageNotFound,
 		}}
 	}
 
 	var cleared []Parameter
 	for idx := range indexSet {
-		dataParamName := appsPrefix + idx + ".Data"
+		dataParamName := appsBasePath + idx + ".Data"
 		for i := range h.parameters {
 			if h.parameters[i].Name == dataParamName {
 				h.parameters[i].Value = "" // Clear the data
