@@ -64,18 +64,10 @@ func New(next, egress wrpkit.Handler, source string, partners ...string) (*Handl
 // HandleWrp is called to process a message.  If the message is not from an allowed
 // partner, a response is sent to the source of the message if applicable.
 func (h Handler) HandleWrp(msg wrp.Message) error {
-	for _, allowed := range h.partners {
-		for _, got := range msg.PartnerIDs {
-			got = strings.TrimSpace(got)
-			if allowed == got || allowed == wildcard {
-				// We found a match, so continue processing the message.
-				return h.next.HandleWrp(msg)
-			}
-		}
+	err := h.next.HandleWrp(msg)
+	if err == nil {
+		return nil
 	}
-
-	// At this point, the message is not from an allowed partner, so send a
-	// response if needed.  Otherwise, return an error.
 
 	if !msg.Type.RequiresTransaction() {
 		return ErrUnauthorized
@@ -91,9 +83,11 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 
 	code := int64(statusCode)
 	response.Status = &code
-	response.Payload = []byte(fmt.Sprintf(`{statusCode: %d, message:"Partner(s) '%s' not allowed.  Allowed: '%s'"}`, code, got, want))
+	response.Payload = []byte(
+		fmt.Sprintf(`{"statusCode": %d, message:"Partner(s) '%s' not allowed. Allowed: '%s'"}`,
+			code, got, want),
+	)
 
 	sendErr := h.egress.HandleWrp(response)
-
 	return errors.Join(ErrUnauthorized, sendErr)
 }

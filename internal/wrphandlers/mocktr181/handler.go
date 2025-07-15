@@ -10,10 +10,32 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
+)
+
+// Constants for TR-181 parameter names that are used multiple times
+const (
+	// App management command base path
+	appMgmtBasePath = "Device.X_COM_NOS_APP_MGMT."
+
+	// App management commands
+	appMgmtUninstallApps = appMgmtBasePath + "UninstallApps"
+	appMgmtInstallApps   = appMgmtBasePath + "InstallApps"
+	appMgmtClearCache    = appMgmtBasePath + "ClearCache"
+	appMgmtClearData     = appMgmtBasePath + "ClearData"
+	appMgmtLaunch        = appMgmtBasePath + "Launch"
+
+	// Apps data path and parameters
+	appsBasePath     = "Device.X_NOS_COM_APPS."
+	numberOfAppsPath = appsBasePath + "NumberOfApps"
+
+	// Common error messages
+	msgPackageNotFound     = "Package not found"
+	msgNoPackagesSpecified = "No packages specified"
 )
 
 var (
@@ -45,7 +67,7 @@ type Handler struct {
 
 type MockParameter struct {
 	Name       string
-	Value      string
+	Value      interface{}
 	Access     string
 	DataType   int // add json labels here
 	Attributes map[string]interface{}
@@ -69,11 +91,18 @@ type Parameters struct {
 
 type Parameter struct {
 	Name       string                 `json:"name"`
-	Value      string                 `json:"value"`
+	Value      interface{}            `json:"value"`
 	DataType   int                    `json:"dataType"`
 	Attributes map[string]interface{} `json:"attributes"`
 	Message    string                 `json:"message"`
 	Count      int                    `json:"parameterCount"`
+}
+
+type InstallApp struct {
+	UUID        string `json:"UUID"`
+	Location    string `json:"Location"`
+	Version     string `json:"Version"`
+	PackageName string `json:"PackageName"`
 }
 
 // New creates a new instance of the Handler struct.  The parameter egress is
@@ -234,78 +263,98 @@ func (h Handler) set(tr181 *Tr181Payload) (int64, []byte, error) {
 		Names:      tr181.Names,
 		StatusCode: http.StatusAccepted,
 	}
+	anyFailure := false
 
-	var (
-		writableParams []*MockParameter
-		failedParams   []Parameter
-	)
-	// Check for any parameters that are not writable.
-	for _, parameter := range tr181.Parameters {
-		var found bool
+	mgmtKeys := map[string]struct{}{
+		appMgmtUninstallApps: {},
+		appMgmtInstallApps:   {},
+		appMgmtClearCache:    {},
+		appMgmtClearData:     {},
+		appMgmtLaunch:        {},
+	}
+
+	for _, param := range tr181.Parameters {
+		var (
+			mp            *MockParameter
+			foundName     bool
+			foundWritable bool
+		)
+
 		for i := range h.parameters {
-			mockParameter := &h.parameters[i]
-			if mockParameter.Name != parameter.Name {
-				continue
+			p := &h.parameters[i]
+			if p.Name == param.Name {
+				foundName = true
+				if strings.Contains(p.Access, "w") {
+					foundWritable = true
+					mp = p
+				}
+				break
 			}
-
-			// Check whether mockParameter is writable.
-			if strings.Contains(mockParameter.Access, "w") {
-				found = true
-				// Add mockParameter to the list of parameters to be updated.
-				writableParams = append(writableParams, mockParameter)
-				continue
-			}
-
-			// mockParameter is not writable.
-			failedParams = append(failedParams, Parameter{
-				Name:    mockParameter.Name,
-				Message: "Parameter is not writable",
-			})
 		}
 
-		if !found {
-			// Requested parameter was not found.
-			failedParams = append(failedParams, Parameter{
-				Name:    parameter.Name,
+		if !foundName {
+			result.Parameters = append(result.Parameters, Parameter{
+				Name:    param.Name,
 				Message: "Invalid parameter name",
 			})
+			anyFailure = true
+			result.StatusCode = 520
+			continue
 		}
-	}
 
-	// Check if any parameters failed.
-	if len(failedParams) != 0 {
-		// If any parameter failed, then do not apply any changes to the parameters in writableParams.
-		writableParams = nil
-		result.Parameters = failedParams
-		result.StatusCode = 520
-	}
-
-	// If all the selected parameters are writable, then update the parameters. Otherwise, do nothing.
-	for _, parameter := range tr181.Parameters {
-		// writableParams will be nil if any parameters failed (i.e.: were not writable).
-		for _, mockParameter := range writableParams {
-			if mockParameter.Name != parameter.Name {
-				continue
-			}
-
-			mockParameter.Value = parameter.Value
-			mockParameter.DataType = parameter.DataType
-			mockParameter.Attributes = parameter.Attributes
+		if !foundWritable {
 			result.Parameters = append(result.Parameters, Parameter{
-				Name:       mockParameter.Name,
-				Value:      mockParameter.Value,
-				DataType:   mockParameter.DataType,
-				Attributes: mockParameter.Attributes,
+				Name:    param.Name,
+				Message: "Parameter is not writable",
+			})
+			anyFailure = true
+			result.StatusCode = 520
+			continue
+		}
+
+		if _, isMgmt := mgmtKeys[param.Name]; isMgmt {
+			var params []Parameter
+			var status int
+			switch param.Name {
+			case appMgmtUninstallApps:
+				params, status = h.handleUninstallApps(param)
+			case appMgmtInstallApps:
+				params, status = h.handleInstallApps(param)
+			case appMgmtClearCache:
+				params, status = h.handleClearCache(param)
+			case appMgmtClearData:
+				params, status = h.handleClearData(param)
+			case appMgmtLaunch:
+				params, status = h.handleLaunch(param)
+			}
+			result.Parameters = append(result.Parameters, params...)
+			if status != http.StatusOK {
+				anyFailure = true
+				result.StatusCode = status
+			}
+		} else {
+			mp.Value = param.Value
+			mp.DataType = param.DataType
+			mp.Attributes = param.Attributes
+			result.Parameters = append(result.Parameters, Parameter{
+				Name:       mp.Name,
+				Value:      mp.Value,
+				DataType:   mp.DataType,
+				Attributes: mp.Attributes,
 				Message:    "Success",
 			})
 		}
 	}
 
-	payload, err := json.Marshal(result)
-	if err != nil {
-		return http.StatusInternalServerError, payload, errors.Join(ErrInvalidResponsePayload, err)
+	if !anyFailure {
+		result.StatusCode = http.StatusOK
 	}
 
+	payload, err := json.Marshal(result)
+	if err != nil {
+		return http.StatusInternalServerError, payload,
+			errors.Join(ErrInvalidResponsePayload, err)
+	}
 	return int64(result.StatusCode), payload, nil
 }
 
@@ -324,4 +373,430 @@ func (h Handler) loadFile() ([]MockParameter, error) {
 	}
 
 	return parameters, nil
+}
+
+func (h *Handler) handleUninstallApps(param Parameter) ([]Parameter, int) {
+
+	// Gather package names from the param value
+	var pkgs []string
+	switch v := param.Value.(type) {
+	case []interface{}:
+		for _, item := range v {
+			if s, ok := item.(string); ok {
+				pkgs = append(pkgs, s)
+			}
+		}
+	case []string:
+		pkgs = v
+	case string:
+		if v != "" {
+			pkgs = append(pkgs, v)
+		}
+	default:
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: "Invalid UninstallApps value: not a string or string array",
+		}}, 520
+	}
+	if len(pkgs) == 0 {
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: msgNoPackagesSpecified,
+		}}, 520
+	}
+
+	// If the first package isn't installed, return a single failure entry
+	firstPkg := pkgs[0]
+	indexSet := h.getIndexesForPackage(firstPkg)
+	if len(indexSet) == 0 {
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: msgPackageNotFound,
+		}}, 520
+	}
+
+	// Otherwise uninstall each and collect deletions
+	var result []Parameter
+	for _, pkg := range pkgs {
+		result = append(result, h.uninstallAppByPackage(pkg)...)
+	}
+	return result, http.StatusOK
+}
+
+func (h *Handler) handleInstallApps(param Parameter) ([]Parameter, int) {
+	var apps []InstallApp
+	appsBytes, err := json.Marshal(param.Value)
+	if err != nil {
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: "Invalid InstallApps value: " + err.Error(),
+		}}, 520
+	}
+	if err := json.Unmarshal(appsBytes, &apps); err != nil {
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: "Invalid InstallApps value: " + err.Error(),
+		}}, 520
+	}
+	if len(apps) == 0 {
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: msgNoPackagesSpecified,
+		}}, 520
+	}
+
+	var result []Parameter
+	for _, app := range apps {
+		if app.PackageName == "" {
+			result = append(result, Parameter{
+				Name:    param.Name,
+				Value:   param.Value,
+				Message: "Missing PackageName for install",
+			})
+			continue
+		}
+		result = append(result, h.installAppByPackage(app)...)
+	}
+	return result, http.StatusOK
+}
+
+func (h *Handler) handleClearCache(param Parameter) ([]Parameter, int) {
+	// Build a slice of package names from the incoming value
+	var pkgs []string
+	switch v := param.Value.(type) {
+	case []interface{}:
+		for _, item := range v {
+			if s, ok := item.(string); ok {
+				pkgs = append(pkgs, s)
+			}
+		}
+	case []string:
+		pkgs = v
+	case string:
+		if v != "" {
+			pkgs = append(pkgs, v)
+		}
+	default:
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: "Invalid ClearCache value: not a string or string array",
+		}}, 520
+	}
+	if len(pkgs) == 0 {
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: msgNoPackagesSpecified,
+		}}, 520
+	}
+
+	// If the first package isn’t installed, return a single “not found” failure
+	first := pkgs[0]
+	indexSet := h.getIndexesForPackage(first)
+	if len(indexSet) == 0 {
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: msgPackageNotFound,
+		}}, 520
+	}
+
+	// Otherwise clear cache for each package and collect the results
+	var result []Parameter
+	for _, pkg := range pkgs {
+		result = append(result, h.clearCacheByPackage(pkg)...)
+	}
+	return result, http.StatusOK
+}
+
+func (h *Handler) handleClearData(param Parameter) ([]Parameter, int) {
+	var pkgs []string
+	switch v := param.Value.(type) {
+	case []interface{}:
+		for _, item := range v {
+			if s, ok := item.(string); ok {
+				pkgs = append(pkgs, s)
+			}
+		}
+	case []string:
+		pkgs = v
+	case string:
+		if v != "" {
+			pkgs = append(pkgs, v)
+		}
+	default:
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: "Invalid ClearData value: not a string or string array",
+		}}, 520
+	}
+	if len(pkgs) == 0 {
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: msgNoPackagesSpecified,
+		}}, 520
+	}
+
+	first := pkgs[0]
+	indexSet := h.getIndexesForPackage(first)
+	if len(indexSet) == 0 {
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: msgPackageNotFound,
+		}}, 520
+	}
+
+	var result []Parameter
+	for _, pkg := range pkgs {
+		result = append(result, h.clearDataByPackage(pkg)...)
+	}
+	return result, http.StatusOK
+}
+
+func (h *Handler) handleLaunch(param Parameter) ([]Parameter, int) {
+	pkg, ok := param.Value.(string)
+	if !ok || pkg == "" {
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: "Invalid Launch value: not a string",
+		}}, 520
+	}
+	indexSet := h.getIndexesForPackage(pkg)
+	if len(indexSet) == 0 {
+		return []Parameter{{
+			Name:    param.Name,
+			Value:   param.Value,
+			Message: "Package not installed",
+		}}, 520
+	}
+	return []Parameter{{
+		Name:    param.Name,
+		Value:   param.Value,
+		Message: "Launch successful",
+	}}, http.StatusOK
+}
+
+func (h *Handler) uninstallAppByPackage(pkg string) []Parameter {
+	indexSet := h.getIndexesForPackage(pkg)
+	if len(indexSet) == 0 {
+		return []Parameter{{
+			Name:    pkg,
+			Message: msgPackageNotFound,
+		}}
+	}
+
+	toDelete := h.getNamesToDelete(indexSet)
+
+	newParams := make([]MockParameter, 0, len(h.parameters))
+	deletions := make([]Parameter, 0, len(toDelete))
+	for _, mp := range h.parameters {
+		if _, found := toDelete[mp.Name]; found {
+			deletions = append(deletions, Parameter{
+				Name:    mp.Name,
+				Message: "Deleted",
+			})
+			continue
+		}
+		newParams = append(newParams, mp)
+	}
+	h.parameters = newParams
+
+	h.updateNumberOfApps(-len(indexSet))
+	return deletions
+}
+
+func (h *Handler) installAppByPackage(app InstallApp) []Parameter {
+	// Find the next available index
+	maxIdx := 0
+	for _, mp := range h.parameters {
+		if strings.HasPrefix(mp.Name, appsBasePath) {
+			tail := strings.TrimPrefix(mp.Name, appsBasePath)
+			parts := strings.SplitN(tail, ".", 2)
+			if len(parts) < 2 {
+				continue
+			}
+			if idx, err := strconv.Atoi(parts[0]); err == nil && idx > maxIdx {
+				maxIdx = idx
+			}
+		}
+	}
+	newIdx := maxIdx + 1
+	idxStr := fmt.Sprintf("%d", newIdx)
+
+	// Create new parameters for the app
+	params := []MockParameter{
+		{
+			Name:   appsBasePath + idxStr + ".Package",
+			Value:  app.PackageName,
+			Access: "r",
+		},
+		{
+			Name:   appsBasePath + idxStr + ".Name",
+			Value:  app.PackageName,
+			Access: "r",
+		},
+		{
+			Name:   appsBasePath + idxStr + ".UUID",
+			Value:  app.UUID,
+			Access: "r",
+		},
+		{
+			Name:   appsBasePath + idxStr + ".Location",
+			Value:  app.Location,
+			Access: "r",
+		},
+		{
+			Name:   appsBasePath + idxStr + ".Version",
+			Value:  app.Version,
+			Access: "r",
+		},
+	}
+
+	// Add to handler's parameters
+	h.parameters = append(h.parameters, params...)
+
+	// Update NumberOfApps
+	h.updateNumberOfApps(1)
+
+	// Return as []Parameter for response
+	result := make([]Parameter, len(params))
+	for i, mp := range params {
+		result[i] = Parameter{
+			Name:     mp.Name,
+			Value:    mp.Value,
+			DataType: mp.DataType,
+			Message:  "Installed",
+		}
+	}
+	return result
+}
+
+func (h *Handler) updateNumberOfApps(delta int) {
+	for i := range h.parameters {
+		if h.parameters[i].Name == numberOfAppsPath {
+			n := 0
+			switch v := h.parameters[i].Value.(type) {
+			case int:
+				n = v
+			case float64:
+				n = int(v)
+			case string:
+				if parsed, err := strconv.Atoi(v); err == nil {
+					n = parsed
+				}
+			default:
+				n = 0
+			}
+			n += delta
+			if n < 0 {
+				n = 0
+			}
+			h.parameters[i].Value = n // always store as int
+			return
+		}
+	}
+	// If not found, add it as int
+	val := delta
+	if val < 0 {
+		val = 0
+	}
+	h.parameters = append(h.parameters, MockParameter{
+		Name:   numberOfAppsPath,
+		Value:  val, // always int
+		Access: "r",
+	})
+}
+
+func (h *Handler) getIndexesForPackage(pkg string) map[string]struct{} {
+	indexSet := make(map[string]struct{})
+	for _, mp := range h.parameters {
+		if !strings.HasPrefix(mp.Name, appsBasePath) || !strings.HasSuffix(mp.Name, ".Package") {
+			continue
+		}
+		tail := strings.TrimPrefix(mp.Name, appsBasePath)
+		parts := strings.SplitN(tail, ".", 2)
+		if len(parts) == 2 && parts[1] == "Package" && mp.Value == pkg {
+			indexSet[parts[0]] = struct{}{}
+		}
+	}
+	return indexSet
+}
+
+func (h *Handler) getNamesToDelete(indexSet map[string]struct{}) map[string]struct{} {
+	toDelete := make(map[string]struct{})
+	for idx := range indexSet {
+		prefix := appsBasePath + idx + "."
+		for _, mp := range h.parameters {
+			if strings.HasPrefix(mp.Name, prefix) {
+				toDelete[mp.Name] = struct{}{}
+			}
+		}
+	}
+	return toDelete
+}
+
+func (h *Handler) clearCacheByPackage(pkg string) []Parameter {
+	indexSet := h.getIndexesForPackage(pkg)
+
+	// If somehow not found here, return a failure entry
+	if len(indexSet) == 0 {
+		return []Parameter{{
+			Name:    pkg,
+			Message: msgPackageNotFound,
+		}}
+	}
+
+	var cleared []Parameter
+	for idx := range indexSet {
+		cacheParamName := appsBasePath + idx + ".Cache"
+		for i := range h.parameters {
+			if h.parameters[i].Name == cacheParamName {
+				h.parameters[i].Value = "" // Clear the cache
+				cleared = append(cleared, Parameter{
+					Name:    cacheParamName,
+					Message: "Cache cleared",
+				})
+				break
+			}
+		}
+	}
+	return cleared
+}
+
+func (h *Handler) clearDataByPackage(pkg string) []Parameter {
+	indexSet := h.getIndexesForPackage(pkg)
+
+	if len(indexSet) == 0 {
+		return []Parameter{{
+			Name:    pkg,
+			Message: msgPackageNotFound,
+		}}
+	}
+
+	var cleared []Parameter
+	for idx := range indexSet {
+		dataParamName := appsBasePath + idx + ".Data"
+		for i := range h.parameters {
+			if h.parameters[i].Name == dataParamName {
+				h.parameters[i].Value = "" // Clear the data
+				cleared = append(cleared, Parameter{
+					Name:    dataParamName,
+					Message: "Data cleared",
+				})
+				break
+			}
+		}
+	}
+	return cleared
 }
