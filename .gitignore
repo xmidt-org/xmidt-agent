@@ -16,7 +16,6 @@
 
 # VS Code directories
 *.code-workspace
-.vscode/*
 .dev/*
 __debug_bin*
 
