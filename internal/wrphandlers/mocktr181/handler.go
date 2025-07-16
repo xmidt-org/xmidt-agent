@@ -79,10 +79,12 @@ type MockParameters struct {
 }
 
 type Tr181Payload struct {
-	Command    string      `json:"command"`
-	Names      []string    `json:"names"`
-	Parameters []Parameter `json:"parameters"`
-	StatusCode int         `json:"statusCode"`
+	Command    string                            `json:"command"`
+	Names      []string                          `json:"names"`
+	Parameters []Parameter                       `json:"parameters"`
+	StatusCode int                               `json:"statusCode"`
+	Table      string                            `json:"table,omitempty"`
+	Rows       map[string]map[string]interface{} `json:"rows,omitempty"`
 }
 
 type Parameters struct {
@@ -181,6 +183,10 @@ func (h Handler) proccessCommand(wrpPayload []byte) (int64, []byte, error) {
 		return h.get(payload)
 	case "SET":
 		return h.set(payload)
+	case "REPLACE_ROWS":
+		return h.updateTableRow(payload)
+	case "DELETE_ROWS":
+		return h.deleteTableRow(payload)
 	default:
 		// currently only get and set are implemented for existing mocktr181
 		return statusCode, []byte(fmt.Sprintf(`{"message": "command '%s' is not supported", "statusCode": %d}`, payload.Command, statusCode)), nil
@@ -358,6 +364,165 @@ func (h Handler) set(tr181 *Tr181Payload) (int64, []byte, error) {
 	return int64(result.StatusCode), payload, nil
 }
 
+func (h *Handler) updateTableRow(tr181 *Tr181Payload) (int64, []byte, error) {
+	result := Tr181Payload{
+		Command:    tr181.Command,
+		StatusCode: http.StatusOK,
+	}
+
+	if tr181.Table == "" {
+		result.StatusCode = 520
+		result.Parameters = []Parameter{{
+			Message: "Table field is required for REPLACE_ROWS operation",
+		}}
+		payload, _ := json.Marshal(result)
+		return int64(result.StatusCode), payload, nil
+	}
+
+	if len(tr181.Rows) == 0 {
+		result.StatusCode = 520
+		result.Parameters = []Parameter{{
+			Message: "Rows field is required for REPLACE_ROWS operation",
+		}}
+		payload, _ := json.Marshal(result)
+		return int64(result.StatusCode), payload, nil
+	}
+
+	anyFailure := false
+	var resultParams []Parameter
+
+	// Process each row in the table
+	for rowIndex, rowData := range tr181.Rows {
+		// Process each parameter in the row
+		for paramName, value := range rowData {
+			// Construct the full parameter name: table + rowIndex + "." + paramName
+			fullParamName := fmt.Sprintf("%s%s.%s", tr181.Table, rowIndex, paramName)
+
+			var (
+				mp            *MockParameter
+				foundName     bool
+				foundWritable bool
+			)
+
+			// Find the parameter in our mock parameters
+			for i := range h.parameters {
+				p := &h.parameters[i]
+				if p.Name == fullParamName {
+					foundName = true
+					if strings.Contains(p.Access, "w") {
+						foundWritable = true
+						mp = p
+					}
+					break
+				}
+			}
+
+			if !foundName {
+				resultParams = append(resultParams, Parameter{
+					Name:    fullParamName,
+					Message: "Invalid parameter name",
+				})
+				anyFailure = true
+				result.StatusCode = 520
+				continue
+			}
+
+			if !foundWritable {
+				resultParams = append(resultParams, Parameter{
+					Name:    fullParamName,
+					Message: "Parameter is not writable",
+				})
+				anyFailure = true
+				result.StatusCode = 520
+				continue
+			}
+
+			// Update the parameter
+			mp.Value = value
+			resultParams = append(resultParams, Parameter{
+				Name:    mp.Name,
+				Value:   mp.Value,
+				Message: "Success",
+			})
+		}
+	}
+
+	if !anyFailure {
+		result.StatusCode = http.StatusOK
+	}
+
+	result.Parameters = resultParams
+
+	payload, err := json.Marshal(result)
+	if err != nil {
+		return http.StatusInternalServerError, payload, errors.Join(ErrInvalidResponsePayload, err)
+	}
+
+	return int64(result.StatusCode), payload, nil
+}
+
+func (h *Handler) deleteTableRow(tr181 *Tr181Payload) (int64, []byte, error) {
+	result := Tr181Payload{
+		Command:    tr181.Command,
+		StatusCode: http.StatusOK,
+	}
+
+	if tr181.Table == "" {
+		result.StatusCode = 520
+		result.Parameters = []Parameter{{
+			Message: "Table field is required for DELETE_ROWS operation",
+		}}
+		payload, _ := json.Marshal(result)
+		return int64(result.StatusCode), payload, nil
+	}
+
+	if len(tr181.Rows) == 0 {
+		result.StatusCode = 520
+		result.Parameters = []Parameter{{
+			Message: "Rows field is required for DELETE_ROWS operation",
+		}}
+		payload, _ := json.Marshal(result)
+		return int64(result.StatusCode), payload, nil
+	}
+
+	var deletedParams []Parameter
+	var newParams []MockParameter
+
+	// For each row index to delete, find all parameters that belong to that row
+	for rowIndex := range tr181.Rows {
+		rowPrefix := fmt.Sprintf("%s%s.", tr181.Table, rowIndex)
+
+		// Find all parameters that start with this row prefix and mark them for deletion
+		for _, param := range h.parameters {
+			if strings.HasPrefix(param.Name, rowPrefix) {
+				deletedParams = append(deletedParams, Parameter{
+					Name:    param.Name,
+					Message: "Deleted",
+				})
+			} else {
+				newParams = append(newParams, param)
+			}
+		}
+	}
+
+	if len(deletedParams) == 0 {
+		result.StatusCode = 404
+		result.Parameters = []Parameter{{
+			Message: "No matching table rows found for deletion",
+		}}
+	} else {
+		h.parameters = newParams
+		result.Parameters = deletedParams
+	}
+
+	payload, err := json.Marshal(result)
+	if err != nil {
+		return http.StatusInternalServerError, payload, errors.Join(ErrInvalidResponsePayload, err)
+	}
+
+	return int64(result.StatusCode), payload, nil
+}
+
 func (h Handler) loadFile() ([]MockParameter, error) {
 	jsonFile, err := os.Open(h.filePath)
 	if err != nil {
@@ -376,7 +541,6 @@ func (h Handler) loadFile() ([]MockParameter, error) {
 }
 
 func (h *Handler) handleUninstallApps(param Parameter) ([]Parameter, int) {
-
 	// Gather package names from the param value
 	var pkgs []string
 	switch v := param.Value.(type) {
@@ -497,7 +661,7 @@ func (h *Handler) handleClearCache(param Parameter) ([]Parameter, int) {
 		}}, 520
 	}
 
-	// If the first package isn’t installed, return a single “not found” failure
+	// If the first package isn't installed, return a single "not found" failure
 	first := pkgs[0]
 	indexSet := h.getIndexesForPackage(first)
 	if len(indexSet) == 0 {
