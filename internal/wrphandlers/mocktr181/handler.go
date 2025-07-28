@@ -83,8 +83,9 @@ type Tr181Payload struct {
 	Names      []string                          `json:"names"`
 	Parameters []Parameter                       `json:"parameters"`
 	StatusCode int                               `json:"statusCode"`
-	Table      string                            `json:"table,omitempty"`
-	Rows       map[string]map[string]interface{} `json:"rows,omitempty"`
+	Table      string                            `json:"table,omitempty"` // For REPLACE_ROWS and ADD_ROW commands
+	Rows       map[string]map[string]interface{} `json:"rows,omitempty"`  // For REPLACE_ROWS command
+	Row        interface{}                       `json:"row,omitempty"`   // For DELETE_ROW (string) or ADD_ROW (object)
 }
 
 type Parameters struct {
@@ -111,6 +112,7 @@ type InstallApp struct {
 // the handler that will be called to send the response.  The parameter source is the source to use in
 // the response message.
 func New(egress wrpkit.Handler, source string, opts ...Option) (*Handler, error) {
+
 	h := Handler{
 		egress: egress,
 		source: source,
@@ -143,7 +145,7 @@ func (h Handler) Enabled() bool {
 }
 
 // HandleWrp is called to process a tr181 command
-func (h Handler) HandleWrp(msg wrp.Message) error {
+func (h *Handler) HandleWrp(msg wrp.Message) error {
 	_, payloadResponse, err := h.proccessCommand(msg.Payload)
 	if err != nil {
 		return errors.Join(err, wrpkit.ErrNotHandled)
@@ -161,7 +163,7 @@ func (h Handler) HandleWrp(msg wrp.Message) error {
 	return nil
 }
 
-func (h Handler) proccessCommand(wrpPayload []byte) (int64, []byte, error) {
+func (h *Handler) proccessCommand(wrpPayload []byte) (int64, []byte, error) {
 	var (
 		err             error
 		payloadResponse []byte
@@ -173,6 +175,7 @@ func (h Handler) proccessCommand(wrpPayload []byte) (int64, []byte, error) {
 	}
 
 	payload := new(Tr181Payload)
+
 	err = json.Unmarshal(wrpPayload, &payload)
 	if err != nil {
 		return statusCode, payloadResponse, err
@@ -185,15 +188,17 @@ func (h Handler) proccessCommand(wrpPayload []byte) (int64, []byte, error) {
 		return h.set(payload)
 	case "REPLACE_ROWS":
 		return h.updateTableRow(payload)
-	case "DELETE_ROWS":
+	case "DELETE_ROW":
 		return h.deleteTableRow(payload)
+	case "ADD_ROW":
+		return h.createTableRow(payload)
 	default:
 		// currently only get and set are implemented for existing mocktr181
 		return statusCode, []byte(fmt.Sprintf(`{"message": "command '%s' is not supported", "statusCode": %d}`, payload.Command, statusCode)), nil
 	}
 }
 
-func (h Handler) get(tr181 *Tr181Payload) (int64, []byte, error) {
+func (h *Handler) get(tr181 *Tr181Payload) (int64, []byte, error) {
 	result := Tr181Payload{
 		Command:    tr181.Command,
 		Names:      tr181.Names,
@@ -215,7 +220,6 @@ func (h Handler) get(tr181 *Tr181Payload) (int64, []byte, error) {
 				continue
 			}
 
-			// Check whether mockParameter is readable.
 			if strings.Contains(mockParameter.Access, "r") {
 				found = true
 				readableParams = append(readableParams, Parameter{
@@ -263,7 +267,7 @@ func (h Handler) get(tr181 *Tr181Payload) (int64, []byte, error) {
 	return int64(result.StatusCode), payload, nil
 }
 
-func (h Handler) set(tr181 *Tr181Payload) (int64, []byte, error) {
+func (h *Handler) set(tr181 *Tr181Payload) (int64, []byte, error) {
 	result := Tr181Payload{
 		Command:    tr181.Command,
 		Names:      tr181.Names,
@@ -467,51 +471,29 @@ func (h *Handler) deleteTableRow(tr181 *Tr181Payload) (int64, []byte, error) {
 		StatusCode: http.StatusOK,
 	}
 
-	if tr181.Table == "" {
+	rowPath, ok := tr181.Row.(string)
+	if !ok || rowPath == "" {
 		result.StatusCode = 520
 		result.Parameters = []Parameter{{
-			Message: "Table field is required for DELETE_ROWS operation",
+			Message: "Row field is required for DELETE_ROW operation and must be a string",
 		}}
 		payload, _ := json.Marshal(result)
 		return int64(result.StatusCode), payload, nil
 	}
 
-	if len(tr181.Rows) == 0 {
-		result.StatusCode = 520
-		result.Parameters = []Parameter{{
-			Message: "Rows field is required for DELETE_ROWS operation",
-		}}
-		payload, _ := json.Marshal(result)
-		return int64(result.StatusCode), payload, nil
+	rowPrefix := rowPath
+	if !strings.HasSuffix(rowPrefix, ".") {
+		rowPrefix += "."
 	}
 
-	var deletedParams []Parameter
-	var newParams []MockParameter
-
-	// For each row index to delete, find all parameters that belong to that row
-	for rowIndex := range tr181.Rows {
-		rowPrefix := fmt.Sprintf("%s%s.", tr181.Table, rowIndex)
-
-		// Find all parameters that start with this row prefix and mark them for deletion
-		for _, param := range h.parameters {
-			if strings.HasPrefix(param.Name, rowPrefix) {
-				deletedParams = append(deletedParams, Parameter{
-					Name:    param.Name,
-					Message: "Deleted",
-				})
-			} else {
-				newParams = append(newParams, param)
-			}
-		}
-	}
+	deletedParams := h.deleteParametersByPrefix([]string{rowPrefix})
 
 	if len(deletedParams) == 0 {
 		result.StatusCode = 404
 		result.Parameters = []Parameter{{
-			Message: "No matching table rows found for deletion",
+			Message: "No matching table row found for deletion",
 		}}
 	} else {
-		h.parameters = newParams
 		result.Parameters = deletedParams
 	}
 
@@ -523,7 +505,106 @@ func (h *Handler) deleteTableRow(tr181 *Tr181Payload) (int64, []byte, error) {
 	return int64(result.StatusCode), payload, nil
 }
 
-func (h Handler) loadFile() ([]MockParameter, error) {
+func (h *Handler) createTableRow(tr181 *Tr181Payload) (int64, []byte, error) {
+	result := Tr181Payload{
+		Command:    tr181.Command,
+		StatusCode: http.StatusOK,
+	}
+	tableName := tr181.Table
+	if tableName == "" {
+		if len(tr181.Names) > 0 {
+			tableName = tr181.Names[0]
+		}
+	}
+
+	if tableName == "" {
+		result.StatusCode = 520
+		result.Parameters = []Parameter{{
+			Message: "Table name is required for ADD_ROW operation (use Table field)",
+		}}
+		payload, _ := json.Marshal(result)
+		return int64(result.StatusCode), payload, nil
+	}
+
+	var rowParams []Parameter
+	if tr181.Row != nil {
+		if rowData, ok := tr181.Row.(map[string]interface{}); ok {
+			for paramName, value := range rowData {
+				rowParams = append(rowParams, Parameter{
+					Name:     paramName,
+					Value:    value,
+					DataType: 0,
+				})
+			}
+		}
+	} else if len(tr181.Parameters) > 0 {
+		rowParams = tr181.Parameters
+	}
+
+	if len(rowParams) == 0 {
+		result.StatusCode = 520
+		result.Parameters = []Parameter{{
+			Message: "Row data is required for ADD_ROW operation (use Row or Parameters field)",
+		}}
+		payload, _ := json.Marshal(result)
+		return int64(result.StatusCode), payload, nil
+	}
+
+	// Ensure table name ends with a dot
+	if !strings.HasSuffix(tableName, ".") {
+		tableName += "."
+	}
+
+	maxIndex := -1
+	for _, param := range h.parameters {
+		if strings.HasPrefix(param.Name, tableName) {
+			remaining := strings.TrimPrefix(param.Name, tableName)
+			parts := strings.Split(remaining, ".")
+			if len(parts) > 0 {
+				if idx, err := strconv.Atoi(parts[0]); err == nil && idx > maxIndex {
+					maxIndex = idx
+				}
+			}
+		}
+	}
+
+	nextIndex := maxIndex + 1
+	rowPrefix := fmt.Sprintf("%s%d.", tableName, nextIndex)
+
+	var resultParams []Parameter
+
+	for _, param := range rowParams {
+		fullParamName := rowPrefix + param.Name
+
+		newParam := MockParameter{
+			Name:       fullParamName,
+			Value:      param.Value,
+			Access:     "rw",
+			DataType:   param.DataType,
+			Attributes: param.Attributes,
+		}
+
+		h.parameters = append(h.parameters, newParam)
+
+		resultParams = append(resultParams, Parameter{
+			Name:    newParam.Name,
+			Value:   newParam.Value,
+			Message: "Created",
+		})
+	}
+
+	result.StatusCode = http.StatusOK
+	result.Parameters = resultParams
+
+	payload, err := json.Marshal(result)
+	if err != nil {
+		return http.StatusInternalServerError, payload, errors.Join(ErrInvalidResponsePayload, err)
+	}
+
+	return int64(result.StatusCode), payload, nil
+}
+
+func (h *Handler) loadFile() ([]MockParameter, error) {
 	jsonFile, err := os.Open(h.filePath)
 	if err != nil {
 		return nil, errors.Join(ErrUnableToReadFile, err)
@@ -760,22 +841,13 @@ func (h *Handler) uninstallAppByPackage(pkg string) []Parameter {
 		}}
 	}
 
-	toDelete := h.getNamesToDelete(indexSet)
-
-	newParams := make([]MockParameter, 0, len(h.parameters))
-	deletions := make([]Parameter, 0, len(toDelete))
-	for _, mp := range h.parameters {
-		if _, found := toDelete[mp.Name]; found {
-			deletions = append(deletions, Parameter{
-				Name:    mp.Name,
-				Message: "Deleted",
-			})
-			continue
-		}
-		newParams = append(newParams, mp)
+	// Build prefixes for all app indexes to delete
+	var prefixes []string
+	for idx := range indexSet {
+		prefixes = append(prefixes, appsBasePath+idx+".")
 	}
-	h.parameters = newParams
 
+	deletions := h.deleteParametersByPrefix(prefixes)
 	h.updateNumberOfApps(-len(indexSet))
 	return deletions
 }
@@ -897,17 +969,31 @@ func (h *Handler) getIndexesForPackage(pkg string) map[string]struct{} {
 	return indexSet
 }
 
-func (h *Handler) getNamesToDelete(indexSet map[string]struct{}) map[string]struct{} {
-	toDelete := make(map[string]struct{})
-	for idx := range indexSet {
-		prefix := appsBasePath + idx + "."
-		for _, mp := range h.parameters {
-			if strings.HasPrefix(mp.Name, prefix) {
-				toDelete[mp.Name] = struct{}{}
+func (h *Handler) deleteParametersByPrefix(prefixes []string) []Parameter {
+	var deletedParams []Parameter
+	var newParams []MockParameter
+
+	for _, param := range h.parameters {
+		shouldDelete := false
+		for _, prefix := range prefixes {
+			if strings.HasPrefix(param.Name, prefix) {
+				shouldDelete = true
+				break
 			}
 		}
+
+		if shouldDelete {
+			deletedParams = append(deletedParams, Parameter{
+				Name:    param.Name,
+				Message: "Deleted",
+			})
+		} else {
+			newParams = append(newParams, param)
+		}
 	}
-	return toDelete
+
+	h.parameters = newParams
+	return deletedParams
 }
 
 func (h *Handler) clearCacheByPackage(pkg string) []Parameter {

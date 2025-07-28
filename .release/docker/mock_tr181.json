@@ -45,19 +45,19 @@
    },
    {
       "name":"Device.Services.X_NOS_PT_EcoWifi.Schedule.1.StartTime",
-      "value":"00:00",
-      "access":"rw",
-      "type":4
-   },
-   {
-      "name":"Device.Services.X_NOS_PT_EcoWifi.Schedule.1.EndTime",
       "value":"00:05",
       "access":"rw",
       "type":4
    },
    {
+      "name":"Device.Services.X_NOS_PT_EcoWifi.Schedule.1.EndTime",
+      "value":"00:10",
+      "access":"rw",
+      "type":4
+   },
+   {
       "name":"Device.Services.X_NOS_PT_EcoWifi.Schedule.1.WeekDays",
-      "value":"Mon",
+      "value":"Sun",
       "access":"rw",
       "type":0
    },
@@ -113,108 +113,126 @@
       "key":"Device.X_NOS_COM_APPS.2.Name",
       "name":"Device.X_NOS_COM_APPS.2.Name",
       "value":"NOS TV",
+      "access":"r",
       "type":0
    },
    {
       "key":"Device.X_NOS_COM_APPS.2.Package",
       "name":"Device.X_NOS_COM_APPS.2.Package",
       "value":"pt.nostv.tv",
+      "access":"r",
       "type":0
    },
    {
       "key":"Device.X_NOS_COM_APPS.2.Version",
       "name":"Device.X_NOS_COM_APPS.2.Version",
       "value":"1.10.4.4(11004208)",
+      "access":"r",
       "type":0
    },
    {
       "key":"Device.X_NOS_COM_APPS.2.StorageSize",
       "name":"Device.X_NOS_COM_APPS.2.StorageSize",
       "value":"",
+      "access":"r",
       "type":2
    },
    {
       "key":"Device.X_NOS_COM_APPS.2.Data",
       "name":"Device.X_NOS_COM_APPS.2.Data",
       "value":"",
+      "access":"r",
       "type":2
    },
    {
       "key":"Device.X_NOS_COM_APPS.2.Cache",
       "name":"Device.X_NOS_COM_APPS.2.Cache",
       "value":"",
+      "access":"r",
       "type":2
    },
    {
       "key":"Device.X_NOS_COM_APPS.2.AppType",
       "name":"Device.X_NOS_COM_APPS.2.AppType",
       "value":"UserInstalledApp",
+      "access":"r",
       "type":0
    },
    {
       "key":"Device.X_NOS_COM_APPS.2.State",
       "name":"Device.X_NOS_COM_APPS.2.State",
       "value":"",
+      "access":"r",
       "type":0
    },
    {
       "key":"Device.X_NOS_COM_APPS.2.LastActivityTime",
       "name":"Device.X_NOS_COM_APPS.2.LastActivityTime",
       "value":"",
+      "access":"r",
       "type":4
    },
    {
       "key":"Device.X_NOS_COM_APPS.3.Name",
       "name":"Device.X_NOS_COM_APPS.3.Name",
       "value":"YouTube",
+      "access":"r",
       "type":0
    },
    {
       "key":"Device.X_NOS_COM_APPS.3.Package",
       "name":"Device.X_NOS_COM_APPS.3.Package",
       "value":"com.google.android.youtube.tv",
+      "access":"r",
       "type":0
    },
    {
       "key":"Device.X_NOS_COM_APPS.3.Version",
       "name":"Device.X_NOS_COM_APPS.3.Version",
       "value":"5.30.301",
+      "access":"r",
       "type":0
    },
    {
       "key":"Device.X_NOS_COM_APPS.3.StorageSize",
       "name":"Device.X_NOS_COM_APPS.3.StorageSize",
       "value":"",
+      "access":"r",
       "type":2
    },
    {
       "key":"Device.X_NOS_COM_APPS.3.Data",
       "name":"Device.X_NOS_COM_APPS.3.Data",
       "value":"",
+      "access":"r",
       "type":2
    },
    {
       "key":"Device.X_NOS_COM_APPS.3.Cache",
       "name":"Device.X_NOS_COM_APPS.3.Cache",
       "value":"",
+      "access":"r",
       "type":2
    },
    {
       "key":"Device.X_NOS_COM_APPS.3.AppType",
       "name":"Device.X_NOS_COM_APPS.3.AppType",
       "value":"SystemApp",
+      "access":"r",
       "type":0
    },
    {
       "key":"Device.X_NOS_COM_APPS.3.State",
       "name":"Device.X_NOS_COM_APPS.3.State",
       "value":"",
+      "access":"r",
       "type":0
    },
    {
       "key":"Device.X_NOS_COM_APPS.3.LastActivityTime",
       "name":"Device.X_NOS_COM_APPS.3.LastActivityTime",
       "value":"",
+      "access":"r",
       "type":4
    },
    {
