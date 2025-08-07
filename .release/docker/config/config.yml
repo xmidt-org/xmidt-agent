@@ -2,5 +2,5 @@
 # SPDX-License-Identifier: Apache-2.0
 mock_tr_181:
   enabled: true
-  file_path: "/mock_tr181.json"
+  file_path: "./mock_tr181.json"
   service_name: "config"

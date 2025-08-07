@@ -312,6 +312,8 @@ func (ws *Websocket) run(ctx context.Context) {
 			})
 			ws.m.Unlock()
 
+			ws.SendOperationalEvent()
+
 			// Read loop
 			for {
 				var msg wrp.Message
@@ -403,6 +405,17 @@ func (ws *Websocket) run(ctx context.Context) {
 			return
 		}
 	}
+}
+
+func (ws *Websocket) SendOperationalEvent() {
+	deviceIDStr := string(ws.id)
+	msg := wrp.Message{
+		Type:        wrp.SimpleEventMessageType,
+		Source:      deviceIDStr,
+		Destination: "event:device-status/" + deviceIDStr,
+		Payload:     []byte(`{"device_id": "` + deviceIDStr + `","status": "operational","source": "device"}`),
+	}
+	ws.Send(context.Background(), msg)
 }
 
 func (ws *Websocket) dial(ctx context.Context, mode event.IpMode) (*nhws.Conn, *http.Response, error) {

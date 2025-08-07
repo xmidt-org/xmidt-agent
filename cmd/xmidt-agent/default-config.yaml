@@ -108,7 +108,7 @@ quic:
     jitter: .33333333 #1.0 / 3.0
     max_interval: 341333ms # 341*time.Second + 333*time.Millisecond
 cloud:
-  prefer_quic: true
+  prefer_quic: false
   # max tries before switching protocols
   max_tries: 10
 lib_parodus:
@@ -144,7 +144,7 @@ storage:
   # temporary: "~/local-rdk-testing/temporary"
   # durable: "~/local-rdk-testing/durable"
 mock_tr_181:
-  enabled: false
+  enabled: true
   file_path: "mock_tr181.json"
   service_name: "mock_config"
 xmidt_agent_crud:
