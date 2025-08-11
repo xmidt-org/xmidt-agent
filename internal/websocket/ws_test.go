@@ -52,6 +52,7 @@ func TestNew(t *testing.T) {
 				wsDefaults,
 				FetchURL(fetcher),
 				DeviceID("mac:112233445566"),
+				Enabled(true),
 				AdditionalHeaders(map[string][]string{
 					"some-other-header": {"vAlUE"},
 				}),
@@ -70,6 +71,7 @@ func TestNew(t *testing.T) {
 				RetryPolicy(retry.Config{}),
 			),
 			check: func(assert *assert.Assertions, c *Websocket) {
+				assert.True(c.enabled)
 				// URL Related
 				assert.Equal("mac:112233445566", string(c.id))
 				assert.NotNil(c.urlFetcher)
