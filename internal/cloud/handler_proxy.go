@@ -77,7 +77,7 @@ func New(opts ...Option) (Handler, error) {
 
 	p.wg.Lock()
 	defer p.wg.Unlock()
-	if p.preferQuic {
+	if p.preferQuic && p.qc.IsEnabled() {
 		p.active = p.qc
 		p.activeWrpHandler = p.qcMsgHandler
 	} else {
@@ -155,6 +155,10 @@ func (p *Proxy) OnQuicConnect(e event.Connect) {
 
 func (p *Proxy) OnWebsocketConnect(e event.Connect) {
 	// should we switch to quic?
+	if !p.qc.IsEnabled() {
+		return
+	}
+
 	if e.Err != nil && e.TriesSinceLastConnect > p.maxTries {
 		p.ws.Stop()
 		p.qc.Start()
@@ -164,4 +168,8 @@ func (p *Proxy) OnWebsocketConnect(e event.Connect) {
 		p.active = p.qc
 		p.activeWrpHandler = p.qcMsgHandler
 	}
+}
+
+func (p *Proxy) IsEnabled() bool {
+	return true
 }

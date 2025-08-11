@@ -16,6 +16,14 @@ import (
 	"github.com/xmidt-org/xmidt-agent/internal/event"
 )
 
+func Enabled(enabled bool) Option {
+	return optionFunc(
+		func(ws *Websocket) error {
+			ws.enabled = enabled
+			return nil
+		})
+}
+
 // DeviceID sets the device ID for the WS connection.
 func DeviceID(id wrp.DeviceID) Option {
 	return optionFunc(

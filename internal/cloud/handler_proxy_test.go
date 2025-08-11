@@ -34,6 +34,8 @@ func (suite *ProxySuite) SetupTest() {
 	mockWebsocketHandler.On("AddConnectListener", mock.Anything).Return(TestCancelFunc)
 	mockQuicHandler.On("AddMessageListener", mock.Anything).Return(TestCancelFunc)
 	mockWebsocketHandler.On("AddMessageListener", mock.Anything).Return(TestCancelFunc)
+	mockQuicHandler.On("IsEnabled", mock.Anything).Return(true)
+	mockWebsocketHandler.On("IsEnabled", mock.Anything).Return(true)
 
 	got, err := New(
 		QuicClient(mockQuicHandler),
@@ -147,6 +149,7 @@ func (suite *ProxySuite) TestProxyConnectListener() {
 }
 
 func (suite *ProxySuite) TestOnQuicConnect() {
+
 	// max tries not exceeded
 	suite.mockQuicClient.On("Name").Return("quic")
 	e := event.Connect{}
@@ -162,9 +165,8 @@ func (suite *ProxySuite) TestOnQuicConnect() {
 	}
 	suite.got.OnQuicConnect(e)
 
-	// Calls are made but asserts are failing
-	// suite.mockQuicClient.AssertCalled(suite.T(), "Stop")
-	// suite.mockQuicClient.AssertCalled(suite.T(), "Start")
+	suite.mockQuicClient.AssertCalled(suite.T(), "Stop")
+	suite.mockWebsocket.AssertCalled(suite.T(), "Start")
 }
 
 func (suite *ProxySuite) TestName() {
@@ -191,9 +193,29 @@ func (suite *ProxySuite) TestOnWebsocketConnect() {
 	}
 	suite.got.OnWebsocketConnect(e)
 
-	// Calls are made but asserts are failing
-	// suite.mockQuicClient.AssertCalled(suite.T(), "Stop")
-	// suite.mockQuicClient.AssertCalled(suite.T(), "Start")
+	suite.mockWebsocket.AssertCalled(suite.T(), "Stop")
+	suite.mockQuicClient.AssertCalled(suite.T(), "Start")
+
+}
+
+func (suite *ProxySuite) TestOnWebsocketConnectQuicDisabled() {
+	// max tries exceeded
+	suite.mockQuicClient.ExpectedCalls = nil
+	suite.mockWebsocket.On("Stop").Return()
+	suite.mockQuicClient.On("Start").Return()
+	suite.mockQuicClient.On("IsEnabled").Return(false)
+
+	suite.mockQuicClient.IsEnabled()
+
+	e := event.Connect{
+		TriesSinceLastConnect: 3,
+		Err:                   errors.New("some error"),
+	}
+
+	suite.got.OnWebsocketConnect(e)
+
+	suite.mockWebsocket.AssertNotCalled(suite.T(), "Stop")
+	suite.mockQuicClient.AssertNotCalled(suite.T(), "Start")
 }
 
 func (suite *ProxySuite) TestProxyCalls() {

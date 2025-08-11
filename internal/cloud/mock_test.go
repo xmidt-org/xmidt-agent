@@ -27,6 +27,11 @@ func (m *MockCloudHandler) Name() string {
 	return args.Get(0).(string)
 }
 
+func (m *MockCloudHandler) IsEnabled() bool {
+	args := m.Called()
+	return args.Get(0).(bool)
+}
+
 func (m *MockCloudHandler) AddMessageListener(l event.MsgListener) event.CancelFunc {
 	args := m.Called(l)
 	return args.Get(0).(event.CancelFunc)

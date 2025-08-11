@@ -48,6 +48,7 @@ xmidt_service:
 #     -----END PUBLIC KEY-----
 #   timeout: 10s
 websocket:
+  disable: false
   url_path:           "/api/v2/device"
   # used if xmidt_service section is empty or xmdit_service connection fails
   back_up_url:        "https://localhost:8080"
@@ -66,6 +67,7 @@ websocket:
       insecure_skip_verify: true
   max_message_bytes: 262144 # 256 * 1024
 quic:
+  disable: true
   url_path:           "/api/v2/device"
   # used if xmidt_service section is empty or xmdit_service connection fails
   back_up_url:        "https://localhost:4432"
@@ -108,7 +110,7 @@ quic:
     jitter: .33333333 #1.0 / 3.0
     max_interval: 341333ms # 341*time.Second + 333*time.Millisecond
 cloud:
-  prefer_quic: true
+  prefer_quic: false
   # max tries before switching protocols
   max_tries: 10
 lib_parodus:
