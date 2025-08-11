@@ -7,7 +7,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/quic-go/quic-go"
+	quic "github.com/quic-go/quic-go"
 )
 
 type Stream interface {

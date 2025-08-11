@@ -18,4 +18,5 @@ type Handler interface {
 	// any listener added will be called when the network channel tries to connect
 	AddConnectListener(listener event.ConnectListener) event.CancelFunc
 	Name() string
+	IsEnabled() bool
 }

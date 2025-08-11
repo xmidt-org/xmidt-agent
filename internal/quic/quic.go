@@ -16,7 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/quic-go/quic-go"
+	quic "github.com/quic-go/quic-go"
 	"github.com/xmidt-org/eventor"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v5"
@@ -180,6 +180,10 @@ func New(opts ...Option) (*QuicClient, error) {
 	return &qc, nil
 }
 
+func (qc *QuicClient) IsEnabled() bool {
+	return qc.enabled
+}
+
 func (qc *QuicClient) Name() string {
 	return Name
 }
@@ -220,10 +224,6 @@ func (qc *QuicClient) Stop() {
 	// is deadlocked
 	//qc.wg.Wait() // TODO - this is blocking forever
 	qc.shutdown = nil
-}
-
-func (qc *QuicClient) IsEnabled() bool {
-	return qc.enabled
 }
 
 func (qc *QuicClient) HandleWrp(m wrp.Message) error {

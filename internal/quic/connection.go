@@ -8,7 +8,7 @@ package quic
 import (
 	"context"
 
-	"github.com/quic-go/quic-go"
+	quic "github.com/quic-go/quic-go"
 )
 
 type Connection interface {

@@ -60,6 +60,7 @@ func provideWS(in WsIn) (wsOut, error) { //nolint
 
 	// Configuration options
 	opts = append(opts,
+		websocket.Enabled(!in.Websocket.Disable),
 		websocket.DeviceID(in.Identity.DeviceID),
 		websocket.FetchURLTimeout(in.Websocket.FetchURLTimeout),
 		websocket.FetchURL(

@@ -38,6 +38,9 @@ type Egress interface {
 }
 
 type Websocket struct {
+	// whether or not websocket protocol is enabled
+	enabled bool
+
 	// id is the device ID for the WS connection.
 	id wrp.DeviceID
 
@@ -205,6 +208,10 @@ func (ws *Websocket) Stop() {
 
 func (ws *Websocket) Name() string {
 	return Name
+}
+
+func (ws *Websocket) IsEnabled() bool {
+	return true
 }
 
 func (ws *Websocket) HandleWrp(m wrp.Message) error {
