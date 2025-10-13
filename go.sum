@@ -22,8 +22,8 @@ github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+
 github.com/gorilla/websocket v1.5.0/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/goschtalt/approx v1.0.0 h1:q8DMVEOSgwjFUYsupwhLApMWhfbaxRfWeSKT2uTU214=
 github.com/goschtalt/approx v1.0.0/go.mod h1:Mh0VbpeEgO2Qo2PKGrSuz241D/nj9q7OPegJNWzrbIU=
-github.com/goschtalt/goschtalt v0.26.1 h1:qKJir8DdIvMn5yhYm7Yinm7VprWtPDExmlGUb3bXykY=
-github.com/goschtalt/goschtalt v0.26.1/go.mod h1:9poGRGvMfVl4Oysn+9l+W6cwbFpNp3jkIhk1/fV+uSg=
+github.com/goschtalt/goschtalt v0.27.0 h1:j0hJS25SGtoIYm/wjFlGgrLxLssProRjx6UGnRO1Raw=
+github.com/goschtalt/goschtalt v0.27.0/go.mod h1:kfX00FBlBjmfaggBUmVFaQ1+iEXgU3+GM64eEdWYwqw=
 github.com/goschtalt/properties-decoder v0.1.0 h1:e4otCq3mUY4Wbwj/iFrJtA+IcwRBxsHYrbh4i/p5ckE=
 github.com/goschtalt/properties-decoder v0.1.0/go.mod h1:TgczKTeyA8DPmW0ajpGQ59xH5k8aF9W9b0jwQ2RFITI=
 github.com/goschtalt/yaml-decoder v0.0.1 h1:fwXf5OoC2tUm6+FOzMizvh6UITFALw6OWxJTVNgbJwg=
