@@ -12,7 +12,7 @@ require (
 	github.com/goschtalt/yaml-encoder v0.0.4
 	github.com/lestrrat-go/jwx/v2 v2.1.6
 	github.com/stretchr/testify v1.11.1
-	github.com/tinylib/msgp v1.4.0
+	github.com/tinylib/msgp v1.5.0
 	github.com/xmidt-org/arrange v0.5.1
 	github.com/xmidt-org/eventor v1.0.23
 	github.com/xmidt-org/retry v0.0.4
