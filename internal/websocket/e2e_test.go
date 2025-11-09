@@ -594,7 +594,7 @@ func TestEndToEndPingPongHeartbeats(t *testing.T) {
 	got.Start()
 
 	// Wait for connection and let ticker pings fire
-	// With 20ms pingWriteTimeout, ticker fires every 10ms
+	// With 100ms pingWriteTimeout, ticker fires every 50ms
 	// Wait 1 second to allow ~100 ticker pings
 	time.Sleep(1 * time.Second)
 
@@ -624,10 +624,6 @@ func TestEndToEndPingPongHeartbeats(t *testing.T) {
 	// With pingWriteTimeout set, client sends pings, server responds with pongs,
 	// and createPongHandler triggers PONG heartbeat events
 	assert.True(hasPong, "should have received PONG heartbeat events from ping/pong cycle")
-
-	// Success! Both createPingHandler() and createPongHandler() are tested
-	// The ping sender goroutine (lines 325-346) is also implicitly tested since
-	// PONG events only occur when the client sends pings and receives pong responses
 }
 
 func TestEndToEndPingSenderFailure(t *testing.T) {
@@ -722,7 +718,7 @@ func TestEndToEndPingSenderFailure(t *testing.T) {
 	}
 	disconnectErrsMu.Unlock()
 
-	// This tests the ping sender error handling (lines 308-311 and 331-334)
+	// This tests the inline ping sender error handling
 	if hasDeadlineExceeded {
 		t.Log("Successfully tested ping sender error path")
 	}
