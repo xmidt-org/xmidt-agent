@@ -549,9 +549,10 @@ func TestEndToEndPingPongHeartbeats(t *testing.T) {
 					heartbeatTypes = append(heartbeatTypes, hb.Type)
 					heartbeatMu.Unlock()
 
-					if hb.Type == event.PING {
+					switch hb.Type {
+					case event.PING:
 						pingEventCnt.Add(1)
-					} else if hb.Type == event.PONG {
+					case event.PONG:
 						pongEventCnt.Add(1)
 					}
 				})),

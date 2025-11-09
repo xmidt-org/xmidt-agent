@@ -435,7 +435,7 @@ func (ws *Websocket) run(ctx context.Context) {
 func (ws *Websocket) createPingHandler() func(context.Context, []byte) bool {
 	return func(ctx context.Context, payload []byte) bool {
 		if ctx.Err() != nil {
-			return false // Don't send pong if context cancelled
+			return false // Don't send pong if context canceled
 		}
 
 		// Update activity timestamp
@@ -458,7 +458,7 @@ func (ws *Websocket) createPingHandler() func(context.Context, []byte) bool {
 func (ws *Websocket) createPongHandler() func(context.Context, []byte) {
 	return func(ctx context.Context, payload []byte) {
 		if ctx.Err() != nil {
-			return // Ignore if context cancelled
+			return // Ignore if context canceled
 		}
 
 		// Update activity timestamp
