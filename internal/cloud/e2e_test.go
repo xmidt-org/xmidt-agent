@@ -1,8 +1,6 @@
 // SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
 // SPDX-License-Identifier: Apache-2.0
 
-//go:build !race
-
 package cloud
 
 import (
@@ -21,9 +19,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coder/websocket"
 	"github.com/quic-go/quic-go"
 	"github.com/stretchr/testify/suite"
-	"github.com/xmidt-org/xmidt-agent/internal/nhooyr.io/websocket"
 	qc "github.com/xmidt-org/xmidt-agent/internal/quic"
 	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 

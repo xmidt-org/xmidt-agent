@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coder/websocket"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -20,7 +21,6 @@ import (
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/event"
 	mockevent "github.com/xmidt-org/xmidt-agent/internal/mocks/event"
-	"github.com/xmidt-org/xmidt-agent/internal/nhooyr.io/websocket"
 )
 
 var (

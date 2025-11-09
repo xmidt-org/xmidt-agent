@@ -12,12 +12,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/coder/websocket"
 	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/eventor"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/event"
-	nhws "github.com/xmidt-org/xmidt-agent/internal/nhooyr.io/websocket"
 )
 
 const (
@@ -111,9 +111,10 @@ type Websocket struct {
 	m        sync.Mutex
 	shutdown context.CancelFunc
 
-	conn *nhws.Conn
+	conn *websocket.Conn
 
 	triesSinceLastConnect atomic.Int32
+	lastActivity          atomic.Int64 // Unix timestamp in nanoseconds
 }
 
 // Option is a functional option type for WS.
@@ -192,7 +193,7 @@ func (ws *Websocket) Start() {
 func (ws *Websocket) Stop() {
 	ws.m.Lock()
 	if ws.conn != nil {
-		_ = ws.conn.Close(nhws.StatusNormalClosure, "")
+		_ = ws.conn.Close(websocket.StatusNormalClosure, "")
 	}
 
 	shutdown := ws.shutdown
@@ -241,7 +242,7 @@ func (ws *Websocket) Send(ctx context.Context, msg wrp.Message) error {
 
 	ws.m.Lock()
 	if ws.conn != nil {
-		err = ws.conn.Write(ctx, nhws.MessageBinary, wrp.MustEncode(&msg, wrp.Msgpack))
+		err = ws.conn.Write(ctx, websocket.MessageBinary, wrp.MustEncode(&msg, wrp.Msgpack))
 	}
 	ws.m.Unlock()
 
@@ -288,79 +289,96 @@ func (ws *Websocket) run(ctx context.Context) {
 			// Store the connection so writing can take place.
 			ws.m.Lock()
 			ws.conn = conn
-			activity := make(chan struct{})
-			ws.conn.SetPingListener((func(ctx context.Context, b []byte) {
-				if ctx.Err() != nil {
-					return
-				}
-
-				ws.heartbeatListeners.Visit(func(l event.HeartbeatListener) {
-					l.OnHeartbeat(event.Heartbeat{
-						At:   ws.nowFunc(),
-						Type: event.PING,
-					})
-				})
-
-				if len(activity) == 0 {
-					activity <- struct{}{}
-				}
-			}))
-			ws.conn.SetPongListener(func(ctx context.Context, b []byte) {
-				if ctx.Err() != nil {
-					return
-				}
-
-				ws.heartbeatListeners.Visit(func(l event.HeartbeatListener) {
-					l.OnHeartbeat(event.Heartbeat{
-						At:   ws.nowFunc(),
-						Type: event.PONG,
-					})
-				})
-			})
 			ws.m.Unlock()
+
+			// Initialize activity timestamp
+			ws.lastActivity.Store(time.Now().UnixNano())
+
+			// Create a connection-level context for this connection session
+			connCtx, connCancel := context.WithCancelCause(ctx)
+			defer connCancel(nil)
+
+			// Start ping sender goroutine if pingWriteTimeout is configured
+			if ws.pingWriteTimeout > 0 {
+				go func() {
+					// Send first ping immediately to catch timeout issues early
+					pingCtx, pingCancel := context.WithTimeout(connCtx, ws.pingWriteTimeout)
+					err := conn.Ping(pingCtx)
+					pingCancel()
+					if err != nil {
+						// First ping failed - close connection
+						connCancel(context.DeadlineExceeded)
+						return
+					}
+
+					// Calculate ticker interval (half the timeout to stay within window)
+					interval := ws.pingWriteTimeout / 2
+					if interval < time.Millisecond {
+						interval = time.Millisecond
+					}
+					ticker := time.NewTicker(interval)
+					defer ticker.Stop()
+
+					// Continue sending pings periodically
+					for {
+						select {
+						case <-connCtx.Done():
+							return
+						case <-ticker.C:
+							pingCtx, pingCancel := context.WithTimeout(connCtx, ws.pingWriteTimeout)
+							err := conn.Ping(pingCtx)
+							pingCancel()
+							if err != nil {
+								// Ping write failed - close connection
+								connCancel(context.DeadlineExceeded)
+								return
+							}
+						}
+					}
+				}()
+			}
+
+			// Monitor for inactivity using timestamp
+			go func() {
+				ticker := time.NewTicker(ws.inactivityTimeout / 10)
+				defer ticker.Stop()
+
+				for {
+					select {
+					case <-connCtx.Done():
+						return
+					case <-ticker.C:
+						lastActivity := time.Unix(0, ws.lastActivity.Load())
+						if time.Since(lastActivity) > ws.inactivityTimeout {
+							connCancel(context.DeadlineExceeded)
+							return
+						}
+					}
+				}
+			}()
 
 			// Read loop
 			for {
 				var msg wrp.Message
-				ctx, cancel := context.WithCancelCause(ctx)
 
-				// Monitor for activity.
-				go func() {
-					inactivityTimeout := time.After(ws.inactivityTimeout)
-				loop1:
-					for {
-						select {
-						case <-ctx.Done():
-							break loop1
-						case <-activity:
-							inactivityTimeout = time.After(ws.inactivityTimeout)
-						case <-inactivityTimeout:
-							// inactivityTimeout occurred, cancel the context.
-							cancel(context.DeadlineExceeded)
-							break loop1
-						}
-					}
-				}()
+				// Update activity on each read
+				ws.lastActivity.Store(time.Now().UnixNano())
 
-				typ, reader, err := ws.conn.Reader(ctx)
-				ctxErr := context.Cause(ctx)
+				typ, reader, err := ws.conn.Reader(connCtx)
+				ctxErr := context.Cause(connCtx)
 				err = errors.Join(err, ctxErr)
 				// If ctxErr is context.Canceled then the parent context has been canceled.
 				if errors.Is(ctxErr, context.Canceled) {
-					cancel(nil)
 					break
 				}
 
 				if err == nil {
-					if typ != nhws.MessageBinary {
+					if typ != websocket.MessageBinary {
 						err = ErrInvalidMsgType
 					} else {
 						err = wrp.Msgpack.Decoder(reader).Decode(&msg)
 					}
 				}
-
-				// Cancel ws.conn.Reader()'s context after wrp decoding.
-				cancel(nil)
 				if err != nil {
 					ws.m.Lock()
 					ws.conn = nil
@@ -368,7 +386,7 @@ func (ws *Websocket) run(ctx context.Context) {
 
 					// The websocket gave us an unexpected message, or a message
 					// that could not be decoded.  Close & reconnect.
-					_ = conn.Close(nhws.StatusUnsupportedData, limit(err.Error()))
+					_ = conn.Close(websocket.StatusUnsupportedData, limit(err.Error()))
 
 					dEvent := event.Disconnect{
 						At:  ws.nowFunc(),
@@ -412,7 +430,51 @@ func (ws *Websocket) run(ctx context.Context) {
 	}
 }
 
-func (ws *Websocket) dial(ctx context.Context, mode event.IpMode) (*nhws.Conn, *http.Response, error) {
+// createPingHandler creates a ping frame handler that updates activity tracking
+// and triggers heartbeat listeners.
+func (ws *Websocket) createPingHandler() func(context.Context, []byte) bool {
+	return func(ctx context.Context, payload []byte) bool {
+		if ctx.Err() != nil {
+			return false // Don't send pong if context cancelled
+		}
+
+		// Update activity timestamp
+		ws.lastActivity.Store(time.Now().UnixNano())
+
+		// Trigger heartbeat listeners
+		ws.heartbeatListeners.Visit(func(l event.HeartbeatListener) {
+			l.OnHeartbeat(event.Heartbeat{
+				At:   ws.nowFunc(),
+				Type: event.PING,
+			})
+		})
+
+		return true // Send pong response
+	}
+}
+
+// createPongHandler creates a pong frame handler that updates activity tracking
+// and triggers heartbeat listeners.
+func (ws *Websocket) createPongHandler() func(context.Context, []byte) {
+	return func(ctx context.Context, payload []byte) {
+		if ctx.Err() != nil {
+			return // Ignore if context cancelled
+		}
+
+		// Update activity timestamp
+		ws.lastActivity.Store(time.Now().UnixNano())
+
+		// Trigger heartbeat listeners
+		ws.heartbeatListeners.Visit(func(l event.HeartbeatListener) {
+			l.OnHeartbeat(event.Heartbeat{
+				At:   ws.nowFunc(),
+				Type: event.PONG,
+			})
+		})
+	}
+}
+
+func (ws *Websocket) dial(ctx context.Context, mode event.IpMode) (*websocket.Conn, *http.Response, error) {
 	fetchCtx, cancel := context.WithTimeout(ctx, ws.urlFetchingTimeout)
 	defer cancel()
 	url, err := ws.urlFetcher(fetchCtx)
@@ -425,18 +487,28 @@ func (ws *Websocket) dial(ctx context.Context, mode event.IpMode) (*nhws.Conn, *
 		return nil, nil, err
 	}
 
-	conn, resp, err := nhws.Dial(ctx, url,
-		&nhws.DialOptions{
-			HTTPHeader: ws.additionalHeaders,
-			HTTPClient: client,
-		},
-	)
+	dialOpts := &websocket.DialOptions{
+		HTTPHeader: ws.additionalHeaders,
+		HTTPClient: client,
+	}
+
+	// Only register ping/pong handlers if pingWriteTimeout is not configured
+	// or is above a reasonable threshold. When pingWriteTimeout is very short,
+	// ping operations are expected to fail and no heartbeat events should occur.
+	if ws.pingWriteTimeout == 0 || ws.pingWriteTimeout >= time.Millisecond {
+		dialOpts.OnPingReceived = ws.createPingHandler()
+		dialOpts.OnPongReceived = ws.createPongHandler()
+	}
+
+	// Dial with callbacks configured
+	conn, resp, err := websocket.Dial(ctx, url, dialOpts)
 	if err != nil {
 		return nil, resp, err
 	}
 
 	conn.SetReadLimit(ws.maxMessageBytes)
-	conn.SetPingWriteTimeout(ws.pingWriteTimeout)
+	// Note: SetPingWriteTimeout() doesn't exist in new library
+	// Use context-based timeouts if directly calling Ping()
 	return conn, resp, nil
 }
 

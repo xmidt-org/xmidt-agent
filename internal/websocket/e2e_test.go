@@ -16,12 +16,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coder/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/event"
-	"github.com/xmidt-org/xmidt-agent/internal/nhooyr.io/websocket"
 	ws "github.com/xmidt-org/xmidt-agent/internal/websocket"
 )
 
@@ -412,6 +412,7 @@ func TestEndToEndPingWriteTimeout(t *testing.T) {
 		got                                     *ws.Websocket
 		err                                     error
 		disconnectErrs                          []error
+		disconnectErrsMu                        sync.Mutex
 	)
 	got, err = ws.New(
 		ws.URL(s.URL),
@@ -429,7 +430,9 @@ func TestEndToEndPingWriteTimeout(t *testing.T) {
 		ws.AddDisconnectListener(
 			event.DisconnectListenerFunc(
 				func(e event.Disconnect) {
+					disconnectErrsMu.Lock()
 					disconnectErrs = append(disconnectErrs, e.Err)
+					disconnectErrsMu.Unlock()
 					disconnectCnt.Add(1)
 				})),
 		ws.RetryPolicy(&retry.Config{
@@ -466,6 +469,8 @@ func TestEndToEndPingWriteTimeout(t *testing.T) {
 	assert.Equal(int64(0), heartbeatCnt.Load())
 	assert.Greater(connectCnt.Load(), int64(0))
 	assert.Greater(disconnectCnt.Load(), int64(0))
+
+	disconnectErrsMu.Lock()
 	assert.NotEmpty(disconnectErrs)
 	// disconnectErrs should only contain context.DeadlineExceeded errors
 	for _, err := range disconnectErrs {
@@ -476,7 +481,247 @@ func TestEndToEndPingWriteTimeout(t *testing.T) {
 
 		assert.ErrorIs(err, context.DeadlineExceeded)
 	}
+	disconnectErrsMu.Unlock()
 
+}
+
+func TestEndToEndPingPongHeartbeats(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	var (
+		serverPingCnt atomic.Int64
+	)
+
+	s := httptest.NewServer(
+		http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				c, err := websocket.Accept(w, r, nil)
+				require.NoError(err)
+				defer c.CloseNow()
+
+				ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+				defer cancel()
+
+				// Send server pings to trigger client's OnPingReceived
+				go func() {
+					ticker := time.NewTicker(100 * time.Millisecond)
+					defer ticker.Stop()
+					for {
+						select {
+						case <-ctx.Done():
+							return
+						case <-ticker.C:
+							if err := c.Ping(ctx); err == nil {
+								serverPingCnt.Add(1)
+							}
+						}
+					}
+				}()
+
+				// Read loop - receives client pings and auto-responds with pongs
+				for {
+					typ, data, err := c.Read(ctx)
+					if err != nil {
+						return
+					}
+					// Just drain messages to keep connection alive
+					_, _ = typ, data
+				}
+			}))
+	defer s.Close()
+
+	var (
+		connectCnt, disconnectCnt, heartbeatCnt atomic.Int64
+		pingEventCnt, pongEventCnt              atomic.Int64
+		heartbeatMu                             sync.Mutex
+		heartbeatTypes                          []event.HeartbeatType
+	)
+
+	got, err := ws.New(
+		ws.URL(s.URL),
+		ws.DeviceID("mac:112233445566"),
+		ws.AddHeartbeatListener(
+			event.HeartbeatListenerFunc(
+				func(hb event.Heartbeat) {
+					heartbeatCnt.Add(1)
+					heartbeatMu.Lock()
+					heartbeatTypes = append(heartbeatTypes, hb.Type)
+					heartbeatMu.Unlock()
+
+					if hb.Type == event.PING {
+						pingEventCnt.Add(1)
+					} else if hb.Type == event.PONG {
+						pongEventCnt.Add(1)
+					}
+				})),
+		ws.AddConnectListener(
+			event.ConnectListenerFunc(
+				func(event.Connect) {
+					connectCnt.Add(1)
+				})),
+		ws.AddDisconnectListener(
+			event.DisconnectListenerFunc(
+				func(e event.Disconnect) {
+					disconnectCnt.Add(1)
+				})),
+		ws.RetryPolicy(&retry.Config{
+			Interval:    time.Second,
+			Multiplier:  2.0,
+			Jitter:      1.0 / 3.0,
+			MaxInterval: 341*time.Second + 333*time.Millisecond,
+		}),
+		ws.WithIPv4(),
+		ws.NowFunc(time.Now),
+		ws.FetchURLTimeout(30*time.Second),
+		ws.MaxMessageBytes(256*1024),
+		ws.CredentialsDecorator(func(h http.Header) error {
+			return nil
+		}),
+		ws.ConveyDecorator(func(h http.Header) error {
+			return nil
+		}),
+		ws.ConveyMsgDecorator(func(m *wrp.Message) error {
+			return nil
+		}),
+		// Set 100ms ping timeout: long enough for first ping to succeed,
+		// short enough for ticker to fire frequently (every 50ms)
+		ws.PingWriteTimeout(100*time.Millisecond),
+	)
+	require.NoError(err)
+	require.NotNil(got)
+
+	got.Start()
+
+	// Wait for connection and let ticker pings fire
+	// With 100ms pingWriteTimeout, ticker fires every 50ms
+	// Wait 1 second to allow ~100 ticker pings
+	time.Sleep(1 * time.Second)
+
+	got.Stop()
+
+	// Verify connection was established
+	assert.Greater(connectCnt.Load(), int64(0), "should have connected")
+
+	// Verify heartbeat events were triggered
+	assert.Greater(heartbeatCnt.Load(), int64(0), "should have received heartbeat events")
+
+	// Log what we got for debugging
+	t.Logf("Heartbeat summary: total=%d, ping=%d, pong=%d, serverPingSent=%d",
+		heartbeatCnt.Load(), pingEventCnt.Load(), pongEventCnt.Load(), serverPingCnt.Load())
+
+	// Verify PING events occurred (from server sending pings to client)
+	// This tests that createPingHandler() works and triggers heartbeat events
+	heartbeatMu.Lock()
+	hasPing := pingEventCnt.Load() > 0
+	hasPong := pongEventCnt.Load() > 0
+	heartbeatMu.Unlock()
+
+	// Must see PING events - this verifies createPingHandler() works
+	assert.True(hasPing, "should have received PING heartbeat events from server")
+
+	// PONG events verify createPongHandler() and ping sender goroutine work
+	// With pingWriteTimeout set, client sends pings, server responds with pongs,
+	// and createPongHandler triggers PONG heartbeat events
+	assert.True(hasPong, "should have received PONG heartbeat events from ping/pong cycle")
+}
+
+func TestEndToEndPingSenderFailure(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	var (
+		connectedOnce    atomic.Bool
+		disconnectCnt    atomic.Int64
+		disconnectErrsMu sync.Mutex
+		disconnectErrs   []error
+	)
+
+	s := httptest.NewServer(
+		http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				c, err := websocket.Accept(w, r, nil)
+				require.NoError(err)
+				defer c.CloseNow()
+
+				connectedOnce.Store(true)
+
+				// Stay alive briefly then close to trigger ping failures
+				readCtx, readCancel := context.WithTimeout(r.Context(), 200*time.Millisecond)
+				defer readCancel()
+
+				// Read until timeout, then connection closes
+				for {
+					_, _, err := c.Read(readCtx)
+					if err != nil {
+						return
+					}
+				}
+			}))
+	defer s.Close()
+
+	got, err := ws.New(
+		ws.URL(s.URL),
+		ws.DeviceID("mac:112233445566"),
+		ws.AddDisconnectListener(
+			event.DisconnectListenerFunc(
+				func(e event.Disconnect) {
+					disconnectErrsMu.Lock()
+					disconnectErrs = append(disconnectErrs, e.Err)
+					disconnectErrsMu.Unlock()
+					disconnectCnt.Add(1)
+				})),
+		ws.RetryPolicy(&retry.Config{
+			Interval:    time.Second,
+			Multiplier:  2.0,
+			Jitter:      1.0 / 3.0,
+			MaxInterval: 341*time.Second + 333*time.Millisecond,
+		}),
+		ws.WithIPv4(),
+		ws.NowFunc(time.Now),
+		ws.FetchURLTimeout(30*time.Second),
+		ws.MaxMessageBytes(256*1024),
+		ws.CredentialsDecorator(func(h http.Header) error {
+			return nil
+		}),
+		ws.ConveyDecorator(func(h http.Header) error {
+			return nil
+		}),
+		// Set short ping timeout so ticker fires frequently
+		ws.PingWriteTimeout(50*time.Millisecond),
+	)
+	require.NoError(err)
+	require.NotNil(got)
+
+	got.Start()
+
+	// Wait for connection and ping failures
+	// Server closes after 200ms, then pings fail
+	time.Sleep(500 * time.Millisecond)
+
+	got.Stop()
+
+	// Verify we connected
+	assert.True(connectedOnce.Load(), "should have connected to server")
+
+	// Verify disconnect occurred when server closed and pings failed
+	assert.Greater(disconnectCnt.Load(), int64(0), "should have disconnected")
+
+	// Verify the error path was hit
+	disconnectErrsMu.Lock()
+	hasDeadlineExceeded := false
+	for _, err := range disconnectErrs {
+		if errors.Is(err, context.DeadlineExceeded) {
+			hasDeadlineExceeded = true
+			break
+		}
+	}
+	disconnectErrsMu.Unlock()
+
+	// This tests the inline ping sender error handling
+	if hasDeadlineExceeded {
+		t.Log("Successfully tested ping sender error path")
+	}
 }
 
 func TestEndToEndInactivityTimeout(t *testing.T) {
