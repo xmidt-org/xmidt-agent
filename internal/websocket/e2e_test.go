@@ -16,12 +16,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coder/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/event"
-	"github.com/xmidt-org/xmidt-agent/internal/nhooyr.io/websocket"
 	ws "github.com/xmidt-org/xmidt-agent/internal/websocket"
 )
 
@@ -412,6 +412,7 @@ func TestEndToEndPingWriteTimeout(t *testing.T) {
 		got                                     *ws.Websocket
 		err                                     error
 		disconnectErrs                          []error
+		disconnectErrsMu                        sync.Mutex
 	)
 	got, err = ws.New(
 		ws.URL(s.URL),
@@ -429,7 +430,9 @@ func TestEndToEndPingWriteTimeout(t *testing.T) {
 		ws.AddDisconnectListener(
 			event.DisconnectListenerFunc(
 				func(e event.Disconnect) {
+					disconnectErrsMu.Lock()
 					disconnectErrs = append(disconnectErrs, e.Err)
+					disconnectErrsMu.Unlock()
 					disconnectCnt.Add(1)
 				})),
 		ws.RetryPolicy(&retry.Config{
@@ -466,6 +469,8 @@ func TestEndToEndPingWriteTimeout(t *testing.T) {
 	assert.Equal(int64(0), heartbeatCnt.Load())
 	assert.Greater(connectCnt.Load(), int64(0))
 	assert.Greater(disconnectCnt.Load(), int64(0))
+
+	disconnectErrsMu.Lock()
 	assert.NotEmpty(disconnectErrs)
 	// disconnectErrs should only contain context.DeadlineExceeded errors
 	for _, err := range disconnectErrs {
@@ -476,6 +481,7 @@ func TestEndToEndPingWriteTimeout(t *testing.T) {
 
 		assert.ErrorIs(err, context.DeadlineExceeded)
 	}
+	disconnectErrsMu.Unlock()
 
 }
 
