@@ -298,32 +298,20 @@ func (ws *Websocket) run(ctx context.Context) {
 			connCtx, connCancel := context.WithCancelCause(ctx)
 			defer connCancel(nil)
 
-			// If pingWriteTimeout is configured, send first ping synchronously
-			// This ensures we catch timeout issues before any server pings arrive
+			// Start ping sender goroutine if pingWriteTimeout is configured
 			if ws.pingWriteTimeout > 0 {
-				pingCtx, pingCancel := context.WithTimeout(connCtx, ws.pingWriteTimeout)
-				err := conn.Ping(pingCtx)
-				pingCancel()
-				if err != nil {
-					// Ping write failed - close connection immediately
-					ws.m.Lock()
-					ws.conn = nil
-					ws.m.Unlock()
-					_ = conn.Close(websocket.StatusInternalError, limit(err.Error()))
-
-					dEvent := event.Disconnect{
-						At:  ws.nowFunc(),
-						Err: context.DeadlineExceeded,
-					}
-					ws.disconnectListeners.Visit(func(l event.DisconnectListener) {
-						l.OnDisconnect(dEvent)
-					})
-					continue // Skip to next connection attempt
-				}
-
-				// Start ping sender goroutine for ongoing pings
 				go func() {
-					// Send pings at half the timeout interval to ensure we stay within the window
+					// Send first ping immediately to catch timeout issues early
+					pingCtx, pingCancel := context.WithTimeout(connCtx, ws.pingWriteTimeout)
+					err := conn.Ping(pingCtx)
+					pingCancel()
+					if err != nil {
+						// First ping failed - close connection
+						connCancel(context.DeadlineExceeded)
+						return
+					}
+
+					// Calculate ticker interval (half the timeout to stay within window)
 					interval := ws.pingWriteTimeout / 2
 					if interval < time.Millisecond {
 						interval = time.Millisecond
@@ -331,6 +319,7 @@ func (ws *Websocket) run(ctx context.Context) {
 					ticker := time.NewTicker(interval)
 					defer ticker.Stop()
 
+					// Continue sending pings periodically
 					for {
 						select {
 						case <-connCtx.Done():
