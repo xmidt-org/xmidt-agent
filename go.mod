@@ -21,7 +21,7 @@ require (
 	github.com/xmidt-org/wrp-go/v5 v5.4.0
 	go.nanomsg.org/mangos/v3 v3.4.2
 	go.uber.org/fx v1.24.0
-	go.uber.org/zap v1.27.0
+	go.uber.org/zap v1.27.1
 	gopkg.in/dealancer/validate.v2 v2.1.0
 )
 
