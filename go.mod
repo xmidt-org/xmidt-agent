@@ -7,7 +7,7 @@ require (
 	github.com/coder/websocket v1.8.14
 	github.com/foxcpp/go-mockdns v1.2.0
 	github.com/google/uuid v1.6.0
-	github.com/goschtalt/goschtalt v0.27.0
+	github.com/goschtalt/goschtalt v0.28.1
 	github.com/goschtalt/properties-decoder v0.1.0
 	github.com/goschtalt/yaml-decoder v0.0.1
 	github.com/goschtalt/yaml-encoder v0.0.4
