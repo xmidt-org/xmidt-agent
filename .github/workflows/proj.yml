@@ -17,6 +17,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  package:
-    uses: xmidt-org/shared-go/.github/workflows/proj.yml@4468342f575e09429c1b04637dcda065145846e4 # v4.9.40
+  proj:
+    # yamllint disable-line
+    uses: xmidt-org/shared-go/.github/workflows/proj.yml@aff0471aa7e2f96ddb059beb178f63747a7cc57e # v4.9.41
     secrets: inherit
