@@ -14,7 +14,7 @@ require (
 	github.com/lestrrat-go/jwx/v2 v2.1.6
 	github.com/stretchr/testify v1.11.1
 	github.com/tinylib/msgp v1.6.3
-	github.com/xmidt-org/arrange v0.5.2
+	github.com/xmidt-org/arrange v0.5.3
 	github.com/xmidt-org/eventor v1.0.42
 	github.com/xmidt-org/retry v0.0.5
 	github.com/xmidt-org/sallust v0.2.4
