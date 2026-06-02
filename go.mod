@@ -1,6 +1,6 @@
 module github.com/xmidt-org/xmidt-agent
 
-go 1.24.2
+go 1.26
 
 require (
 	github.com/alecthomas/kong v1.15.0
@@ -17,7 +17,7 @@ require (
 	github.com/xmidt-org/arrange v0.5.5
 	github.com/xmidt-org/eventor v1.0.49
 	github.com/xmidt-org/retry v0.0.5
-	github.com/xmidt-org/sallust v0.2.6
+	github.com/xmidt-org/sallust v0.2.8
 	github.com/xmidt-org/wrp-go/v5 v5.4.2
 	go.nanomsg.org/mangos/v3 v3.4.2
 	go.uber.org/fx v1.24.0
@@ -57,7 +57,7 @@ require (
 	golang.org/x/mod v0.27.0 // indirect
 	golang.org/x/net v0.43.0 // indirect
 	golang.org/x/sync v0.16.0 // indirect
-	golang.org/x/sys v0.35.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/tools v0.36.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
