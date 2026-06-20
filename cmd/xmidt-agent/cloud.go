@@ -39,13 +39,12 @@ type cloudHandlerOut struct {
 }
 
 func provideCloudHandler(in CloudHandlerIn) (cloudHandlerOut, error) {
-	var opts []cloud.Option
-	opts = append(opts,
+	opts := []cloud.Option{
 		cloud.PreferQuic(in.Cloud.PreferQuic),
 		cloud.QuicClient(in.QuicClient),
 		cloud.Websocket(in.Websocket),
 		cloud.MaxTries(in.Cloud.MaxTries),
-	)
+	}
 
 	var (
 		msg, con, discon event.CancelFunc

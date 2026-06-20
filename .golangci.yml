@@ -18,6 +18,10 @@ linters:
   settings:
     errorlint:
       errorf: false
+    goconst:
+      min-len: 5
+      min-occurrences: 5
+      ignore-tests: true
     misspell:
       locale: US
   exclusions:
@@ -31,6 +35,8 @@ linters:
       - linters:
           - dupl
           - funlen
+          - goconst
+          - prealloc
         path: _test.go
       - linters:
           - gosec
@@ -38,7 +44,6 @@ linters:
       - linters:
           - bodyclose
           - errorlint
-          - goconst
           - gosec
           - govet
           - misspell

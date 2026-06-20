@@ -81,11 +81,11 @@ func (h myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go sendMessageFromServer(conn, suite, context.Background())
-	go listenForMessageFromClient(conn, suite, context.Background(), testId)
+	go sendMessageFromServer(conn)
+	go listenForMessageFromClient(conn, suite, context.Background(), testId) //nolint:gosec // G118: goroutine outlives request; r.Context() would cancel it
 }
 
-func sendMessageFromServer(conn *quic.Conn, suite *EToESuite, ctx context.Context) {
+func sendMessageFromServer(conn *quic.Conn) {
 	msg := GetWrpMessage("server")
 
 	stream, err := conn.OpenStream()
