@@ -3,7 +3,7 @@ module github.com/xmidt-org/xmidt-agent
 go 1.26
 
 require (
-	github.com/alecthomas/kong v1.15.0
+	github.com/alecthomas/kong v1.16.0
 	github.com/coder/websocket v1.8.15
 	github.com/foxcpp/go-mockdns v1.2.0
 	github.com/google/uuid v1.6.0
