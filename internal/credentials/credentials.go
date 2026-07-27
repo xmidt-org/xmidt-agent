@@ -265,7 +265,7 @@ func (c *Credentials) fetch(ctx context.Context) (*storage.Info, time.Duration, 
 	fe.UUID = tid
 
 	req.Header.Set("X-Midt-Boot-Retry-Wait", c.bootRetryWait.String())
-	req.Header.Set("X-Midt-Mac-Address", c.macAddress.ID())
+	req.Header.Set("X-Midt-Mac-Address", string(c.macAddress))
 	req.Header.Set("X-Midt-Serial-Number", c.serialNumber)
 	req.Header.Set("X-Midt-Uuid", tid.String())
 	req.Header.Set("X-Midt-Partner-Id", c.partnerID())
