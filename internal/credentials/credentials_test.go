@@ -263,50 +263,6 @@ func TestEndToEnd429(t *testing.T) {
 	assert.Equal(1, called)
 }
 
-func TestFetchRequestHeaders(t *testing.T) {
-	assert := assert.New(t)
-	require := require.New(t)
-
-	var gotHeader string
-	server := httptest.NewServer(
-		http.HandlerFunc(
-			func(w http.ResponseWriter, r *http.Request) {
-				gotHeader = r.Header.Get("X-Midt-Mac-Address")
-				r.Body.Close()
-				w.Header().Add("Expires", time.Now().Add(1*time.Hour).Format(http.TimeFormat))
-				_, _ = w.Write([]byte(`token`))
-			},
-		),
-	)
-	defer server.Close()
-
-	c, err := New(
-		URL(server.URL),
-		MacAddress(wrp.DeviceID("mac:112233445566")),
-		SerialNumber("1234567890"),
-		HardwareModel("model"),
-		HardwareManufacturer("manufacturer"),
-		FirmwareVersion("version"),
-		LastRebootReason("reason"),
-		XmidtProtocol("protocol"),
-		BootRetryWait(1),
-	)
-	require.NoError(err)
-	require.NotNil(c)
-
-	c.Start()
-	defer c.Stop()
-
-	ctx := context.Background()
-	deadline, cancel := context.WithDeadline(ctx, time.Now().Add(1*time.Second))
-	defer cancel()
-	c.WaitUntilValid(deadline)
-
-	// The header must include the full device ID with the "mac:" prefix so that
-	// themis populates the "device-id" claim correctly and talaria can parse it.
-	assert.Equal("mac:112233445566", gotHeader)
-}
-
 func TestEndToEndWithExpires(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
@@ -419,11 +375,12 @@ func TestEndToEnd(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
+	deviceID := wrp.DeviceID("mac:112233445566")
 	server := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				r.Body.Close()
-
+				assert.Equal(string(deviceID), r.Header.Get("X-Midt-Mac-Address"))
 				_, _ = w.Write([]byte(`token`))
 			},
 		),
@@ -434,7 +391,7 @@ func TestEndToEnd(t *testing.T) {
 
 	c, err := New(
 		URL(server.URL),
-		MacAddress(wrp.DeviceID("mac:112233445566")),
+		MacAddress(deviceID),
 		SerialNumber("1234567890"),
 		HardwareModel("model"),
 		HardwareManufacturer("manufacturer"),
