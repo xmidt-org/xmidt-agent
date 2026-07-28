@@ -1,6 +1,6 @@
 module github.com/xmidt-org/xmidt-agent
 
-go 1.26
+go 1.26.5
 
 require (
 	github.com/alecthomas/kong v1.16.0
