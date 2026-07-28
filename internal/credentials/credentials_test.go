@@ -380,7 +380,7 @@ func TestEndToEnd(t *testing.T) {
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				r.Body.Close()
-				assert.Equal(string(deviceID), r.Header.Get("X-Midt-Mac-Address"))
+				assert.Equal(deviceID.String(), r.Header.Get("X-Midt-Mac-Address"))
 				_, _ = w.Write([]byte(`token`))
 			},
 		),
