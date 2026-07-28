@@ -375,11 +375,12 @@ func TestEndToEnd(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
+	deviceID := wrp.DeviceID("mac:112233445566")
 	server := httptest.NewServer(
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				r.Body.Close()
-
+				assert.Equal(deviceID.String(), r.Header.Get("X-Midt-Mac-Address"))
 				_, _ = w.Write([]byte(`token`))
 			},
 		),
@@ -390,7 +391,7 @@ func TestEndToEnd(t *testing.T) {
 
 	c, err := New(
 		URL(server.URL),
-		MacAddress(wrp.DeviceID("mac:112233445566")),
+		MacAddress(deviceID),
 		SerialNumber("1234567890"),
 		HardwareModel("model"),
 		HardwareManufacturer("manufacturer"),
