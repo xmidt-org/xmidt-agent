@@ -12,7 +12,7 @@ require (
 	github.com/goschtalt/yaml-decoder v0.0.1
 	github.com/goschtalt/yaml-encoder v0.0.4
 	github.com/lestrrat-go/jwx/v2 v2.1.7
-	github.com/stretchr/testify v1.12.0
+	github.com/stretchr/testify v1.12.1
 	github.com/tinylib/msgp v1.6.4
 	github.com/xmidt-org/arrange v0.5.6
 	github.com/xmidt-org/eventor v1.0.49
@@ -28,6 +28,7 @@ require (
 require (
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/text v0.40.0 // indirect
 )
 
