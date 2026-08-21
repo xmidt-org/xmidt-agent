@@ -15,7 +15,7 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/tinylib/msgp v1.6.4
 	github.com/xmidt-org/arrange v0.5.7
-	github.com/xmidt-org/eventor v1.0.49
+	github.com/xmidt-org/eventor v1.0.50
 	github.com/xmidt-org/retry v0.0.6
 	github.com/xmidt-org/sallust v0.2.8
 	github.com/xmidt-org/wrp-go/v5 v5.4.5
