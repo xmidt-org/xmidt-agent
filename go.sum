@@ -92,8 +92,8 @@ github.com/xmidt-org/httpaux v0.4.3 h1:hrA8tAgMFoZkBZrysSmmait9CP7P3hMAYQjnpFJNq
 github.com/xmidt-org/httpaux v0.4.3/go.mod h1:Fb6nJXQFYa52T2GqclJL0Dbb+frEIank2amS+DerJf4=
 github.com/xmidt-org/retry v0.0.6 h1:GcCGYNcleTP0Q/p86JY8nTFgsnFzuA4vvc1NFP0Ad5U=
 github.com/xmidt-org/retry v0.0.6/go.mod h1:AN7G0GLNeEO3Yuma1t2/YwWgPhPBuxRbMxByuSBrTnI=
-github.com/xmidt-org/sallust v0.2.8 h1:SUvBdFL0PDrpW20T8VE6d4I8DKVtshhmJwlKoLx3ZJQ=
-github.com/xmidt-org/sallust v0.2.8/go.mod h1:IA73vXpu7XkmEWtG3qsxKLW7u6xTR5ZTRUTffP6uVXU=
+github.com/xmidt-org/sallust v0.2.9 h1:R41iDzhq3RzDX3qTJVNZHBqByAmyER7m1rLtWv5Vtlg=
+github.com/xmidt-org/sallust v0.2.9/go.mod h1:FBDOmfGlAPihf8aND9tbDKHCWAW1jstfBtYj1BY6I+8=
 github.com/xmidt-org/wrp-go/v5 v5.4.5 h1:KARq7pHL/eGWNU361d/OWwfngRCFiVmFFvzlrrD0RPU=
 github.com/xmidt-org/wrp-go/v5 v5.4.5/go.mod h1:iwThh1FGPlsPfgFu7NX4TjR6PhomJPv6dots8yc8/WI=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
