@@ -16,7 +16,7 @@ require (
 	github.com/tinylib/msgp v1.6.4
 	github.com/xmidt-org/arrange v0.5.8
 	github.com/xmidt-org/eventor v1.0.50
-	github.com/xmidt-org/retry v0.0.6
+	github.com/xmidt-org/retry v0.0.7
 	github.com/xmidt-org/sallust v0.2.10
 	github.com/xmidt-org/wrp-go/v5 v5.4.5
 	go.nanomsg.org/mangos/v3 v3.4.2
