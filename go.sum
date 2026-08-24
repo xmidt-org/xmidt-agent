@@ -94,8 +94,8 @@ github.com/xmidt-org/retry v0.0.6 h1:GcCGYNcleTP0Q/p86JY8nTFgsnFzuA4vvc1NFP0Ad5U
 github.com/xmidt-org/retry v0.0.6/go.mod h1:AN7G0GLNeEO3Yuma1t2/YwWgPhPBuxRbMxByuSBrTnI=
 github.com/xmidt-org/sallust v0.2.10 h1:q5RR3zZ22+FHIGGLNTlARdSqGKYVIQeWL320NybHhxk=
 github.com/xmidt-org/sallust v0.2.10/go.mod h1:SWs5tDl0oyi1bBgvVU8ucxaR1qjPO66ecyLW8/cAzUk=
-github.com/xmidt-org/wrp-go/v5 v5.4.5 h1:KARq7pHL/eGWNU361d/OWwfngRCFiVmFFvzlrrD0RPU=
-github.com/xmidt-org/wrp-go/v5 v5.4.5/go.mod h1:iwThh1FGPlsPfgFu7NX4TjR6PhomJPv6dots8yc8/WI=
+github.com/xmidt-org/wrp-go/v5 v5.4.6 h1:7v2jrC+42617ooTfCHzsYDLVXj5oM7njVqtGbNbTijM=
+github.com/xmidt-org/wrp-go/v5 v5.4.6/go.mod h1:qciLrhMJl22nZSqDNC7K1tH8S1HDmLBx2TtU4O6rL4Q=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 go.nanomsg.org/mangos/v3 v3.4.2 h1:gHlopxjWvJcVCcUilQIsRQk9jdj6/HB7wrTiUN8Ki7Q=
 go.nanomsg.org/mangos/v3 v3.4.2/go.mod h1:8+hjBMQub6HvXmuGvIq6hf19uxGQIjCofmc62lbedLA=
