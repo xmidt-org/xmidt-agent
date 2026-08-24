@@ -84,8 +84,8 @@ github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWD
 github.com/stretchr/testify v1.12.1/go.mod h1:MDEgiDPPsNp5cuIrHPPCyornHKgEVbtFUmoNlxoYthg=
 github.com/tinylib/msgp v1.6.4 h1:mOwYbyYDLPj35mkA2BjjYejgJk9BuHxDdvRnb6v2ZcQ=
 github.com/tinylib/msgp v1.6.4/go.mod h1:RSp0LW9oSxFut3KzESt5Voq4GVWyS+PSulT77roAqEA=
-github.com/xmidt-org/arrange v0.5.7 h1:dxd5gfij+yi4IpKH3u9rX7TpNTYJaXmIbjJNvnNUhSk=
-github.com/xmidt-org/arrange v0.5.7/go.mod h1:tUqiQLLGrWiJ7k52PLiHWrP6d7uNfrShuNhwhKZdK/0=
+github.com/xmidt-org/arrange v0.5.8 h1:0ZOplVBqa2DAq7xfYeR3j+BxUMppJqRjNenkhAP47n4=
+github.com/xmidt-org/arrange v0.5.8/go.mod h1:NThiyMoXKGlMPJ7Tc+lmjDGkiEtVW4XXWKh15v4/V+Q=
 github.com/xmidt-org/eventor v1.0.50 h1:ULd/oEGxjclejPnHW4idYnUJ3zEbOAj6fpZ1XADvf+0=
 github.com/xmidt-org/eventor v1.0.50/go.mod h1:Gh3TsQRRBx8zmMmY6oLIX0mV8UGZk/Mw6BDJdMcY0rY=
 github.com/xmidt-org/httpaux v0.4.3 h1:hrA8tAgMFoZkBZrysSmmait9CP7P3hMAYQjnpFJNqk8=
