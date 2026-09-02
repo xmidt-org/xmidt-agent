@@ -45,8 +45,7 @@ require (
 	github.com/magiconair/properties v1.8.10 // indirect
 	github.com/miekg/dns v1.1.62 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
-	github.com/quic-go/quic-go v0.61.0
-	github.com/rogpeppe/go-internal v1.13.1 // indirect
+	github.com/quic-go/quic-go v0.62.0
 	github.com/segmentio/asm v1.2.1 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/xmidt-org/httpaux v0.4.5 // indirect
