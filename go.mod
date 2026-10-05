@@ -5,7 +5,7 @@ go 1.26.5
 require (
 	github.com/alecthomas/kong v1.16.1
 	github.com/coder/websocket v1.8.15
-	github.com/foxcpp/go-mockdns v1.2.0
+	github.com/foxcpp/go-mockdns v1.3.0
 	github.com/google/uuid v1.6.0
 	github.com/goschtalt/goschtalt v0.28.1
 	github.com/goschtalt/properties-decoder v0.1.0
