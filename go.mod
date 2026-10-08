@@ -19,7 +19,7 @@ require (
 	github.com/xmidt-org/retry v0.0.7
 	github.com/xmidt-org/sallust v0.2.10
 	github.com/xmidt-org/wrp-go/v5 v5.4.6
-	go.nanomsg.org/mangos/v3 v3.4.2
+	go.nanomsg.org/mangos/v3 v3.5.0
 	go.uber.org/fx v1.24.0
 	go.uber.org/zap v1.28.0
 	gopkg.in/dealancer/validate.v2 v2.1.0
@@ -56,7 +56,7 @@ require (
 	golang.org/x/mod v0.37.0 // indirect
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/tools v0.47.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
