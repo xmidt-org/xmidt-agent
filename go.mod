@@ -18,7 +18,7 @@ require (
 	github.com/xmidt-org/eventor v1.0.50
 	github.com/xmidt-org/retry v0.0.8
 	github.com/xmidt-org/sallust v0.2.10
-	github.com/xmidt-org/wrp-go/v5 v5.4.6
+	github.com/xmidt-org/wrp-go/v5 v5.4.7
 	go.nanomsg.org/mangos/v3 v3.5.0
 	go.uber.org/fx v1.24.0
 	go.uber.org/zap v1.28.0
