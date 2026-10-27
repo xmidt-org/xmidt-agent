@@ -82,8 +82,8 @@ github.com/xmidt-org/eventor v1.0.50 h1:ULd/oEGxjclejPnHW4idYnUJ3zEbOAj6fpZ1XADv
 github.com/xmidt-org/eventor v1.0.50/go.mod h1:Gh3TsQRRBx8zmMmY6oLIX0mV8UGZk/Mw6BDJdMcY0rY=
 github.com/xmidt-org/httpaux v0.4.5 h1:+/YVnfWlUn7FJJbNguYgBPxzih32lPGEt30sSSPN2F0=
 github.com/xmidt-org/httpaux v0.4.5/go.mod h1:t+5YuVNn1vWYVVS30MbdprFEkSL+wWCrJWti+7LP+ls=
-github.com/xmidt-org/retry v0.0.8 h1:L9yHrtetRvew/0YvEBnrbjzVARYGCHGJJA20SeVIuBQ=
-github.com/xmidt-org/retry v0.0.8/go.mod h1:oGAxU4FN/EKp4eGhuiwmIRARo6ItURCneMuyJoR1Tm0=
+github.com/xmidt-org/retry v0.0.9 h1:w/wsmZjoi1lkT5Dks/k1uuApQIA68Z00h9jQeqDfIv0=
+github.com/xmidt-org/retry v0.0.9/go.mod h1:oGAxU4FN/EKp4eGhuiwmIRARo6ItURCneMuyJoR1Tm0=
 github.com/xmidt-org/sallust v0.2.10 h1:q5RR3zZ22+FHIGGLNTlARdSqGKYVIQeWL320NybHhxk=
 github.com/xmidt-org/sallust v0.2.10/go.mod h1:SWs5tDl0oyi1bBgvVU8ucxaR1qjPO66ecyLW8/cAzUk=
 github.com/xmidt-org/wrp-go/v5 v5.4.7 h1:BJuz1doC6emDJPli9vmXTsroKciU4CsBedu3YJYamv8=
