@@ -17,11 +17,11 @@ type fs struct {
 }
 
 // New creates a new fs struct with the specified base directory.  If the
-// directory does not exist, it is created with 0755 permissions.
+// directory does not exist, it is created with 0o755 permissions.
 func New(base string) (*fs, error) {
 	tmp := fs{}
 
-	err := xafs.Operate(&tmp, xafs.WithDirs(base, 0755))
+	err := xafs.Operate(&tmp, xafs.WithDirs(base, 0o755))
 	if err != nil {
 		return nil, err
 	}

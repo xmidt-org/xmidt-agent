@@ -14,6 +14,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials/event"
 	"github.com/xmidt-org/xmidt-agent/internal/fs/mem"
@@ -387,7 +388,7 @@ func TestEndToEnd(t *testing.T) {
 	)
 	defer server.Close()
 
-	fs := mem.New(mem.WithDir(".", 0755))
+	fs := mem.New(mem.WithDir(".", 0o755))
 
 	c, err := New(
 		URL(server.URL),
@@ -400,7 +401,7 @@ func TestEndToEnd(t *testing.T) {
 		XmidtProtocol("protocol"),
 		BootRetryWait(1),
 		AssumedLifetime(24*time.Hour),
-		LocalStorage(fs, "credentials.msgpack", 0600),
+		LocalStorage(fs, "credentials.msgpack", 0o600),
 		AddFetchListener(event.FetchListenerFunc(
 			func(e event.Fetch) {
 				fmt.Println("Fetch:")
@@ -579,7 +580,7 @@ func TestToAndFromFile(t *testing.T) {
 	)
 	defer server.Close()
 
-	fs := mem.New(mem.WithDir(".", 0755))
+	fs := mem.New(mem.WithDir(".", 0o755))
 
 	opts := []Option{
 		URL(server.URL),
@@ -591,7 +592,7 @@ func TestToAndFromFile(t *testing.T) {
 		LastRebootReason("reason"),
 		XmidtProtocol("protocol"),
 		BootRetryWait(1),
-		LocalStorage(fs, "credentials.msgpack", 0600),
+		LocalStorage(fs, "credentials.msgpack", 0o600),
 	}
 
 	var listenerCount int

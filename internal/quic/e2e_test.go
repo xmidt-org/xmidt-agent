@@ -12,13 +12,11 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
-	"log"
-
 	"fmt"
+	"log"
 	"math/big"
 	"net"
 	"net/http"
-
 	"sync/atomic"
 	"testing"
 	"time"
@@ -63,7 +61,7 @@ func (h myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if shouldRedirect {
 		suite.clientRedirected = true
 		fmt.Println("about to redirect")
-		http.Redirect(w, r, fmt.Sprintf("https://127.0.0.1:%s", remoteServerPort), http.StatusMovedPermanently)
+		http.Redirect(w, r, "https://127.0.0.1:"+remoteServerPort, http.StatusMovedPermanently)
 		w.Write([]byte("test body"))
 		fmt.Println("redirected")
 		return
@@ -82,7 +80,7 @@ func (h myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	go sendMessageFromServer(conn)
-	go listenForMessageFromClient(conn, suite, context.Background(), testId) //nolint:gosec // G118: goroutine outlives request; r.Context() would cancel it
+	go listenForMessageFromClient(conn, suite, context.Background(), testId)
 }
 
 func sendMessageFromServer(conn *quic.Conn) {
@@ -128,7 +126,7 @@ func listenForMessageFromClient(conn *quic.Conn, suite *EToESuite, ctx context.C
 func GetWrpMessage(origin string) wrp.Message {
 	return wrp.Message{
 		Type:        wrp.SimpleEventMessageType,
-		Source:      fmt.Sprintf("event:test.com/%s", origin),
+		Source:      "event:test.com/" + origin,
 		Destination: "mac:4ca161000109/mock_config",
 		PartnerIDs:  []string{"foobar"},
 	}

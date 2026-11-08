@@ -8,11 +8,12 @@ import (
 	"os"
 	"strings"
 
+	"go.uber.org/fx"
+	"go.uber.org/zap"
+
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/jwtxt"
 	"github.com/xmidt-org/xmidt-agent/internal/jwtxt/event"
-	"go.uber.org/fx"
-	"go.uber.org/zap"
 )
 
 type instructionsIn struct {

@@ -3,8 +3,6 @@
 
 package cloud
 
-import ()
-
 type Option interface {
 	apply(*Proxy) error
 }

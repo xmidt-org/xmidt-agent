@@ -13,6 +13,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/quic-go/quic-go"
+
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/event"

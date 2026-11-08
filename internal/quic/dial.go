@@ -6,7 +6,6 @@
 package quic
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -52,15 +51,19 @@ func (qd *QuicDialer) DialQuic(ctx context.Context, url *url.URL) (Connection, e
 		return nil, err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, url.String(), bytes.NewBuffer([]byte{}))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url.String(), http.NoBody)
 	if err != nil {
 		roundTripper.Close()
 		return nil, err
 	}
 
 	req.Header.Set("Content-Type", "application/msgpack")
-	qd.credDecorator(req.Header)
-	qd.conveyDecorator(req.Header)
+	if err = qd.credDecorator(req.Header); err != nil {
+		return nil, err
+	}
+	if err = qd.conveyDecorator(req.Header); err != nil {
+		return nil, err
+	}
 
 	err = reqStream.SendRequestHeader(req)
 	if err != nil {

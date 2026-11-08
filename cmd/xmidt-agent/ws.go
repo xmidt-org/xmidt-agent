@@ -8,14 +8,15 @@ import (
 	"errors"
 	"time"
 
+	"go.uber.org/fx"
+	"go.uber.org/zap"
+
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials"
 	"github.com/xmidt-org/xmidt-agent/internal/event"
 	"github.com/xmidt-org/xmidt-agent/internal/jwtxt"
 	"github.com/xmidt-org/xmidt-agent/internal/metadata"
 	"github.com/xmidt-org/xmidt-agent/internal/websocket"
-	"go.uber.org/fx"
-	"go.uber.org/zap"
 )
 
 var (
@@ -43,7 +44,7 @@ type wsOut struct {
 	Cancels []func() `group:"cancels,flatten"`
 }
 
-func provideWS(in WsIn) (wsOut, error) { //nolint
+func provideWS(in WsIn) (wsOut, error) { //nolint:govet // fx injects the input struct by value
 
 	var fetchURLFunc func(context.Context) (string, error)
 	// JWTXT is not required

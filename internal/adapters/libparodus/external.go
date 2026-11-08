@@ -8,12 +8,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/xmidt-org/wrp-go/v5"
-	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
-	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 	"go.nanomsg.org/mangos/v3"
 	"go.nanomsg.org/mangos/v3/protocol"
 	"go.nanomsg.org/mangos/v3/protocol/push"
+
+	"github.com/xmidt-org/wrp-go/v5"
+	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
+	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 )
 
 var (
@@ -150,7 +151,7 @@ func (s *external) keepalive(ctx context.Context) {
 	if err == nil {
 		for {
 			select {
-			case <-ctx.Done(): //context canceled
+			case <-ctx.Done(): // context canceled
 				break
 			case <-time.After(s.heartbeatInterval):
 			}

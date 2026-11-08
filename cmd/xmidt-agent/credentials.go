@@ -7,11 +7,12 @@ import (
 	"context"
 	"time"
 
+	"go.uber.org/fx"
+	"go.uber.org/zap"
+
 	"github.com/xmidt-org/xmidt-agent/internal/credentials"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials/event"
 	"github.com/xmidt-org/xmidt-agent/internal/fs"
-	"go.uber.org/fx"
-	"go.uber.org/zap"
 )
 
 const (

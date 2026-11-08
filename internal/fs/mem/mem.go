@@ -84,7 +84,7 @@ func WithDir(name string, perm iofs.FileMode) Option {
 // Implement the iofs.FS interface.
 
 func (fs *FS) Open(name string) (iofs.File, error) {
-	if err := fs.hasPerms(name, iofs.FileMode(0222)); err != nil {
+	if err := fs.hasPerms(name, iofs.FileMode(0o222)); err != nil {
 		return nil, err
 	}
 
@@ -106,7 +106,7 @@ func (fs *FS) Open(name string) (iofs.File, error) {
 
 func (fs *FS) Mkdir(path string, perm iofs.FileMode) error {
 	if path != separator {
-		if err := fs.hasPerms(path, iofs.FileMode(0111)); err != nil {
+		if err := fs.hasPerms(path, iofs.FileMode(0o111)); err != nil {
 			return err
 		}
 	}
@@ -145,7 +145,7 @@ func (fs *FS) MkdirAll(path string, perm iofs.FileMode) error {
 }
 
 func (fs *FS) ReadFile(name string) ([]byte, error) {
-	if err := fs.hasPerms(name, iofs.FileMode(0444)); err != nil {
+	if err := fs.hasPerms(name, iofs.FileMode(0o444)); err != nil {
 		return nil, err
 	}
 
@@ -156,7 +156,7 @@ func (fs *FS) ReadFile(name string) ([]byte, error) {
 }
 
 func (fs *FS) WriteFile(name string, data []byte, perm iofs.FileMode) error {
-	if err := fs.hasPerms(name, iofs.FileMode(0222)); err != nil {
+	if err := fs.hasPerms(name, iofs.FileMode(0o222)); err != nil {
 		return err
 	}
 
@@ -183,11 +183,11 @@ func (fs *FS) hasPerms(name string, perm iofs.FileMode) error {
 		if path != "." {
 			return iofs.ErrNotExist
 		}
-		// Default to 0755 for the root directory.
-		dir = 0755
+		// Default to 0o755 for the root directory.
+		dir = 0o755
 	}
 
-	if dir&iofs.FileMode(0111) == 0 {
+	if dir&iofs.FileMode(0o111) == 0 {
 		return fmt.Errorf("%w: dir named: '%s'", iofs.ErrPermission, path)
 	}
 

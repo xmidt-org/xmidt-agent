@@ -18,7 +18,7 @@ func main() {
 	id := os.Args[2]
 	pemFile := os.Args[3]
 
-	pem, err := os.ReadFile(pemFile) // nolint:gosec
+	pem, err := os.ReadFile(pemFile) //nolint:gosec // example reads a user supplied file
 	if err != nil {
 		panic(err)
 	}

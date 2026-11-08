@@ -12,17 +12,16 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/goschtalt/goschtalt"
+	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
+	"go.uber.org/zap"
+
 	"github.com/xmidt-org/sallust"
 	"github.com/xmidt-org/xmidt-agent/internal/adapters/libparodus"
 	"github.com/xmidt-org/xmidt-agent/internal/cloud"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials"
-	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/qos"
-
 	"github.com/xmidt-org/xmidt-agent/internal/loglevel"
-
-	"go.uber.org/fx"
-	"go.uber.org/fx/fxevent"
-	"go.uber.org/zap"
+	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/qos"
 )
 
 const (
@@ -133,7 +132,7 @@ func provideAppOptions(args []string) fx.Option {
 	)
 
 	if cli != nil && cli.Graph != "" {
-		_ = os.WriteFile(cli.Graph, []byte(g), 0600)
+		_ = os.WriteFile(cli.Graph, []byte(g), 0o600)
 	}
 
 	return opts
@@ -248,7 +247,7 @@ func provideLogger(in LoggerIn) (*zap.AtomicLevel, *zap.Logger, error) {
 }
 
 func onStart(cred *credentials.Credentials, cloudHandler cloud.Handler, libParodus *libparodus.Adapter, qos *qos.Handler, waitUntilFetched time.Duration, logger *zap.Logger) func(context.Context) error {
-	//logger = logger.Named("on_start")
+	// logger = logger.Named("on_start")
 
 	return func(ctx context.Context) (err error) {
 		if err = ctx.Err(); err != nil {

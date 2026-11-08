@@ -4,12 +4,11 @@
 package metadata
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
-
-	"encoding/base64"
 
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/net"
@@ -134,8 +133,8 @@ func (c *MetadataProvider) DecorateMsg(msg *wrp.Message) error {
 	}
 
 	for key, value := range m {
-		if value != nil {
-			msg.Metadata[key] = value.(string)
+		if s, ok := value.(string); ok {
+			msg.Metadata[key] = s
 		}
 	}
 

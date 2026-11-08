@@ -33,7 +33,7 @@ Device.Other.Thing.Something.Else=green
 Device.URL=https://fabric.xmidt.example.com
 `,
 			),
-			Mode: 0755,
+			Mode: 0o755,
 		},
 	}
 
@@ -195,7 +195,7 @@ func TestExternal_apply(t *testing.T) {
         - from: Device.URL # missing the to
 `,
 			),
-			Mode: 0755,
+			Mode: 0o755,
 		},
 		"one.txt": &fstest.MapFile{
 			Data: []byte(`
@@ -204,7 +204,7 @@ Device.Other.Thing.Something.Else=green
 Device.URL=https://fabric.xmidt.example.com
 `,
 			),
-			Mode: 0755,
+			Mode: 0o755,
 		},
 	}
 

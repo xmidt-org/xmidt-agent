@@ -17,6 +17,7 @@ import (
 	"time"
 
 	quic "github.com/quic-go/quic-go"
+
 	"github.com/xmidt-org/eventor"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v5"
@@ -109,7 +110,7 @@ type QuicClient struct {
 	rd Redirector
 
 	triesSinceLastConnect atomic.Int32
-	//done                  bool
+	// done                  bool
 }
 
 // Option is a functional option type for Quic.
@@ -137,7 +138,7 @@ func New(opts ...Option) (*QuicClient, error) {
 		credDecorator:      emptyDecorator,
 		conveyDecorator:    emptyDecorator,
 		conveyMsgDecorator: emptyMsgDecorator,
-		//done:            true,
+		// done:            true,
 	}
 
 	opts = append(opts,
@@ -157,8 +158,12 @@ func New(opts ...Option) (*QuicClient, error) {
 		}
 	}
 
-	qc.credDecorator(qc.additionalHeaders)
-	qc.conveyDecorator(qc.additionalHeaders)
+	if err := qc.credDecorator(qc.additionalHeaders); err != nil {
+		return nil, err
+	}
+	if err := qc.conveyDecorator(qc.additionalHeaders); err != nil {
+		return nil, err
+	}
 
 	// separating for test purposes but introduces tramp data
 	dialer := &QuicDialer{
@@ -204,7 +209,7 @@ func (qc *QuicClient) Start() {
 	ctx, qc.shutdown = context.WithCancel(context.Background())
 
 	go qc.run(ctx)
-	//qc.done = false
+	// qc.done = false
 }
 
 // Stop stops the quic connection.
@@ -222,7 +227,7 @@ func (qc *QuicClient) Stop() {
 
 	// run doesn't seem to exit until Stop() is finished so below
 	// is deadlocked
-	//qc.wg.Wait() // TODO - this is blocking forever
+	// qc.wg.Wait() // TODO - this is blocking forever
 	qc.shutdown = nil
 }
 
@@ -251,7 +256,7 @@ func (qc *QuicClient) Send(ctx context.Context, msg wrp.Message) error {
 	defer stream.Close()
 
 	fmt.Printf("before decorate %v", msg.Metadata)
-	qc.conveyMsgDecorator(&msg)
+	_ = qc.conveyMsgDecorator(&msg) // best effort
 	fmt.Printf("after decorate %v", msg.Metadata)
 
 	_, err = stream.Write(wrp.MustEncode(&msg, wrp.Msgpack))
@@ -287,8 +292,8 @@ func (qc *QuicClient) dial(ctx context.Context) (Connection, error) {
 }
 
 func (qc *QuicClient) run(ctx context.Context) {
-	//qc.wg.Add(1)  // see deadlock comment in Stop()
-	//defer qc.wg.Done()
+	// qc.wg.Add(1)  // see deadlock comment in Stop()
+	// defer qc.wg.Done()
 	defer qc.recordDone()
 
 	policy := qc.retryPolicyFactory.NewPolicy(ctx)
@@ -302,7 +307,7 @@ func (qc *QuicClient) run(ctx context.Context) {
 
 		// If auth fails, then continue with no credentials.
 
-		conn, dialErr := qc.dial(ctx) //nolint:bodyclose
+		conn, dialErr := qc.dial(ctx)
 		cEvent.At = qc.nowFunc()
 
 		if dialErr == nil {
@@ -329,7 +334,7 @@ func (qc *QuicClient) run(ctx context.Context) {
 				if err != nil {
 					cancel(nil)
 
-					qc.conn.CloseWithError(quic.ApplicationErrorCode(quic.StreamStateError), "error accepting stream")
+					_ = qc.conn.CloseWithError(quic.ApplicationErrorCode(quic.StreamStateError), "error accepting stream")
 
 					dEvent := event.Disconnect{
 						At:  qc.nowFunc(),
@@ -341,16 +346,17 @@ func (qc *QuicClient) run(ctx context.Context) {
 
 					break
 				}
-				defer stream.Close()
 
 				ctxErr := context.Cause(ctx)
 				// If ctxErr is context.Canceled then the parent context has been canceled.
 				if errors.Is(ctxErr, context.Canceled) {
 					cancel(nil)
+					_ = stream.Close()
 					break
 				}
 
 				data, err := readBytes(stream)
+				_ = stream.Close()
 				if err == nil {
 					decoder := wrp.NewDecoder(bytes.NewReader(data), wrp.Msgpack)
 					err = decoder.Decode(&msg)
@@ -361,7 +367,7 @@ func (qc *QuicClient) run(ctx context.Context) {
 				if err != nil {
 					// The connection gave us an unexpected message, or a message
 					// that could not be decoded.  Close & reconnect.
-					defer qc.conn.CloseWithError(quic.ApplicationErrorCode(quic.StreamStateError), "unable to decode wrp message")
+					_ = qc.conn.CloseWithError(quic.ApplicationErrorCode(quic.StreamStateError), "unable to decode wrp message")
 
 					dEvent := event.Disconnect{
 						At:  qc.nowFunc(),
@@ -377,9 +383,6 @@ func (qc *QuicClient) run(ctx context.Context) {
 				qc.msgListeners.Visit(func(l event.MsgListener) {
 					l.OnMessage(msg)
 				})
-
-				// close stream since we are staying in the read loop
-				stream.Close()
 			}
 		}
 
@@ -410,7 +413,7 @@ func (qc *QuicClient) run(ctx context.Context) {
 
 // debug print for deadlock
 func (qc *QuicClient) recordDone() {
-	//qc.done = true
+	// qc.done = true
 	fmt.Println("exiting quic run")
 }
 

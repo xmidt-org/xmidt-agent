@@ -16,6 +16,8 @@ import (
 	_ "github.com/goschtalt/properties-decoder"
 	_ "github.com/goschtalt/yaml-decoder"
 	_ "github.com/goschtalt/yaml-encoder"
+	"gopkg.in/dealancer/validate.v2"
+
 	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/sallust"
@@ -24,7 +26,6 @@ import (
 	"github.com/xmidt-org/xmidt-agent/internal/net"
 	myquic "github.com/xmidt-org/xmidt-agent/internal/quic"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/qos"
-	"gopkg.in/dealancer/validate.v2"
 )
 
 //go:embed default-config.yaml
@@ -313,7 +314,7 @@ func provideConfig(cli *CLI) (*goschtalt.Config, error) {
 	}
 
 	if cli.Default != "" {
-		err := os.WriteFile("./"+cli.Default, defaultConfigFile, 0644) // nolint: gosec
+		err := os.WriteFile("./"+cli.Default, defaultConfigFile, 0o644) //nolint:gosec // path comes from trusted configuration
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(-1)

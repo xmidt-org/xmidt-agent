@@ -6,9 +6,10 @@ package main
 import (
 	"errors"
 
+	"go.uber.org/fx"
+
 	"github.com/xmidt-org/xmidt-agent/internal/fs"
 	"github.com/xmidt-org/xmidt-agent/internal/fs/os"
-	"go.uber.org/fx"
 )
 
 func fsProvide() fx.Option {

@@ -23,43 +23,43 @@ func TestFS_Mkdir(t *testing.T) {
 		{
 			description: "simple rel path",
 			path:        "foo",
-			perm:        0755,
+			perm:        0o755,
 			expect: map[string]iofs.FileMode{
-				"foo": iofs.FileMode(0755),
+				"foo": iofs.FileMode(0o755),
 			},
 		}, {
 			description: "simple abs path",
 			fs: FS{
 				Dirs: map[string]iofs.FileMode{
-					"/": iofs.FileMode(0755),
+					"/": iofs.FileMode(0o755),
 				},
 			},
 			path: "/foo",
-			perm: 0755,
+			perm: 0o755,
 			expect: map[string]iofs.FileMode{
-				"/foo": iofs.FileMode(0755),
+				"/foo": iofs.FileMode(0o755),
 			},
 		}, {
 			description: "add a longer path",
 			fs: FS{
 				Dirs: map[string]iofs.FileMode{
-					"foo": iofs.FileMode(0755),
+					"foo": iofs.FileMode(0o755),
 				},
 			},
 			path: "foo/bar",
-			perm: 0755,
+			perm: 0o755,
 			expect: map[string]iofs.FileMode{
-				"foo/bar": iofs.FileMode(0755),
-				"foo":     iofs.FileMode(0755),
+				"foo/bar": iofs.FileMode(0o755),
+				"foo":     iofs.FileMode(0o755),
 			},
 		}, {
 			description: "fail on a longer path",
 			path:        "foo/bar",
-			perm:        0755,
+			perm:        0o755,
 			expectedErr: iofs.ErrNotExist,
 		}, {
 			description: "fail on an empty path",
-			perm:        0755,
+			perm:        0o755,
 			expectedErr: iofs.ErrInvalid,
 		}, {
 			description: "err path",
@@ -69,7 +69,7 @@ func TestFS_Mkdir(t *testing.T) {
 				},
 			},
 			path:        "foo",
-			perm:        0755,
+			perm:        0o755,
 			expectedErr: iofs.ErrInvalid,
 		},
 	}
@@ -99,30 +99,30 @@ func TestFS_MkdirAll(t *testing.T) {
 		{
 			description: "simple rel path",
 			path:        "foo",
-			perm:        0755,
+			perm:        0o755,
 			expect: map[string]iofs.FileMode{
-				"foo": iofs.FileMode(0755),
+				"foo": iofs.FileMode(0o755),
 			},
 		}, {
 			description: "simple abs path",
 			fs: FS{
 				Dirs: map[string]iofs.FileMode{
-					"/": iofs.FileMode(0755),
+					"/": iofs.FileMode(0o755),
 				},
 			},
 			path: "/foo",
-			perm: 0755,
+			perm: 0o755,
 			expect: map[string]iofs.FileMode{
-				"/foo": iofs.FileMode(0755),
+				"/foo": iofs.FileMode(0o755),
 			},
 		}, {
 			description: "simple longer path",
 			fs:          FS{},
 			path:        "foo/bar",
-			perm:        0755,
+			perm:        0o755,
 			expect: map[string]iofs.FileMode{
-				"foo":     iofs.FileMode(0755),
-				"foo/bar": iofs.FileMode(0755),
+				"foo":     iofs.FileMode(0o755),
+				"foo/bar": iofs.FileMode(0o755),
 			},
 		}, {
 			description: "err path",
@@ -132,7 +132,7 @@ func TestFS_MkdirAll(t *testing.T) {
 				},
 			},
 			path:        "foo",
-			perm:        0755,
+			perm:        0o755,
 			expectedErr: iofs.ErrInvalid,
 		},
 	}
@@ -163,7 +163,7 @@ func TestFS_ReadFile(t *testing.T) {
 				Files: map[string]File{
 					"foo.txt": {
 						Bytes: []byte("foo file"),
-						Perm:  0644,
+						Perm:  0o644,
 					},
 				},
 			},
@@ -175,11 +175,11 @@ func TestFS_ReadFile(t *testing.T) {
 				Files: map[string]File{
 					"bar/foo.txt": {
 						Bytes: []byte("foo file"),
-						Perm:  0644,
+						Perm:  0o644,
 					},
 				},
 				Dirs: map[string]iofs.FileMode{
-					"bar": iofs.FileMode(0755),
+					"bar": iofs.FileMode(0o755),
 				},
 			},
 			filename: "bar/foo.txt",
@@ -199,7 +199,7 @@ func TestFS_ReadFile(t *testing.T) {
 				Files: map[string]File{
 					"foo/bar.txt": {
 						Bytes: []byte("foo file"),
-						Perm:  0644,
+						Perm:  0o644,
 					},
 				},
 			},
@@ -211,11 +211,11 @@ func TestFS_ReadFile(t *testing.T) {
 				Files: map[string]File{
 					"foo/bar.txt": {
 						Bytes: []byte("foo file"),
-						Perm:  0644,
+						Perm:  0o644,
 					},
 				},
 				Dirs: map[string]iofs.FileMode{
-					"foo": iofs.FileMode(0644),
+					"foo": iofs.FileMode(0o644),
 				},
 			},
 			filename:    "foo/bar.txt",
@@ -226,7 +226,7 @@ func TestFS_ReadFile(t *testing.T) {
 				Files: map[string]File{
 					"foo.txt": {
 						Bytes: []byte("foo file"),
-						Perm:  0200,
+						Perm:  0o200,
 					},
 				},
 			},
@@ -238,11 +238,11 @@ func TestFS_ReadFile(t *testing.T) {
 				Files: map[string]File{
 					"foo.txt": {
 						Bytes: []byte("foo file"),
-						Perm:  0644,
+						Perm:  0o644,
 					},
 				},
 				Dirs: map[string]iofs.FileMode{
-					".": iofs.FileMode(0111),
+					".": iofs.FileMode(0o111),
 				},
 			},
 			filename:    "foo.txt",
@@ -279,12 +279,12 @@ func TestFS_WriteFile(t *testing.T) {
 			description: "simple rel path",
 			filename:    "foo.txt",
 			data:        "foo file",
-			perm:        0644,
+			perm:        0o644,
 			expect: FS{
 				Files: map[string]File{
 					"foo.txt": {
 						Bytes: []byte("foo file"),
-						Perm:  0644,
+						Perm:  0o644,
 					},
 				},
 			},
@@ -292,20 +292,20 @@ func TestFS_WriteFile(t *testing.T) {
 			description: "longer path",
 			filename:    "foo/bar.txt",
 			data:        "bar file",
-			perm:        0644,
+			perm:        0o644,
 			fs: FS{
 				Dirs: map[string]iofs.FileMode{
-					"foo": iofs.FileMode(0755),
+					"foo": iofs.FileMode(0o755),
 				},
 			},
 			expect: FS{
 				Dirs: map[string]iofs.FileMode{
-					"foo": iofs.FileMode(0755),
+					"foo": iofs.FileMode(0o755),
 				},
 				Files: map[string]File{
 					"foo/bar.txt": {
 						Bytes: []byte("bar file"),
-						Perm:  0644,
+						Perm:  0o644,
 					},
 				},
 			},
@@ -313,13 +313,13 @@ func TestFS_WriteFile(t *testing.T) {
 			description: "missing path",
 			filename:    "foo/bar.txt",
 			data:        "bar file",
-			perm:        0644,
+			perm:        0o644,
 			expectedErr: iofs.ErrNotExist,
 		}, {
 			description: "error path",
 			filename:    "foo.txt",
 			data:        "foo file",
-			perm:        0644,
+			perm:        0o644,
 			fs: FS{
 				Errs: map[string]error{
 					"foo.txt": iofs.ErrInvalid,
@@ -373,13 +373,13 @@ func TestFS_Open(t *testing.T) {
 				Files: map[string]File{
 					"foo.txt": {
 						Bytes: []byte("foo file"),
-						Perm:  0644,
+						Perm:  0o644,
 					},
 				},
 			},
 			expect: &File{
 				Bytes: []byte("foo file"),
-				Perm:  0644,
+				Perm:  0o644,
 				name:  "foo.txt",
 			},
 		}, {
@@ -387,11 +387,11 @@ func TestFS_Open(t *testing.T) {
 			name:        "foo",
 			fs: FS{
 				Dirs: map[string]iofs.FileMode{
-					"foo": iofs.FileMode(0755),
+					"foo": iofs.FileMode(0o755),
 				},
 			},
 			expect: &File{
-				Perm:  0755,
+				Perm:  0o755,
 				name:  "foo",
 				isDir: true,
 			},
@@ -442,30 +442,30 @@ func TestNew(t *testing.T) {
 		}, {
 			description: "with a file",
 			opts: []Option{
-				WithDir(".", 0755),
-				WithFile("foo.txt", "foo file", 0644),
+				WithDir(".", 0o755),
+				WithFile("foo.txt", "foo file", 0o644),
 			},
 			want: FS{
 				Files: map[string]File{
 					"foo.txt": {
 						Bytes: []byte("foo file"),
-						Perm:  0644,
+						Perm:  0o644,
 					},
 				},
 				Dirs: map[string]iofs.FileMode{
-					".": iofs.FileMode(0755),
+					".": iofs.FileMode(0o755),
 				},
 			},
 		}, {
 			description: "panic on WithDir",
 			opts: []Option{
-				WithDir("", 0755),
+				WithDir("", 0o755),
 			},
 			panics: true,
 		}, {
 			description: "panic on WithFile",
 			opts: []Option{
-				WithFile("", "", 0755),
+				WithFile("", "", 0o755),
 			},
 			panics: true,
 		},

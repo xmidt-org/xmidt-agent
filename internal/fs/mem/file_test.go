@@ -22,25 +22,25 @@ func TestFile_Stat(t *testing.T) {
 			description: "a simple file",
 			file: File{
 				Bytes: []byte("hello"),
-				Perm:  iofs.FileMode(0644),
+				Perm:  iofs.FileMode(0o644),
 				name:  "foo",
 			},
 			want: &fileInfo{
 				name:  "foo",
 				size:  5,
-				mode:  iofs.FileMode(0644),
+				mode:  iofs.FileMode(0o644),
 				isDir: false,
 			},
 		}, {
 			description: "a simple dir",
 			file: File{
-				Perm:  iofs.FileMode(0755),
+				Perm:  iofs.FileMode(0o755),
 				name:  "foo",
 				isDir: true,
 			},
 			want: &fileInfo{
 				name:  "foo",
-				mode:  iofs.FileMode(0755),
+				mode:  iofs.FileMode(0o755),
 				isDir: true,
 			},
 		},
@@ -76,7 +76,7 @@ func TestFile_Read(t *testing.T) {
 			description: "a simple file read",
 			file: File{
 				Bytes: []byte("hello"),
-				Perm:  iofs.FileMode(0644),
+				Perm:  iofs.FileMode(0o644),
 				name:  "foo",
 			},
 			buf:    make([]byte, 5),
@@ -86,7 +86,7 @@ func TestFile_Read(t *testing.T) {
 			description: "a simple file read that is shorter than the buffer",
 			file: File{
 				Bytes: []byte("hello"),
-				Perm:  iofs.FileMode(0644),
+				Perm:  iofs.FileMode(0o644),
 				name:  "foo",
 			},
 			buf:    make([]byte, 1),
@@ -95,7 +95,7 @@ func TestFile_Read(t *testing.T) {
 		}, {
 			description: "read an empty file",
 			file: File{
-				Perm: iofs.FileMode(0644),
+				Perm: iofs.FileMode(0o644),
 				name: "foo",
 			},
 			buf:         make([]byte, 5),
@@ -104,7 +104,7 @@ func TestFile_Read(t *testing.T) {
 		}, {
 			description: "read a directory",
 			file: File{
-				Perm:  iofs.FileMode(0755),
+				Perm:  iofs.FileMode(0o755),
 				name:  "foo",
 				isDir: true,
 			},
@@ -114,7 +114,7 @@ func TestFile_Read(t *testing.T) {
 		}, {
 			description: "read a closed file",
 			file: File{
-				Perm: iofs.FileMode(0644),
+				Perm: iofs.FileMode(0o644),
 				name: "foo",
 			},
 			before: func(file *File) {
@@ -127,7 +127,7 @@ func TestFile_Read(t *testing.T) {
 			description: "read a partially read file",
 			file: File{
 				Bytes: []byte("hello"),
-				Perm:  iofs.FileMode(0644),
+				Perm:  iofs.FileMode(0o644),
 				name:  "foo",
 			},
 			before: func(file *File) {

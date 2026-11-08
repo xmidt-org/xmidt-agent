@@ -4,8 +4,9 @@
 package main
 
 import (
-	"github.com/xmidt-org/xmidt-agent/internal/net"
 	"go.uber.org/fx"
+
+	"github.com/xmidt-org/xmidt-agent/internal/net"
 )
 
 type networkServiceIn struct {

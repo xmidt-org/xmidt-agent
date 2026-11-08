@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jws"
 	"github.com/lestrrat-go/jwx/v2/jwt"
+
 	"github.com/xmidt-org/eventor"
 	"github.com/xmidt-org/xmidt-agent/internal/jwtxt/event"
 )
@@ -102,7 +104,7 @@ func New(opts ...Option) (*Instructions, error) {
 		algorithms: map[jwa.SignatureAlgorithm]struct{}{},
 	}
 
-	full := append(opts,
+	full := append(slices.Clone(opts),
 		validateAlgs(),
 		validateBase(),
 		validateTheID(),
@@ -167,11 +169,9 @@ func (ins *Instructions) fetch(ctx context.Context) error {
 			fe.Server = dnsError.Server
 			fe.Timeout = dnsError.Timeout()
 			fe.TemporaryErr = dnsError.Temporary()
-		} else {
-			if ctx.Err() != nil {
-				fe.Timeout = true
-				fe.TemporaryErr = true
-			}
+		} else if ctx.Err() != nil {
+			fe.Timeout = true
+			fe.TemporaryErr = true
 		}
 		fe.Duration = time.Since(fe.At)
 		fe.Err = err
@@ -233,7 +233,7 @@ func (ins *Instructions) reassemble(lines []string) string {
 	// we can here, but don't be too strict.
 	var buf strings.Builder
 
-	for i := 0; i < len(parts); i++ {
+	for i := range len(parts) {
 		val, found := parts[getIndexString(i)]
 		if !found {
 			break
@@ -270,7 +270,7 @@ func (ins *Instructions) validate(input string) error {
 	ins.validUntil = token.Expiration().Local()
 
 	ep, _ := token.Get("endpoint")
-	ins.endpoint = ep.(string)
+	ins.endpoint, _ = ep.(string)
 
 	return nil
 }

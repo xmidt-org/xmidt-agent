@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	xafs "github.com/xmidt-org/xmidt-agent/internal/fs"
 	"github.com/xmidt-org/xmidt-agent/internal/fs/mem"
 )
@@ -29,103 +30,103 @@ func TestWithDirOrSimiar(t *testing.T) {
 	}{
 		{
 			description: "simple path",
-			opt:         xafs.WithDir("foo", 0755),
-			expect:      mem.New(mem.WithDir("foo", 0755)),
+			opt:         xafs.WithDir("foo", 0o755),
+			expect:      mem.New(mem.WithDir("foo", 0o755)),
 		}, {
 			description: "simple existing path",
-			opt:         xafs.WithDir("foo", 0755),
-			start:       mem.New(mem.WithDir("foo", 0755)),
-			expect:      mem.New(mem.WithDir("foo", 0755)),
+			opt:         xafs.WithDir("foo", 0o755),
+			start:       mem.New(mem.WithDir("foo", 0o755)),
+			expect:      mem.New(mem.WithDir("foo", 0o755)),
 		}, {
 			description: "not a directory",
-			opt:         xafs.WithDir("foo", 0755),
-			start:       mem.New(mem.WithFile("foo", "data", 0755)),
+			opt:         xafs.WithDir("foo", 0o755),
+			start:       mem.New(mem.WithFile("foo", "data", 0o755)),
 			expectErr:   xafs.ErrNotDirectory,
 		}, {
 			description: "error opening the file",
-			opt:         xafs.WithDir("foo", 0755),
+			opt:         xafs.WithDir("foo", 0o755),
 			start:       mem.New(mem.WithError("foo", errUnknown)),
 			expectErr:   errUnknown,
 		}, {
 			description: "three directory path",
 			opts: []xafs.Option{
-				xafs.WithDir("foo", 0700),
-				xafs.WithDir("foo/bar", 0750),
-				xafs.WithDir("foo/bar/car", 0755),
+				xafs.WithDir("foo", 0o700),
+				xafs.WithDir("foo/bar", 0o750),
+				xafs.WithDir("foo/bar/car", 0o755),
 			},
 			expect: mem.New(
-				mem.WithDir("foo", 0700),
-				mem.WithDir("foo/bar", 0750),
-				mem.WithDir("foo/bar/car", 0755),
+				mem.WithDir("foo", 0o700),
+				mem.WithDir("foo/bar", 0o750),
+				mem.WithDir("foo/bar/car", 0o755),
 			),
 		}, {
 			description: "abs directory path",
-			start:       mem.New(mem.WithDir("/", 0755)),
+			start:       mem.New(mem.WithDir("/", 0o755)),
 			opts: []xafs.Option{
-				xafs.WithDir("/foo", 0700),
-				xafs.WithDir("/foo/bar", 0750),
-				xafs.WithDir("/foo/bar/car", 0755),
+				xafs.WithDir("/foo", 0o700),
+				xafs.WithDir("/foo/bar", 0o750),
+				xafs.WithDir("/foo/bar/car", 0o755),
 			},
 			expect: mem.New(
-				mem.WithDir("/", 0755),
-				mem.WithDir("/foo", 0700),
-				mem.WithDir("/foo/bar", 0750),
-				mem.WithDir("/foo/bar/car", 0755),
+				mem.WithDir("/", 0o755),
+				mem.WithDir("/foo", 0o700),
+				mem.WithDir("/foo/bar", 0o750),
+				mem.WithDir("/foo/bar/car", 0o755),
 			),
 		}, {
 			description: "WithDirs three directory path",
 			start:       mem.New(),
 			opts: []xafs.Option{
-				xafs.WithDirs("foo/bar/car", 0755),
+				xafs.WithDirs("foo/bar/car", 0o755),
 			},
 			expect: mem.New(
-				mem.WithDir("foo", 0755),
-				mem.WithDir("foo/bar", 0755),
-				mem.WithDir("foo/bar/car", 0755),
+				mem.WithDir("foo", 0o755),
+				mem.WithDir("foo/bar", 0o755),
+				mem.WithDir("foo/bar/car", 0o755),
 			),
 		}, {
 			description: "WithDirs three directory path one exists",
-			start:       mem.New(mem.WithDir("foo", 0711)),
+			start:       mem.New(mem.WithDir("foo", 0o711)),
 			opts: []xafs.Option{
-				xafs.WithDirs("foo/bar/car", 0755),
+				xafs.WithDirs("foo/bar/car", 0o755),
 			},
 			expect: mem.New(
-				mem.WithDir("foo", 0711),
-				mem.WithDir("foo/bar", 0755),
-				mem.WithDir("foo/bar/car", 0755),
+				mem.WithDir("foo", 0o711),
+				mem.WithDir("foo/bar", 0o755),
+				mem.WithDir("foo/bar/car", 0o755),
 			),
 		}, {
 			description: "abs three directory path",
-			start:       mem.New(mem.WithDir("/", 0700)),
+			start:       mem.New(mem.WithDir("/", 0o700)),
 			opts: []xafs.Option{
-				xafs.WithDirs("/boo/egg/cat", 0755),
+				xafs.WithDirs("/boo/egg/cat", 0o755),
 			},
 			expect: mem.New(
-				mem.WithDir("/", 0700),
-				mem.WithDir("/boo", 0755),
-				mem.WithDir("/boo/egg", 0755),
-				mem.WithDir("/boo/egg/cat", 0755),
+				mem.WithDir("/", 0o700),
+				mem.WithDir("/boo", 0o755),
+				mem.WithDir("/boo/egg", 0o755),
+				mem.WithDir("/boo/egg/cat", 0o755),
 			),
 		}, {
 			description: "WithPath two directory path one exists, and a filename",
-			start:       mem.New(mem.WithDir("foo", 0711)),
+			start:       mem.New(mem.WithDir("foo", 0o711)),
 			opts: []xafs.Option{
-				xafs.WithPath("foo/bar/car.json", 0755),
+				xafs.WithPath("foo/bar/car.json", 0o755),
 			},
 			expect: mem.New(
-				mem.WithDir("foo", 0711),
-				mem.WithDir("foo/bar", 0755),
+				mem.WithDir("foo", 0o711),
+				mem.WithDir("foo/bar", 0o755),
 			),
 		}, {
 			description: "Ensure Operate can handle nil options",
-			start:       mem.New(mem.WithDir("foo", 0711)),
+			start:       mem.New(mem.WithDir("foo", 0o711)),
 			opts: []xafs.Option{
 				nil,
-				xafs.WithPath("foo/bar/car.json", 0755),
+				xafs.WithPath("foo/bar/car.json", 0o755),
 			},
 			expect: mem.New(
-				mem.WithDir("foo", 0711),
-				mem.WithDir("foo/bar", 0755),
+				mem.WithDir("foo", 0o711),
+				mem.WithDir("foo/bar", 0o755),
 			),
 		},
 	}
@@ -175,27 +176,27 @@ func TestReadFileWithSHA256(t *testing.T) {
 			description: "simple path",
 			filename:    "./foo",
 			start: mem.New(
-				mem.WithDir(".", 0755),
-				mem.WithFile("./foo", "text\n", 0644),
-				mem.WithFile("./foo.sha256", "b9e68e1bea3e5b19ca6b2f98b73a54b73daafaa250484902e09982e07a12e733  foo\n", 0644),
+				mem.WithDir(".", 0o755),
+				mem.WithFile("./foo", "text\n", 0o644),
+				mem.WithFile("./foo.sha256", "b9e68e1bea3e5b19ca6b2f98b73a54b73daafaa250484902e09982e07a12e733  foo\n", 0o644),
 			),
 			expect: "text\n",
 		}, {
 			description: "no ./ prefix",
 			filename:    "foo",
 			start: mem.New(
-				mem.WithDir(".", 0755),
-				mem.WithFile("foo", "text\n", 0644),
-				mem.WithFile("foo.sha256", "b9e68e1bea3e5b19ca6b2f98b73a54b73daafaa250484902e09982e07a12e733  foo\n", 0644),
+				mem.WithDir(".", 0o755),
+				mem.WithFile("foo", "text\n", 0o644),
+				mem.WithFile("foo.sha256", "b9e68e1bea3e5b19ca6b2f98b73a54b73daafaa250484902e09982e07a12e733  foo\n", 0o644),
 			),
 			expect: "text\n",
 		}, {
 			description: "deeper path",
 			filename:    "cat/foo",
 			start: mem.New(
-				mem.WithDir("cat", 0755),
-				mem.WithFile("cat/foo", "text\n", 0644),
-				mem.WithFile("cat/foo.sha256", "b9e68e1bea3e5b19ca6b2f98b73a54b73daafaa250484902e09982e07a12e733  foo\n", 0644),
+				mem.WithDir("cat", 0o755),
+				mem.WithFile("cat/foo", "text\n", 0o644),
+				mem.WithFile("cat/foo.sha256", "b9e68e1bea3e5b19ca6b2f98b73a54b73daafaa250484902e09982e07a12e733  foo\n", 0o644),
 			),
 			expect: "text\n",
 		}, {
@@ -207,17 +208,17 @@ func TestReadFileWithSHA256(t *testing.T) {
 			description: "no sha256 file",
 			filename:    "./foo",
 			start: mem.New(
-				mem.WithDir(".", 0755),
-				mem.WithFile("./foo", "text\n", 0644),
+				mem.WithDir(".", 0o755),
+				mem.WithFile("./foo", "text\n", 0o644),
 			),
 			expectErr: fs.ErrNotExist,
 		}, {
 			description: "invalid sha",
 			filename:    "./foo",
 			start: mem.New(
-				mem.WithDir(".", 0755),
-				mem.WithFile("./foo", "text\n", 0644),
-				mem.WithFile("./foo.sha256", "0000000000000000000000000000000000000000000000000000000000000000  foo\n", 0644),
+				mem.WithDir(".", 0o755),
+				mem.WithFile("./foo", "text\n", 0o644),
+				mem.WithFile("./foo.sha256", "0000000000000000000000000000000000000000000000000000000000000000  foo\n", 0o644),
 			),
 			expectErr: xafs.ErrInvalidSHA,
 		},
@@ -258,71 +259,71 @@ func TestWriteileWithSHA256(t *testing.T) {
 			description: "simple path",
 			filename:    "./foo",
 			data:        "text\n",
-			perm:        0644,
-			start:       mem.New(mem.WithDir(".", 0755)),
+			perm:        0o644,
+			start:       mem.New(mem.WithDir(".", 0o755)),
 			expect: mem.New(
-				mem.WithDir(".", 0755),
-				mem.WithFile("./foo", "text\n", 0644),
-				mem.WithFile("./foo.sha256", "b9e68e1bea3e5b19ca6b2f98b73a54b73daafaa250484902e09982e07a12e733  foo\n", 0644),
+				mem.WithDir(".", 0o755),
+				mem.WithFile("./foo", "text\n", 0o644),
+				mem.WithFile("./foo.sha256", "b9e68e1bea3e5b19ca6b2f98b73a54b73daafaa250484902e09982e07a12e733  foo\n", 0o644),
 			),
 		}, {
 			description: "no ./ prefix",
 			filename:    "foo",
 			data:        "text\n",
-			perm:        0644,
-			start:       mem.New(mem.WithDir(".", 0755)),
+			perm:        0o644,
+			start:       mem.New(mem.WithDir(".", 0o755)),
 			expect: mem.New(
-				mem.WithDir(".", 0755),
-				mem.WithFile("foo", "text\n", 0644),
-				mem.WithFile("foo.sha256", "b9e68e1bea3e5b19ca6b2f98b73a54b73daafaa250484902e09982e07a12e733  foo\n", 0644)),
+				mem.WithDir(".", 0o755),
+				mem.WithFile("foo", "text\n", 0o644),
+				mem.WithFile("foo.sha256", "b9e68e1bea3e5b19ca6b2f98b73a54b73daafaa250484902e09982e07a12e733  foo\n", 0o644)),
 		}, {
 			description: "deeper path",
 			filename:    "cat/foo",
 			data:        "text\n",
-			perm:        0644,
-			start:       mem.New(mem.WithDir("cat", 0755)),
+			perm:        0o644,
+			start:       mem.New(mem.WithDir("cat", 0o755)),
 			expect: mem.New(
-				mem.WithDir("cat", 0755),
-				mem.WithFile("cat/foo", "text\n", 0644),
-				mem.WithFile("cat/foo.sha256", "b9e68e1bea3e5b19ca6b2f98b73a54b73daafaa250484902e09982e07a12e733  foo\n", 0644)),
+				mem.WithDir("cat", 0o755),
+				mem.WithFile("cat/foo", "text\n", 0o644),
+				mem.WithFile("cat/foo.sha256", "b9e68e1bea3e5b19ca6b2f98b73a54b73daafaa250484902e09982e07a12e733  foo\n", 0o644)),
 		}, {
 			description: "over files",
 			filename:    "foo",
 			data:        "text\n",
-			perm:        0644,
+			perm:        0o644,
 			start: mem.New(
-				mem.WithDir(".", 0755),
-				mem.WithFile("foo", "some other text\n", 0644),
-				mem.WithFile("foo.sha256", "0000000000000000000000000000000000000000000000000000000000000000  foo\n", 0644)),
+				mem.WithDir(".", 0o755),
+				mem.WithFile("foo", "some other text\n", 0o644),
+				mem.WithFile("foo.sha256", "0000000000000000000000000000000000000000000000000000000000000000  foo\n", 0o644)),
 			expect: mem.New(
-				mem.WithDir(".", 0755),
-				mem.WithFile("foo", "text\n", 0644),
-				mem.WithFile("foo.sha256", "b9e68e1bea3e5b19ca6b2f98b73a54b73daafaa250484902e09982e07a12e733  foo\n", 0644)),
+				mem.WithDir(".", 0o755),
+				mem.WithFile("foo", "text\n", 0o644),
+				mem.WithFile("foo.sha256", "b9e68e1bea3e5b19ca6b2f98b73a54b73daafaa250484902e09982e07a12e733  foo\n", 0o644)),
 		}, {
 			description: "unable to write to file",
 			filename:    "foo",
 			data:        "text\n",
-			perm:        0644,
+			perm:        0o644,
 			start: mem.New(
-				mem.WithDir(".", 0755),
+				mem.WithDir(".", 0o755),
 				mem.WithError("foo", errUnknown)),
 			expectErr: errUnknown,
 			expect: mem.New(
-				mem.WithDir(".", 0755),
+				mem.WithDir(".", 0o755),
 				mem.WithError("foo", errUnknown)),
 		}, {
 			description: "unable to write to sha file",
 			filename:    "foo",
 			data:        "text\n",
-			perm:        0644,
+			perm:        0o644,
 			start: mem.New(
-				mem.WithDir(".", 0755),
+				mem.WithDir(".", 0o755),
 				mem.WithError("foo.sha256", errUnknown),
 			),
 			expectErr: errUnknown,
 			expect: mem.New(
-				mem.WithDir(".", 0755),
-				mem.WithFile("foo", "text\n", 0644),
+				mem.WithDir(".", 0o755),
+				mem.WithFile("foo", "text\n", 0o644),
 				mem.WithError("foo.sha256", errUnknown)),
 		},
 	}

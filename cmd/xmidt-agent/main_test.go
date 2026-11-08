@@ -13,6 +13,7 @@ import (
 	_ "github.com/goschtalt/yaml-encoder"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"github.com/xmidt-org/sallust"
 )
 

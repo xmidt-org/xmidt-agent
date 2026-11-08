@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	ErrInvalidInput = fmt.Errorf("invalid input")
+	ErrInvalidInput = errors.New("invalid input")
 )
 
 const (

@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	ErrInvalidInput = fmt.Errorf("invalid input")
-	ErrUnauthorized = fmt.Errorf("unauthorized")
+	ErrInvalidInput = errors.New("invalid input")
+	ErrUnauthorized = errors.New("unauthorized")
 )
 
 const (

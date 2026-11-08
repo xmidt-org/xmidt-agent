@@ -3,27 +3,64 @@
 ---
 version: "2"
 linters:
+  default: standard
   enable:
+    - asasalint
+    - asciicheck
+    - bidichk
     - bodyclose
+    - copyloopvar
     - dupl
+    - durationcheck
+    - errname
     - errorlint
+    - exhaustive
+    - fatcontext
+    - forcetypeassert
+    - gocheckcompilerdirectives
     - goconst
+    - gocritic
     - gosec
+    - intrange
+    - makezero
     - misspell
+    - nilerr
+    - noctx
+    - nolintlint
+    - perfsprint
     - prealloc
+    - predeclared
+    - reassign
+    - rowserrcheck
+    - sqlclosecheck
     - unconvert
-  disable:
-    - errcheck
-    - ineffassign
+    - usestdlibvars
+    - wastedassign
   settings:
     errorlint:
-      errorf: false
+      errorf: true
+    exhaustive:
+      default-signifies-exhaustive: true
     goconst:
       min-len: 5
       min-occurrences: 5
-      ignore-tests: true
+      ignore-string-values: []
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+      disabled-checks:
+        - ifElseChain
+        - importShadow
+        - commentedOutCode
+        - unnamedResult
+        - whyNoLint
+        - sloppyReassign
     misspell:
       locale: US
+    nolintlint:
+      require-explanation: true
+      require-specific: true
   exclusions:
     generated: lax
     presets:
@@ -37,6 +74,13 @@ linters:
           - funlen
           - goconst
           - prealloc
+          - errcheck
+          - forcetypeassert
+          - exhaustive
+          - gocritic
+          - gosec
+          - noctx
+          - perfsprint
         path: _test.go
       - linters:
           - gosec
@@ -56,6 +100,15 @@ linters:
       - builtin$
       - examples$
 formatters:
+  enable:
+    - gci
+    - goimports
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/xmidt-org)
   exclusions:
     generated: lax
     paths:

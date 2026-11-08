@@ -6,17 +6,13 @@
 package quic
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
-	"errors"
-	"io"
-	"time"
-
 	"fmt"
-
+	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	quic "github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
@@ -57,24 +53,25 @@ func (r *UrlRedirector) GetUrl(ctx context.Context, inUrl *url.URL) (*url.URL, e
 		return http.ErrUseLastResponse
 	}
 
-	req, err := http.NewRequest(http.MethodPost, inUrl.String(), bytes.NewBuffer([]byte{}))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, inUrl.String(), http.NoBody)
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header.Set("Content-Type", "application/msgpack")
-	r.credDecorator(req.Header)
-	r.conveyDecorator(req.Header)
+	if err = r.credDecorator(req.Header); err != nil {
+		return nil, err
+	}
+	if err = r.conveyDecorator(req.Header); err != nil {
+		return nil, err
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = io.Copy(io.Discard, resp.Body)
-	if (err != nil) && errors.Is(err, io.EOF) {
-		err = nil
-	}
+	_, _ = io.Copy(io.Discard, resp.Body)
 
 	defer resp.Body.Close()
 

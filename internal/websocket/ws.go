@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+
 	"github.com/xmidt-org/arrange/arrangehttp"
 	"github.com/xmidt-org/eventor"
 	"github.com/xmidt-org/retry"
@@ -204,7 +205,7 @@ func (ws *Websocket) Stop() {
 	}
 
 	// TODO - run is not exiting until Stop() exits so this is causing deadlock
-	//ws.wg.Wait()
+	// ws.wg.Wait()
 }
 
 func (ws *Websocket) Name() string {
@@ -238,7 +239,7 @@ func (ws *Websocket) Send(ctx context.Context, msg wrp.Message) error {
 	ctx, cancel := context.WithTimeout(ctx, ws.sendTimeout)
 	defer cancel()
 
-	ws.conveyMsgDecorator(&msg)
+	_ = ws.conveyMsgDecorator(&msg) // best effort
 
 	ws.m.Lock()
 	if ws.conn != nil {
@@ -269,11 +270,11 @@ func (ws *Websocket) run(ctx context.Context) {
 		}
 
 		// If auth fails, then continue with no credentials.
-		ws.credDecorator(ws.additionalHeaders)
+		_ = ws.credDecorator(ws.additionalHeaders)
 
-		ws.conveyDecorator(ws.additionalHeaders)
+		_ = ws.conveyDecorator(ws.additionalHeaders)
 
-		conn, _, dialErr := ws.dial(ctx, mode) //nolint:bodyclose
+		conn, _, dialErr := ws.dial(ctx, mode) //nolint:bodyclose // the dial response is consumed by the dialer
 		cEvent.At = ws.nowFunc()
 
 		if dialErr == nil {
@@ -296,7 +297,6 @@ func (ws *Websocket) run(ctx context.Context) {
 
 			// Create a connection-level context for this connection session
 			connCtx, connCancel := context.WithCancelCause(ctx)
-			defer connCancel(nil)
 
 			// Start ping sender goroutine if pingWriteTimeout is configured
 			if ws.pingWriteTimeout > 0 {
@@ -403,6 +403,9 @@ func (ws *Websocket) run(ctx context.Context) {
 					l.OnMessage(msg)
 				})
 			}
+
+			// Stop the ping goroutines tied to this connection.
+			connCancel(nil)
 		}
 
 		ws.triesSinceLastConnect.Add(1)
@@ -547,7 +550,6 @@ func (ws *Websocket) newHTTPClient(mode event.IpMode) (*http.Client, error) {
 	dialer := &net.Dialer{
 		Timeout:   client.Timeout,
 		KeepAlive: ws.keepAliveInterval,
-		DualStack: false,
 	}
 	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 		return dialer.DialContext(ctx, string(mode), addr)

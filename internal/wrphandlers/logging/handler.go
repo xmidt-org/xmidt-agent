@@ -4,16 +4,17 @@
 package loghandler
 
 import (
-	"fmt"
+	"errors"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 var (
-	ErrInvalidInput = fmt.Errorf("invalid input")
+	ErrInvalidInput = errors.New("invalid input")
 )
 
 // Handler logs information about the message being processed and sends the

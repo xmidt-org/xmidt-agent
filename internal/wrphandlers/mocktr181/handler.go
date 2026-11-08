@@ -17,11 +17,11 @@ import (
 )
 
 var (
-	ErrInvalidInput           = fmt.Errorf("invalid input")
-	ErrInvalidFileInput       = fmt.Errorf("misconfigured file input")
-	ErrUnableToReadFile       = fmt.Errorf("unable to read file")
-	ErrInvalidPayload         = fmt.Errorf("invalid request payload")
-	ErrInvalidResponsePayload = fmt.Errorf("invalid response payload")
+	ErrInvalidInput           = errors.New("invalid input")
+	ErrInvalidFileInput       = errors.New("misconfigured file input")
+	ErrUnableToReadFile       = errors.New("unable to read file")
+	ErrInvalidPayload         = errors.New("invalid request payload")
+	ErrInvalidResponsePayload = errors.New("invalid response payload")
 )
 
 // Option is a functional option type for mocktr181 Handler.

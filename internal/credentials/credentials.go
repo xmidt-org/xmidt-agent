@@ -6,7 +6,6 @@ package credentials
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	iofs "io/fs"
 	"net/http"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	"github.com/xmidt-org/eventor"
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials/event"
@@ -23,12 +23,12 @@ import (
 )
 
 var (
-	ErrInvalidInput      = fmt.Errorf("invalid input")
-	ErrNilRequest        = fmt.Errorf("nil request")
-	ErrNoToken           = fmt.Errorf("no token")
-	ErrTokenExpired      = fmt.Errorf("token expired")
-	ErrFetchNotAttempted = fmt.Errorf("fetch not attempted")
-	ErrFetchFailed       = fmt.Errorf("fetch failed")
+	ErrInvalidInput      = errors.New("invalid input")
+	ErrNilRequest        = errors.New("nil request")
+	ErrNoToken           = errors.New("no token")
+	ErrTokenExpired      = errors.New("token expired")
+	ErrFetchNotAttempted = errors.New("fetch not attempted")
+	ErrFetchFailed       = errors.New("fetch failed")
 )
 
 const (
@@ -238,7 +238,7 @@ func (c *Credentials) decorate(headers http.Header) error {
 		return c.dispatch(e)
 	}
 
-	headers.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	headers.Set("Authorization", "Bearer "+token)
 
 	return c.dispatch(e)
 }
@@ -250,7 +250,7 @@ func (c *Credentials) fetch(ctx context.Context) (*storage.Info, time.Duration, 
 		Origin: "network",
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url, http.NoBody)
 	if err != nil {
 		fe.Err = errors.Join(err, ErrFetchNotAttempted)
 		return nil, 0, c.dispatch(fe)
@@ -390,7 +390,6 @@ func (c *Credentials) run(ctx context.Context) {
 		}
 
 		timer = time.NewTimer(next)
-		defer timer.Stop()
 
 		select {
 		case ch := <-c.wakeup:
@@ -400,9 +399,11 @@ func (c *Credentials) run(ctx context.Context) {
 				valid = false
 				c.m.Unlock()
 			}
+			timer.Stop()
 			ch <- struct{}{}
 		case <-timer.C:
 		case <-ctx.Done():
+			timer.Stop()
 			return
 		}
 	}

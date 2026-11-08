@@ -12,14 +12,15 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	"github.com/xmidt-org/eventor"
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 )
 
 var (
-	ErrInvalidInput = fmt.Errorf("invalid input")
-	ErrTimeout      = fmt.Errorf("timeout")
+	ErrInvalidInput = errors.New("invalid input")
+	ErrTimeout      = errors.New("timeout")
 )
 
 // CancelFunc removes the associated listener with and cancels any future events

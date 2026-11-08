@@ -11,6 +11,7 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jws"
+
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/jwtxt/event"
 )
@@ -301,7 +302,8 @@ func (makeSetOption) apply(ins *Instructions) error {
 	ins.set = jwk.NewSet()
 
 	for _, k := range ins.publicKeys {
-		ins.set.AddKey(k)
+		// AddKey only fails for a nil key, which validation rejects earlier.
+		_ = ins.set.AddKey(k)
 	}
 	return nil
 }

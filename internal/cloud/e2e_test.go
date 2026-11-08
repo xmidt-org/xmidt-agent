@@ -5,16 +5,10 @@ package cloud
 
 import (
 	"context"
-
 	"crypto/tls"
-
 	"errors"
-	"net/http/httptest"
-
-	"fmt"
-
 	"net/http"
-
+	"net/http/httptest"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -22,13 +16,13 @@ import (
 	"github.com/coder/websocket"
 	"github.com/quic-go/quic-go"
 	"github.com/stretchr/testify/suite"
-	qc "github.com/xmidt-org/xmidt-agent/internal/quic"
-	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 
 	"github.com/xmidt-org/retry"
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/event"
+	qc "github.com/xmidt-org/xmidt-agent/internal/quic"
 	ws "github.com/xmidt-org/xmidt-agent/internal/websocket"
+	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 )
 
 type key string
@@ -42,7 +36,7 @@ const (
 func GetWrpMessage(origin string) wrp.Message {
 	return wrp.Message{
 		Type:        wrp.SimpleEventMessageType,
-		Source:      fmt.Sprintf("event:test.com/%s", origin),
+		Source:      "event:test.com/" + origin,
 		Destination: "mac:4ca161000109/mock_config",
 		PartnerIDs:  []string{"foobar"},
 	}

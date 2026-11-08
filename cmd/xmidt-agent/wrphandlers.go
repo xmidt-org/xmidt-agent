@@ -5,6 +5,9 @@ package main
 import (
 	"errors"
 
+	"go.uber.org/fx"
+	"go.uber.org/zap"
+
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/cloud"
 	"github.com/xmidt-org/xmidt-agent/internal/event"
@@ -18,8 +21,6 @@ import (
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/qos"
 	"github.com/xmidt-org/xmidt-agent/internal/wrphandlers/xmidt_agent_crud"
 	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
-	"go.uber.org/fx"
-	"go.uber.org/zap"
 )
 
 var (

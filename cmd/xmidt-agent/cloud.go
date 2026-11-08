@@ -53,16 +53,21 @@ func provideCloudHandler(in CloudHandlerIn) (cloudHandlerOut, error) {
 
 	cloudProxy, err := cloud.New(opts...)
 	if err != nil {
-		err = errors.Join(ErrCloudConfig, err)
+		return cloudHandlerOut{}, errors.Join(ErrCloudConfig, err)
 	}
 
 	if in.CLI.Dev {
 		cancels = append(cancels, msg, con, discon)
 	}
 
+	wrpHandler, ok := any(cloudProxy).(wrpkit.Handler)
+	if !ok {
+		return cloudHandlerOut{}, errors.Join(ErrCloudConfig, errors.New("cloud proxy is not a wrpkit.Handler"))
+	}
+
 	return cloudHandlerOut{
 		CloudHandler: cloudProxy,
-		WrpHandler:   cloudProxy.(wrpkit.Handler),
+		WrpHandler:   wrpHandler,
 		Cancels:      cancels,
-	}, err
+	}, nil
 }

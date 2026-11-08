@@ -44,7 +44,7 @@ func (l *LogLevelService) SetLevel(level string, duration time.Duration) error {
 
 	go func() {
 		<-t.C
-		l.level.UnmarshalText(l.origLevel)
+		_ = l.level.UnmarshalText(l.origLevel) // origLevel was previously valid
 	}()
 
 	return nil

@@ -72,8 +72,13 @@ func New(opts ...Option) (Handler, error) {
 	p.AddProxyListeners(p.qc)
 	p.AddProxyListeners(p.ws)
 
-	p.qcMsgHandler = p.qc.(wrpkit.Handler)
-	p.wsMsgHandler = p.ws.(wrpkit.Handler)
+	var ok bool
+	if p.qcMsgHandler, ok = p.qc.(wrpkit.Handler); !ok {
+		return nil, errors.New("quic client does not implement wrpkit.Handler")
+	}
+	if p.wsMsgHandler, ok = p.ws.(wrpkit.Handler); !ok {
+		return nil, errors.New("websocket client does not implement wrpkit.Handler")
+	}
 
 	p.wg.Lock()
 	defer p.wg.Unlock()

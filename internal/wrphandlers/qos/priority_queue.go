@@ -193,7 +193,7 @@ func (pq *priorityQueue) Swap(i, j int) {
 }
 
 func (pq *priorityQueue) Push(x any) {
-	msg := x.(wrp.Message)
+	msg, _ := x.(wrp.Message)
 	pq.sizeBytes += int64(len(msg.Payload))
 
 	var qosExpires time.Duration

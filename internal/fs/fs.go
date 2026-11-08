@@ -42,10 +42,10 @@ func (f OptionFunc) Apply(fs FS) error {
 // Example:
 //
 //	Operate(fs,
-//		MakeDir("tmp", 0755),
-//		MakeDir("tmp/foo", 0755),
-//		MakeDir("tmp/foo/bar", 0755),
-//		WriteFile("tmp/foo/bar/baz.txt", []byte("hello world"), 0644))
+//		MakeDir("tmp", 0o755),
+//		MakeDir("tmp/foo", 0o755),
+//		MakeDir("tmp/foo/bar", 0o755),
+//		WriteFile("tmp/foo/bar/baz.txt", []byte("hello world"), 0o644))
 func Operate(f FS, opts ...Option) error {
 	for _, opt := range opts {
 		if opt == nil {

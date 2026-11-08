@@ -9,13 +9,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/xmidt-org/wrp-go/v5"
-	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
 	"go.nanomsg.org/mangos/v3"
 	"go.nanomsg.org/mangos/v3/protocol/pull"
+	_ "go.nanomsg.org/mangos/v3/transport/tcp" // register transports
 
-	// register transports
-	_ "go.nanomsg.org/mangos/v3/transport/tcp"
+	"github.com/xmidt-org/wrp-go/v5"
+	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
 )
 
 var (
@@ -187,7 +186,7 @@ func (a *Adapter) receive(ctx context.Context) {
 
 		switch msg.Type {
 		case wrp.ServiceRegistrationMessageType:
-			a.register(ctx, msg)
+			_ = a.register(ctx, msg) // best effort; failures are reported to the sender elsewhere
 		case wrp.Invalid0MessageType,
 			wrp.Invalid1MessageType,
 			wrp.ServiceAliveMessageType:

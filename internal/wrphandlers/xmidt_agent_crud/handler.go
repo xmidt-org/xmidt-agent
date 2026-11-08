@@ -47,19 +47,19 @@ func (h *Handler) HandleWrp(msg wrp.Message) error {
 	if err != nil {
 		statusCode := int64(http.StatusInternalServerError)
 		response.Status = &statusCode
-		response.Payload = []byte(fmt.Sprintf(`{statusCode: %d, message: "%s"}`, statusCode, err.Error()))
+		response.Payload = []byte(fmt.Sprintf(`{statusCode: %d, message: %q}`, statusCode, err.Error()))
 		return h.egress.HandleWrp(response)
 	}
 
 	statusCode := int64(http.StatusBadRequest)
-	payloadResponse := []byte(fmt.Sprintf(`{statusCode: %d, message: "%s"}`, statusCode, ""))
+	payloadResponse := []byte(fmt.Sprintf(`{statusCode: %d, message: %q}`, statusCode, ""))
 
 	switch msg.Type {
 	case wrp.UpdateMessageType:
 		statusCode, err = h.update(msg.Path, payload)
-		payloadResponse = []byte(fmt.Sprintf(`{statusCode: %d, message: "%s"}`, statusCode, ""))
+		payloadResponse = []byte(fmt.Sprintf(`{statusCode: %d, message: %q}`, statusCode, ""))
 		if err != nil {
-			payloadResponse = []byte(fmt.Sprintf(`{statusCode: %d, message: "%s"}`, statusCode, err.Error()))
+			payloadResponse = []byte(fmt.Sprintf(`{statusCode: %d, message: %q}`, statusCode, err.Error()))
 		}
 
 	default:

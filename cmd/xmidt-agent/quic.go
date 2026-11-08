@@ -8,10 +8,10 @@ import (
 	"errors"
 	"time"
 
-	"github.com/xmidt-org/wrp-go/v5"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
+	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/xmidt-agent/internal/credentials"
 	"github.com/xmidt-org/xmidt-agent/internal/event"
 	"github.com/xmidt-org/xmidt-agent/internal/jwtxt"
@@ -44,7 +44,7 @@ type quicOut struct {
 	Cancels []func() `group:"cancels,flatten"`
 }
 
-func provideQuic(in QuicIn) (quicOut, error) { //nolint
+func provideQuic(in QuicIn) (quicOut, error) { //nolint:govet // fx injects the input struct by value
 	var fetchURLFunc func(context.Context) (string, error)
 	// JWTXT is not required
 	// fetchURL() will use in.quic.BackUpURL if in.JWTXT is nil

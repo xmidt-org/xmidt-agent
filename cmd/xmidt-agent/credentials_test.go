@@ -7,9 +7,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/xmidt-org/xmidt-agent/internal/credentials"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
+
+	"github.com/xmidt-org/xmidt-agent/internal/credentials"
 )
 
 func Test_provideCredentials(t *testing.T) {

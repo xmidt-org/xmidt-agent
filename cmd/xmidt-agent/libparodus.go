@@ -6,9 +6,10 @@ package main
 import (
 	"errors"
 
+	"go.uber.org/fx"
+
 	"github.com/xmidt-org/xmidt-agent/internal/adapters/libparodus"
 	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
-	"go.uber.org/fx"
 )
 
 type libParodusIn struct {

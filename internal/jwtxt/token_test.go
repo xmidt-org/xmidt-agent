@@ -14,6 +14,7 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"github.com/xmidt-org/xmidt-agent/internal/jwtxt/event"
 )
 

@@ -6,10 +6,10 @@ package main
 import (
 	"time"
 
-	"github.com/xmidt-org/xmidt-agent/internal/metadata"
-
-	"github.com/xmidt-org/xmidt-agent/internal/net"
 	"go.uber.org/fx"
+
+	"github.com/xmidt-org/xmidt-agent/internal/metadata"
+	"github.com/xmidt-org/xmidt-agent/internal/net"
 )
 
 type metadataIn struct {

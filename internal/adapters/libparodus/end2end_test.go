@@ -13,12 +13,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/xmidt-org/wrp-go/v5"
-	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
-	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 	mangos "go.nanomsg.org/mangos/v3"
 	"go.nanomsg.org/mangos/v3/protocol/pull"
 	"go.nanomsg.org/mangos/v3/protocol/push"
+
+	"github.com/xmidt-org/wrp-go/v5"
+	"github.com/xmidt-org/xmidt-agent/internal/pubsub"
+	"github.com/xmidt-org/xmidt-agent/internal/wrpkit"
 )
 
 type mockLibParodus struct {
