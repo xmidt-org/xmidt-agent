@@ -14,7 +14,7 @@ require (
 	github.com/lestrrat-go/jwx/v2 v2.1.7
 	github.com/stretchr/testify v1.12.1
 	github.com/tinylib/msgp v1.6.5
-	github.com/xmidt-org/arrange v0.5.10
+	github.com/xmidt-org/arrange v0.5.11
 	github.com/xmidt-org/eventor v1.0.50
 	github.com/xmidt-org/retry v0.0.8
 	github.com/xmidt-org/sallust v0.2.10
@@ -48,7 +48,7 @@ require (
 	github.com/quic-go/quic-go v0.65.0
 	github.com/segmentio/asm v1.2.1 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
-	github.com/xmidt-org/httpaux v0.4.5 // indirect
+	github.com/xmidt-org/httpaux v0.4.6 // indirect
 	go.uber.org/dig v1.19.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.54.0 // indirect
