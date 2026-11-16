@@ -76,12 +76,12 @@ github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWD
 github.com/stretchr/testify v1.12.1/go.mod h1:MDEgiDPPsNp5cuIrHPPCyornHKgEVbtFUmoNlxoYthg=
 github.com/tinylib/msgp v1.6.5 h1:iAH6XTP7BpzErjBZlujJQXxA+GmRi2YWs6M4KdLtNbE=
 github.com/tinylib/msgp v1.6.5/go.mod h1:RSp0LW9oSxFut3KzESt5Voq4GVWyS+PSulT77roAqEA=
-github.com/xmidt-org/arrange v0.5.10 h1:nB3ufAq8wzZhD7CvJCJWDQ1v+AwMo7TFlR9v7azUQQM=
-github.com/xmidt-org/arrange v0.5.10/go.mod h1:c4aEwqmzU2UaJ8wJ4vW0cV3MWwxwtzvNpss12KN8tkA=
+github.com/xmidt-org/arrange v0.5.11 h1:NwCxEslt8sRN5fCmIsoH3CRu3cVzJhH9QaXSE22DZwg=
+github.com/xmidt-org/arrange v0.5.11/go.mod h1:zzwq31pHeUBocqUCu+91QNNnhJK2CoEVGhlQFsbouO0=
 github.com/xmidt-org/eventor v1.0.50 h1:ULd/oEGxjclejPnHW4idYnUJ3zEbOAj6fpZ1XADvf+0=
 github.com/xmidt-org/eventor v1.0.50/go.mod h1:Gh3TsQRRBx8zmMmY6oLIX0mV8UGZk/Mw6BDJdMcY0rY=
-github.com/xmidt-org/httpaux v0.4.5 h1:+/YVnfWlUn7FJJbNguYgBPxzih32lPGEt30sSSPN2F0=
-github.com/xmidt-org/httpaux v0.4.5/go.mod h1:t+5YuVNn1vWYVVS30MbdprFEkSL+wWCrJWti+7LP+ls=
+github.com/xmidt-org/httpaux v0.4.6 h1:EavMWP4BAmk+1VAThMhXW2YdUpfTDbIyydz/mCmZKEI=
+github.com/xmidt-org/httpaux v0.4.6/go.mod h1:t+5YuVNn1vWYVVS30MbdprFEkSL+wWCrJWti+7LP+ls=
 github.com/xmidt-org/retry v0.0.8 h1:L9yHrtetRvew/0YvEBnrbjzVARYGCHGJJA20SeVIuBQ=
 github.com/xmidt-org/retry v0.0.8/go.mod h1:oGAxU4FN/EKp4eGhuiwmIRARo6ItURCneMuyJoR1Tm0=
 github.com/xmidt-org/sallust v0.2.10 h1:q5RR3zZ22+FHIGGLNTlARdSqGKYVIQeWL320NybHhxk=
